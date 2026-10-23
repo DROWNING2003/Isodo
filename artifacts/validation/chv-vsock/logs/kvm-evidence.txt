@@ -1,0 +1,5 @@
+pid=30162
+/dev/kvm
+anon_inode:kvm-vm
+anon_inode:kvm-vcpu:0
+anon_inode:kvm-vcpu:1
