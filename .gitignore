@@ -1,0 +1,16 @@
+# Product prototype and imported workbench reference are kept locally for now.
+/prototype/
+/app/
+
+# Local development artifacts
+node_modules/
+dist/
+.DS_Store
+.env
+.env.*
+!.env.example
+
+# Go build/test output
+/bin/
+*.test
+coverage.out

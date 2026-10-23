@@ -1,0 +1,318 @@
+syntax = "proto3";
+
+package isodo.guest.v1;
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// Node-to-Guest API. This is not an E2B wire-compatible protocol.
+// Behavioral constraints and validation: specs/guest-protocol.md.
+service GuestService {
+  rpc Ready(google.protobuf.Empty) returns (ReadyResponse);
+  rpc StartProcess(StartProcessRequest) returns (ProcessInfo);
+  rpc GetProcess(ProcessRef) returns (ProcessInfo);
+  rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
+  rpc SubscribeProcess(SubscribeProcessRequest) returns (stream ProcessEvent);
+  rpc WriteInput(stream InputFrame) returns (stream InputAck);
+  rpc ResizeTerminal(ResizeTerminalRequest) returns (google.protobuf.Empty);
+  rpc SignalProcess(SignalProcessRequest) returns (google.protobuf.Empty);
+  rpc Stat(StatRequest) returns (FileInfo);
+  rpc ListDirectory(ListDirectoryRequest) returns (ListDirectoryResponse);
+  rpc ReadFile(ReadFileRequest) returns (stream ReadFileFrame);
+  rpc WriteFile(stream WriteFileFrame) returns (WriteFileResponse);
+  rpc MakeDirectory(MakeDirectoryRequest) returns (FileInfo);
+  rpc Remove(RemoveRequest) returns (google.protobuf.Empty);
+  rpc Move(MoveRequest) returns (FileInfo);
+}
+
+message RuntimeIdentity {
+  string sandbox_id = 1;
+  uint64 ownership_generation = 2;
+  string boot_id = 3;
+  string guest_epoch = 4; // New value for each Guest Agent process lifetime.
+}
+
+message ReadyResponse {
+  uint32 protocol_major = 1;
+  uint32 protocol_minor = 2;
+  RuntimeIdentity identity = 3;
+  string agent_version = 4;
+  repeated string capabilities = 5;
+  GuestLimits limits = 6;
+}
+
+message GuestLimits {
+  uint32 max_processes = 1;
+  uint32 max_terminals = 2;
+  uint32 max_subscribers_per_process = 3;
+  uint32 max_chunk_bytes = 4;
+  uint64 output_ring_bytes = 5;
+  uint32 result_retention_seconds = 6;
+  uint32 dedup_retention_seconds = 7;
+  uint64 max_file_bytes = 8;
+  uint32 max_file_transfers = 9;
+  uint32 max_grpc_message_bytes = 10;
+  uint32 max_retained_records = 11;
+  uint32 max_directory_entries = 12;
+}
+
+message ProcessRef {
+  RuntimeIdentity identity = 1;
+  string execution_id = 2;
+}
+
+message Command {
+  repeated string argv = 1; // No implicit shell expansion.
+}
+
+message TerminalSize {
+  uint32 rows = 1;
+  uint32 cols = 2;
+}
+
+message StartProcessRequest {
+  RuntimeIdentity identity = 1;
+  string request_id = 2; // Node-minted deduplication key.
+  Command command = 3;
+  optional string cwd = 4;
+  map<string, string> env = 5;
+  optional uint32 command_timeout_seconds = 6;
+  bool stdin_open = 7;
+  optional TerminalSize pty = 8; // Presence selects PTY mode.
+}
+
+enum ProcessState {
+  PROCESS_STATE_UNSPECIFIED = 0;
+  PROCESS_STATE_RUNNING = 1;
+  PROCESS_STATE_EXITED = 2;
+}
+
+enum ExitReason {
+  EXIT_REASON_UNSPECIFIED = 0;
+  EXIT_REASON_COMPLETED = 1;
+  EXIT_REASON_SIGNALED = 2;
+  EXIT_REASON_COMMAND_TIMEOUT = 3;
+}
+
+message ProcessExit {
+  optional int32 exit_code = 1; // Present only on normal wait status.
+  optional uint32 signal = 2; // Linux signal; never fabricated as an exit code.
+  ExitReason reason = 3;
+  google.protobuf.Timestamp exited_at = 4;
+  bool output_incomplete = 5;
+}
+
+message ProcessInfo {
+  ProcessRef ref = 1;
+  uint32 pid = 2; // Diagnostic, never a public selector.
+  ProcessState state = 3;
+  bool pty = 4;
+  bool stdin_open = 5;
+  google.protobuf.Timestamp started_at = 6;
+  optional ProcessExit result = 7;
+  uint64 first_available_seq = 8;
+  uint64 next_seq = 9;
+  optional google.protobuf.Timestamp result_expires_at = 10;
+}
+
+message ListProcessesRequest {
+  RuntimeIdentity identity = 1;
+  uint32 page_size = 2;
+  string page_token = 3;
+}
+
+message ListProcessesResponse {
+  repeated ProcessInfo processes = 1;
+  string next_page_token = 2;
+}
+
+message SubscribeProcessRequest {
+  ProcessRef ref = 1;
+  optional uint64 after_seq = 2; // Absent: replay currently retained events.
+}
+
+message Attached {
+  ProcessInfo process = 1; // First frame; does not create a new process.
+}
+
+enum OutputChannel {
+  OUTPUT_CHANNEL_UNSPECIFIED = 0;
+  OUTPUT_CHANNEL_STDOUT = 1;
+  OUTPUT_CHANNEL_STDERR = 2;
+  OUTPUT_CHANNEL_PTY = 3;
+}
+
+message ProcessOutput {
+  OutputChannel channel = 1;
+  bytes data = 2;
+}
+
+message OutputGap {
+  uint64 first_missing_seq = 1;
+  uint64 last_missing_seq = 2; // Inclusive.
+}
+
+message Heartbeat {}
+
+message ProcessEvent {
+  uint64 seq = 1; // Nonzero for output/exit; zero for subscription control frames.
+  oneof event {
+    Attached attached = 2;
+    ProcessOutput output = 3;
+    OutputGap gap = 4;
+    ProcessExit exit = 5;
+    Heartbeat heartbeat = 6;
+  }
+}
+
+message InputOpen {
+  ProcessRef ref = 1;
+}
+
+message InputFrame {
+  uint64 seq = 1; // Open=0; data/close_stdin=1,2,... per connection.
+  oneof frame {
+    InputOpen open = 2;
+    bytes data = 3;
+    google.protobuf.Empty close_stdin = 4; // Non-PTY only.
+  }
+}
+
+message InputAck {
+  uint64 accepted_seq = 1; // Open ack=0, subsequent ack after kernel write.
+  string writer_token = 2; // Issued by open; scoped to this input stream.
+}
+
+message ResizeTerminalRequest {
+  ProcessRef ref = 1;
+  string writer_token = 2;
+  TerminalSize size = 3;
+}
+
+enum ProcessSignal {
+  PROCESS_SIGNAL_UNSPECIFIED = 0;
+  PROCESS_SIGNAL_INTERRUPT = 1;
+  PROCESS_SIGNAL_TERMINATE = 2;
+  PROCESS_SIGNAL_KILL = 3;
+}
+
+message SignalProcessRequest {
+  ProcessRef ref = 1;
+  ProcessSignal signal = 2;
+}
+
+enum FileKind {
+  FILE_KIND_UNSPECIFIED = 0;
+  FILE_KIND_REGULAR = 1;
+  FILE_KIND_DIRECTORY = 2;
+  FILE_KIND_SYMLINK = 3;
+}
+
+message FileInfo {
+  string path = 1; // Absolute logical path beneath /workspace.
+  string name = 2;
+  FileKind kind = 3;
+  uint64 size_bytes = 4;
+  uint32 mode = 5;
+  google.protobuf.Timestamp modified_at = 6;
+  optional string symlink_target = 7; // Read as metadata, never followed.
+}
+
+message StatRequest {
+  RuntimeIdentity identity = 1;
+  string path = 2;
+}
+
+message ListDirectoryRequest {
+  RuntimeIdentity identity = 1;
+  string path = 2;
+  uint32 page_size = 3;
+  string page_token = 4;
+}
+
+message ListDirectoryResponse {
+  repeated FileInfo entries = 1;
+  string next_page_token = 2;
+}
+
+message ReadFileRequest {
+  RuntimeIdentity identity = 1;
+  string path = 2;
+}
+
+message ReadFileHeader {
+  FileInfo file = 1;
+}
+
+message FileChunk {
+  uint64 offset = 1;
+  bytes data = 2;
+}
+
+message ReadFileEnd {
+  uint64 size_bytes = 1;
+  bytes sha256 = 2; // Exactly 32 raw bytes.
+}
+
+message ReadFileFrame {
+  oneof frame {
+    ReadFileHeader header = 1;
+    FileChunk chunk = 2;
+    ReadFileEnd end = 3;
+  }
+}
+
+message WriteFileHeader {
+  RuntimeIdentity identity = 1;
+  string request_id = 2;
+  string path = 3;
+  uint64 size_bytes = 4;
+  bytes sha256 = 5; // Mandatory, exactly 32 raw bytes; includes empty files.
+  optional uint32 mode = 6;
+  bool overwrite = 7; // Default false.
+}
+
+message WriteFileFrame {
+  oneof frame {
+    WriteFileHeader header = 1;
+    FileChunk chunk = 2;
+  }
+}
+
+message WriteFileResponse {
+  FileInfo file = 1;
+  bytes sha256 = 2;
+  bool replayed = 3;
+}
+
+message MakeDirectoryRequest {
+  RuntimeIdentity identity = 1;
+  string request_id = 2;
+  string path = 3;
+  optional uint32 mode = 4;
+  bool parents = 5;
+}
+
+message RemoveRequest {
+  RuntimeIdentity identity = 1;
+  string request_id = 2;
+  string path = 3;
+  bool recursive = 4; // Default false.
+}
+
+message MoveRequest {
+  RuntimeIdentity identity = 1;
+  string request_id = 2;
+  string source = 3;
+  string destination = 4;
+  bool overwrite = 5; // Default false; directories never replaced.
+}
+
+// Serialized in google.rpc.Status.details as this protobuf Any type.
+// Transport uses standard gRPC status codes; no fabricated exit event on RPC failure.
+message ErrorDetail {
+  string code = 1;
+  string request_id = 2;
+  bool retryable = 3;
+  string field = 4;
+}

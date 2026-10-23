@@ -1,0 +1,4 @@
+MainPID=30162
+ControlGroup=/system.slice/isodo-validation-chv.service
+CPUQuotaPerSecUSec=2s
+MemoryMax=805306368
