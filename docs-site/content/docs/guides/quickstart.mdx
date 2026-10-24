@@ -1,0 +1,69 @@
+---
+title: 快速开始
+description: 在本地启动 Isodo 并调用公开 Sandbox API。
+---
+
+# 快速开始
+
+## 准备环境
+
+需要 Node.js 22.12 或更新版本、Go 工具链、Docker Compose，以及 Casdoor 的 GitHub Provider 配置。
+
+在仓库根目录初始化环境并启动依赖：
+
+```bash
+make init
+# 按 .env.example 中的说明配置 Casdoor 客户端信息
+make infra-up
+```
+
+启动 API 和 Web：
+
+```bash
+make api
+make web
+```
+
+Web 默认监听 `http://127.0.0.1:5734`，控制 API 默认监听 `http://127.0.0.1:8080`。本地 Casdoor 的地址和回调配置见 [身份认证](./authentication)。
+
+## 生成 API 客户端和文档
+
+修改 `api/openapi/openapi-public.yaml` 后，在仓库根目录运行：
+
+```bash
+make generate
+```
+
+这会更新 Go 路由绑定、Web TypeScript 客户端和 API Reference 的 MDX 页面。生成代码不应手动编辑。运行文档站：
+
+```bash
+make docs
+```
+
+然后打开 `http://127.0.0.1:3000/docs`。
+
+## 调用公开 API
+
+公开 API 需要有效会话、Casdoor Bearer Token 或 API Key。登录后可以在 Web 的“开发者 → API 密钥”创建 Key，并通过 `X-API-Key` 请求头发送。密钥仅在创建时展示一次。
+
+```bash
+curl http://127.0.0.1:8080/v1/sandboxes \
+  -H 'X-API-Key: <your-api-key>'
+```
+
+端点和请求响应模型以 [API Reference](/docs/api-reference) 中从 OpenAPI 契约生成的内容为准。
+
+## 指定模板
+
+创建时使用系统目录名称或个人模板 UUID，可追加 `:tag`；省略时选择 `linux-base:default`。平台需先在 Linux/KVM 节点完成 base 工件构建和发布，步骤见仓库 `images/linux-base/README.md`。
+
+```bash
+curl -X POST http://127.0.0.1:8080/v1/sandboxes \
+  -H 'X-API-Key: <your-api-key>' \
+  -H 'Content-Type: application/json' \
+  -d '{"name":"my-workspace","template":"linux-base"}'
+```
+
+响应中的 `template_id`、`template_build_id` 和 `template_digest` 是创建事务固定的来源。更新模板 tag 不会修改已有沙箱的来源。私有、已删除或没有 Ready build 的模板不能用于新建；统一返回 `TEMPLATE_NOT_FOUND`，避免暴露其他用户的模板信息。
+
+当前创建接口登记沙箱并固定来源，仍需以 `observed_state` 判断运行状态；Node 启动和路由发布链路尚在接入，创建记录不能视为 Guest 已可执行命令。

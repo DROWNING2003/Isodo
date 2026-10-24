@@ -1,0 +1,20 @@
+---
+title: Sandbox
+description: Isodo 中隔离工作空间的资源模型和状态。
+---
+
+# Sandbox
+
+Sandbox 是 Agent 执行任务时使用的隔离工作空间。每个 Sandbox 归属一个认证用户，公开 API 的读写操作都会检查所有权；访问不存在或属于其他用户的 ID 返回相同的未找到结果。
+
+## 状态
+
+API 模型区分期望状态（`desired_state`）和观测状态（`observed_state`）。期望状态表示用户希望达到的状态，观测状态由运行时执行后反馈。CRUD API 返回的 Sandbox 资源不等同于完整的 VM 或终端会话接口。
+
+## 元数据
+
+`metadata` 用于附加与产品相关的 JSON 属性。它不应承载凭证或其他需要保密的数据。Sandbox 的网络、持久盘、快照、任务和进程能力会在对应 API 契约明确后单独记录。
+
+## 生命周期 API
+
+公开 HTTP API 当前定义 Sandbox 列表、创建、读取、更新和删除操作。详细的鉴权方案、字段和错误模型见 [API Reference](/docs/api-reference)。
