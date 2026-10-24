@@ -2,6 +2,8 @@ syntax = "proto3";
 
 package isodo.guest.v1;
 
+option go_package = "github.com/DROWNING2003/Isodo/internal/api/guest/v1;guestv1";
+
 import "google/protobuf/empty.proto";
 import "google/protobuf/timestamp.proto";
 
@@ -9,6 +11,8 @@ import "google/protobuf/timestamp.proto";
 // Behavioral constraints and validation: specs/guest-protocol.md.
 service GuestService {
   rpc Ready(google.protobuf.Empty) returns (ReadyResponse);
+  // Bind a restored template Guest to one Node-owned Sandbox runtime identity.
+  rpc BindRuntime(BindRuntimeRequest) returns (ReadyResponse);
   rpc StartProcess(StartProcessRequest) returns (ProcessInfo);
   rpc GetProcess(ProcessRef) returns (ProcessInfo);
   rpc ListProcesses(ListProcessesRequest) returns (ListProcessesResponse);
@@ -39,6 +43,14 @@ message ReadyResponse {
   string agent_version = 4;
   repeated string capabilities = 5;
   GuestLimits limits = 6;
+  // False means this Guest is an unbound template and must reject workload RPCs.
+  bool runtime_bound = 7;
+}
+
+message BindRuntimeRequest {
+  string sandbox_id = 1;
+  uint64 ownership_generation = 2;
+  string boot_id = 3;
 }
 
 message GuestLimits {

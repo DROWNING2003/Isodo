@@ -1,0 +1,5 @@
+package: adminapi
+output: internal/api/admin/api.gen.go
+generate:
+  models: true
+  std-http-server: true

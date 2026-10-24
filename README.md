@@ -20,34 +20,54 @@ Isodo 面向使用 AI Agent 开发软件和处理日常任务的个人用户。�
 | 模板与快照 | 从用途模板创建环境；将文件和环境保存为快照，并可创建相互独立的新沙箱。 |
 | 个人云端资源 | 以套餐管理云端计算和快照存储权益；模型额度由用户自己的服务连接提供。 |
 
+## 本地 T3 沙箱开发
+
+在两个终端分别启动 Lima Node 和 Control API；API 默认选择本地 Lima 后端：
+
+```sh
+make node-local-t3
+make api
+```
+
+`make api` 会应用数据库迁移并生成仅用于本机 Node mTLS 的证书。登录后创建沙箱会写入 Control 数据库，再由 worker 调度到 Lima，Guest Ready 后启动 T3，并从沙箱卡片进入配对登录。此路径使用 Lima 自带 Linux 基础环境，不会伪造 CHV/S3 模板记录；云端 CHV 创建仍要求 Registry 已发布 `linux-base` Ready build。首次运行还需要按 `.env.example` 配置本地 Casdoor 的 GitHub OAuth 应用。
+
 ## 架构方向
 
 ```mermaid
 flowchart LR
     User[用户 / Web / CLI / 桌面端] --> API[Isodo Control API]
-    API --> DB[(控制面数据库)]
-    API --> Node[Linux Node Runtime]
-    Node --> VMM[Cloud Hypervisor 微型虚拟机]
+    API -->|事务写 Sandbox 与 outbox| DB[(PostgreSQL<br/>租户、持久资源、期望状态、操作)]
+    Worker[Control Worker<br/>Placement · Operation] -->|领取 outbox| DB
+    Worker -->|mTLS gRPC · node_id| Orch[Node Orchestrator]
+    Worker -->|active Sandbox records| Redis[(Redis)]
+    Orch -->|routing records| Redis
+    Relay[Sandbox Relay] -->|按 Sandbox ID 查询| Redis
+    Relay --> Orch
+    Orch --> VMM[Cloud Hypervisor 微型虚拟机]
     VMM --> Guest[Guest Agent]
     Guest --> Agent[Agent 与用户进程]
     Agent -->|经受控转发| Gateway[Connection Gateway]
     Gateway --> Secrets[(凭证库)]
-    Node --> Disk[(模板与沙箱磁盘)]
+    Orch --> Disk[(模板与沙箱磁盘)]
+    Template[Template Build Service] --> Artifacts[(SeaweedFS S3<br/>模板 manifest、kernel、rootfs)]
+    Orch -->|按 digest 校验与缓存| Artifacts
     API -.后续能力.-> Snapshot[(快照对象存储)]
 ```
 
-Control API 管理账号、沙箱资源与操作；Node Runtime 管理本机虚拟机、磁盘、网络和恢复；Guest Agent 提供安全的进程、PTY 与文件能力；Connection Gateway 在沙箱外执行获授权的外部调用。Nomad 部署平台服务和节点守护进程，单个沙箱由 Node Runtime 管理。
+Control API 在 PostgreSQL 事务中写入 Sandbox 与 outbox；Control Worker 领取 operation、完成 placement 后，使用 mTLS gRPC 将命令发送给指定 Node Orchestrator。Worker 将已确认运行的 Sandbox record 写入 Redis，Orchestrator 独立维护 Sandbox 到 Node 的 route record，PostgreSQL 保存持久租户与期望状态。Node Orchestrator 管理本机虚拟机、磁盘、网络和恢复；Guest Agent 提供安全的进程、PTY 与文件能力；Connection Gateway 在沙箱外执行获授权的外部调用。Redis 在线目录可从数据库分配关系与 Node journal 重建。Nomad 部署平台服务和节点守护进程，单个沙箱由 Node Orchestrator 管理。
 
 ## 文档
 
 - [产品概念与术语](docs/product-context.md)
 - [产品决策](docs/product-decisions.md)
 - [产品架构规格](specs/product-architecture.md)
+- [Control API、Node gRPC 与 Redis 接入契约](specs/control-node-contract.md)
 - [服务实施计划](tasks/plan.md)
 - [实施 TODO 与验收条件](tasks/todo.md)
 - [沙箱 Runtime 技术规格](specs/isodo-sandbox-runtime-v0.1-spec.md)
 - [规格索引与验证状态](specs/README.md)
 - [模块与目录职责](specs/directory-responsibilities.md)
+- [文档站开发说明](docs-site/README.md)
 - [Guest Exec / PTY / Files 协议](specs/guest-protocol.md)
 - [上游项目与许可证依据](specs/references.md)
 - [参赛要求与交付核对](docs/competition-requirements.md)
@@ -56,11 +76,22 @@ Control API 管理账号、沙箱资源与操作；Node Runtime 管理本机虚�
 
 ```text
 .
-├── api/       # 对内 Guest 协议定义
-├── docs/      # 产品概念、决策和交付说明
-├── specs/     # 产品/服务架构、接口契约、验证依据
-├── tests/     # 可复现的 Runtime 技术验证探针
-├── artifacts/ # 探针日志与核验材料
-├── tasks/     # 分阶段实施计划与验收清单
-└── assets/    # Isodo 品牌素材
+├── api/
+│   ├── openapi/   # 控制面与公开 HTTP 契约
+│   └── proto/     # 当前 Guest RPC 契约
+├── docs-site/     # Fumadocs 文档站，API Reference 从公开契约生成
+├── cmd/           # Go 进程入口
+├── internal/      # 控制面与运行时模块
+├── migrations/    # 数据库迁移
+├── deploy/        # Casdoor、PostgreSQL、Redis、SeaweedFS 与服务部署配置
+├── scripts/       # 生成、环境配置和验证脚本
+├── tools/         # API 代码生成工具配置
+├── docs/          # 产品概念、决策和交付说明
+├── specs/         # 人读的产品/服务架构、模块和研究规格
+├── tests/         # 验证工具与跨模块测试
+├── artifacts/     # 可核对的验证证据
+├── prototype/     # 本地原型，当前由 .gitignore 排除
+├── app/           # 本地 T3 派生多应用工作区，当前由 .gitignore 排除
+├── tasks/         # 分阶段实施计划与验收清单
+└── assets/        # 项目共用品牌素材
 ```
