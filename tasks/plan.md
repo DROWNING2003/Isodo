@@ -10,6 +10,8 @@
 
 - 先做 Guest Agent Exec/PTY/Files 的端到端切片，因为它定义 Node 与 VM 的实际调用契约；PTY 由 Isodo 自行实现，不依赖 Cocoon shell session。
 - Control API 保存租户期望状态及 operation；Node 保存本机 journal 并独立管理 CHV 生命周期。Nomad 部署平台守护进程，不管理单个 Sandbox。
+- Control Worker 通过 Node Registry/Placement 选择 Orchestrator endpoint，并用 mTLS gRPC 调用；Node Orchestrator 提供内部版本化 service，不暴露给用户请求。
+- PostgreSQL 保存租户、持久 Sandbox/desired state、operation 与配额；Redis 是 Runtime 必需组件，Control 写 active Sandbox record/index，Orchestrator 写 `sandbox:routing` catalog。两类 Redis 记录可依据 DB assignment 与 Node journal 重建。
 - Node 与 Guest 通过 Vsock + 版本化 RPC 通信；公网 API 与 Node RPC 使用不同身份和信任边界。
 - P0 的 Stop 是冷启动语义且保留原 Node 磁盘；Delete 才回收；产品 Snapshot、内存 Pause/Resume 和跨节点恢复延后。
 - Guest Agent 和 Agent 均按不可信负载设计；平台凭证由 Guest 外 Gateway 授权调用，普通公网不授予凭证。
@@ -20,22 +22,24 @@
 
 ```text
 T0 仓库来源 / v0 / PR 门禁
-  └─ T1 接口、镜像和部署输入冻结
-       └─ T2 Guest Exec 最小切片
-            ├─ T3 Guest PTY 与 Files
-            └─ T4 Node Supervisor / CHV / 存储 / 网络
-                 └─ T5 Control API / 调度 / Operation
-                      ├─ T6 Gateway 最小真实连接
-                      └─ T7 集成、故障恢复、安全验证与交付
+  └─ T1.1 接口契约冻结
+       ├─ T1.2 Guest 镜像 ── T2.1 Guest Exec ── T3.1 Node CHV Supervisor
+       └─ T1.3 Template Registry（系统默认 + 个人 public/private）
+                    T1.2 + T1.3 + T2.1 + T3.1
+                                  └─ T1.4 Guest-enabled base build / Build Service
+                                       ├─ T1.5 预热快照优化
+                                       └─ T4.1 Sandbox 固定引用 Ready build
+                                            ├─ T5.1 Gateway 最小真实连接
+                                            └─ T6 集成、故障恢复、安全验证与交付
 ```
 
-T3 与 T4 在 Guest RPC/镜像契约冻结后可以并行；T5 依赖稳定 Node RPC；T6 依赖 Sandbox 身份、策略和 Guest 外转发路径；T7 汇总所有 P0 切片。T0 未完成前不得向被混入的代码基线写入产品实现。
+Template Registry 可与 Guest 镜像/运行底座并行设计；Guest-enabled base build 还依赖可启动的 Guest Agent、Node/CHV 和 Exec 基础能力。Template build 可用后，Sandbox Create 才按授权解析并固定不可变 build。Isodo v1 不包含团队/组织模板。Gateway 依赖 Sandbox 身份、策略和 Guest 外转发路径；集成阶段汇总所有 P0 切片。T0 未完成前不得向被混入的代码基线写入产品实现。
 
 ## 阶段
 
 ### Phase 0 — 可审计的开发基线
 
-核清根仓库、`app/` 来源、原始提交与 `v0` tag 真实性，恢复或建立正确的 Isodo repo 和分支/PR 工作流，保留真实贡献记录。当前 Isodo 根目录无 `.git`；`app/` 是独立 T3 参考仓库且有大量未提交变更，不能直接开始往其中实现 Isodo。
+核清根仓库来源、原始提交与 `v0` tag 真实性，并建立符合参赛要求的分支/PR 工作流，保留真实贡献记录。当前根目录已有 `.git`；`app/` 是根仓库内被忽略的 T3 派生多应用工作区，不是嵌套 Git 仓库。原始来源记录与 `v0` tag 是否满足赛方要求仍未核实。
 
 **Checkpoint 0：** 有可核验的干净工作仓库、真实基线 tag 或赛方允许的处置记录；首个实现 PR 可创建并关联基线；参赛截止时区已核对。
 
@@ -79,7 +83,7 @@ T3 与 T4 在 Guest RPC/镜像契约冻结后可以并行；T5 依赖稳定 Node
 
 | 风险 | 影响 | 处置 |
 | --- | --- | --- |
-| 根目录无 Git，嵌套 `app/` 有大量改动 | 无法证明代码来源、贡献和比赛 `v0` 基线 | 实现门禁 T0；不清理/覆盖 `app/`，由用户确认合法来源后建立独立 Isodo 基线。 |
+| 根仓库已有 Git，但原始 codebase 基线未核实；`app/` 是被忽略的 T3 派生工作区 | 无法仅凭当前目录证明来源、贡献和比赛 `v0` 基线 | 保持 T0 门禁；保留 `app/` 原路径，不覆盖本地工作区；核实来源和基线后再定正式纳入方式。 |
 | 截止时间近且赛方时区未知 | 计划可能超出可交付时间 | 先核对赛方时区，按真实剩余时间收缩 P0；禁止用 mock 替代安全能力并宣称完成。 |
 | CHV/Vsock 探针为固定命令且 root 运行 | 可能误以为 Guest Agent 或生产隔离已验证 | 每项状态按证据分层；正式 Guest、非特权/宿主防护、安全测试重新验收。 |
 | Snapshot、桌面和服务 P0 混杂 | 核心沙箱延迟并重复定义 Stop/快照 | 按当前架构范围分阶段；Snapshot 和桌面保持后续阶段。 |
@@ -88,5 +92,16 @@ T3 与 T4 在 Guest RPC/镜像契约冻结后可以并行；T5 依赖稳定 Node
 ## 尚需在实现前核实的输入
 
 - 参赛要求中截止时间的实际时区，以及现阶段应按参赛交付还是长期产品目标排序。
-- Isodo 根仓库应该从哪个可证明的原始 codebase 建立；`app/` 的参考 fork 是否只保存在本地、是否有可核验的导入记录。
+- Isodo 根仓库对应的原始 codebase、提交和 `v0` 是否可证明；`app/` 的 T3 派生来源是否需要正式纳入，以及是否有可核验的导入记录。
 - 目标 Linux/KVM 节点、CHV 发布版本与 Nomad 运行环境是否继续使用已验证节点作为首个测试宿主。
+
+## 并行轨道 — macOS 本地 Lima 与 T3
+
+此轨道按 [T3 Server 与 Lima 本地沙箱接入规格](../specs/t3-lima-local-runtime.md) 独立推进，不替换 Linux/CHV P0 服务目标，也不把当前 CHV Guest transport 当作 Lima 已支持的协议。
+
+1. 实现 Isodo Node 内独立的 Lima provider：受限实例命名、创建/启动/停止/删除/查询，默认禁止宿主目录挂载。
+2. 将 provider 接入 Node operation journal 和生命周期 RPC，保留 CHV provider 的现有行为。
+3. 明确并实现 Lima Guest transport，再验证 Guest Agent Ready、文件/进程接口。
+4. 解决 T3 Server bundle 原生依赖的 ARM64 构建，接入 Isodo Guest API、Loopback HTTP/WebSocket Proxy，再验证 Codex/Claude Guest 环境。
+
+第一步只证明并封装 Lima 实例管理；单独的 provider 不等同于完整沙箱服务或 T3 端到端运行。

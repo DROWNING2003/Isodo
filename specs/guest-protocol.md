@@ -1,12 +1,12 @@
 # Guest Exec / PTY / Files 协议 v1
 
-状态：2026-10-24，实现契约草案。行为基准为 E2B；本文的 protobuf 已做编译校验，服务端、SDK 和 CHV 上的 gRPC 尚未实现或验收。桌面端集成延后。
+状态：2026-10-24，实现契约草案。行为基准为 E2B；protobuf 已生成，Guest Agent 已实现模板态 Ready、BindRuntime 身份绑定和未绑定 RPC 拦截，Node Guest transport 已加入等待模板态与绑定调用。Exec、PTY、Files、SDK 和真实 CHV gRPC 验收仍未完成。桌面端集成延后。
 
 协议源文件：[guest.proto](../api/proto/isodo/guest/v1/guest.proto)。服务通用行为见 [service-behavior.md](service-behavior.md)，已完成的真实 VM/Vsock 探针见 [validation.md](validation.md)。本文件固定 Guest 接口；REST/Node API 负责映射这些能力，不再另外定义另一套执行生命周期。
 
 ## 1. 范围与依据
 
-首版提供 Ready、进程创建/查询/列表/输出订阅、输入、信号、PTY resize，以及工作区文件的 Stat/List/Read/Write/Mkdir/Remove/Move。持久 Shell Session、文件 Watch、Guest 热升级和 Agent 对话协议留给后续版本。
+首版提供模板态 Ready/BindRuntime、进程创建/查询/列表/输出订阅、输入、信号、PTY resize，以及工作区文件的 Stat/List/Read/Write/Mkdir/Remove/Move。持久 Shell Session、文件 Watch、Guest 热升级和 Agent 对话协议留给后续版本。
 
 主要参考本地 E2B commit `6b82caf690b06fb983254714187dc496ac4d0cec`：
 
@@ -42,15 +42,17 @@ API / SDK -> Node 可信 RPC -> CHV per-VM Unix socket
 | `boot_id` | Node 每次冷启动 VM 生成；Node 进程重启不更换 |
 | `guest_epoch` | Guest Agent 每次启动生成；Guest Agent 重启即更换 |
 
-前三项通过模板支持的启动配置注入，禁止放入长期密钥；`guest_epoch` 经 Ready 获取。Node 将响应与宿主启动记录交叉核对，随后在转发时填入 identity。外部用户不能通过提交更高 generation 获得控制权。
+实例态的前三项由 Node 通过 `BindRuntime` 注入，禁止放入长期密钥；`guest_epoch` 由 Guest Agent 在首次绑定时生成并经 Ready 获取。模板快照不得包含 Sandbox RuntimeIdentity。Node 将响应与宿主启动记录交叉核对，随后在转发时填入 identity。外部用户不能通过提交更高 generation 获得控制权。
 
 不匹配返回 `FAILED_PRECONDITION / STALE_RUNTIME`，不按新实例 PID 自动寻找替代进程。Guest 的 `execution_id` 只在完整 identity 下唯一。PID 仅用于诊断，不提供任意 PID 的操作入口。
 
 ### 2.2 Ready 与兼容
 
-`Ready` 在 Vsock listener、进程管理、Guest workload cgroup、工作区目录及文件服务初始化成功后返回；未就绪返回 `UNAVAILABLE / GUEST_NOT_READY`。
+`Ready` 在 Vsock listener、进程管理、Guest workload cgroup、工作区目录及文件服务初始化成功后返回；未就绪返回 `UNAVAILABLE / GUEST_NOT_READY`。尚未绑定 Sandbox 的模板 Guest 返回 `runtime_bound=false` 且不含 identity；此状态仅表示模板 Agent 已初始化，不表示可以接受租户工作负载。
 
-响应必须含 protocol `1.0`、identity、agent_version、capabilities 和实际 limits。首版要求 `exec.v1`、`pty.v1`、`files.v1`、`output_replay.v1`。Node 仅在 major 相同且所需能力齐全时将实例判为 Guest Ready；不能只凭 TCP/Vsock 连通判断 running。
+响应必须含 protocol `1.0`、agent_version、capabilities、实际 limits 和 `runtime_bound`。实例态响应还必须有完整 identity。首版要求 `exec.v1`、`pty.v1`、`files.v1`、`output_replay.v1`。Node 仅在 major 相同、所需能力齐全、runtime_bound=true 且 identity 完全匹配时将实例判为 Guest Ready；不能只凭 TCP/Vsock 连通或模板态 Ready 判断 running。
+
+`BindRuntime` 只允许未绑定模板态执行。Node 提交 sandbox_id、ownership_generation、boot_id；Agent 生成新的 guest_epoch 并原子切换到实例态。相同请求重试必须返回首次绑定的相同 identity；任何不同身份的二次绑定返回 `FAILED_PRECONDITION / RUNTIME_ALREADY_BOUND`。绑定完成前 Guest 必须拒绝所有有副作用的进程、PTY 和文件 RPC。Agent 不得从快照继承 workload 进程、PTY、执行记录或 writer token。Node 收到 BindRuntime 响应后仍需调用 Ready 并独立比对身份。
 
 新增 protobuf 字段必须兼容；删除字段保留 field number/name。新增可选能力通过 capability 声明；客户端不得仅凭 minor 版本推测能力。安全字段、启动参数和枚举未知值要明确拒绝，不能静默按默认权限执行。
 

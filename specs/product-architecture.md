@@ -29,15 +29,21 @@ Isodo 为个人用户提供安全、持久、可连接工具的 Agent 工作空�
 
 ```mermaid
 flowchart LR
-  User[用户入口<br/>Web / CLI / SDK<br/>桌面端后续] --> Control[Control API<br/>认证 · Sandbox · Operation]
-  Control --> State[(PostgreSQL<br/>租户 · 期望状态 · 配额)]
-  Control --> Node[Node Runtime<br/>单机资源 · 生命周期 · Reconcile]
-  Node --> CHV[Cloud Hypervisor<br/>每个 Sandbox 一台 VM]
+  User[用户入口<br/>Web / CLI / SDK<br/>桌面端后续] --> Control[Control API + Worker<br/>认证 · Sandbox · Placement · Operation]
+  Control --> State[(PostgreSQL<br/>租户 · 持久资源 · 期望状态 · Operation)]
+  Control -->|mTLS gRPC| Orch[Node Orchestrator<br/>本机资源 · 生命周期 · Reconcile]
+  Control -->|运行态 Sandbox 与租户索引| Redis[(Redis<br/>active registry)]
+  Orch -->|运行路由记录| Redis
+  Relay[Sandbox Relay / Gateway] -->|按 Sandbox ID 查路由| Redis
+  Relay --> Orch
+  Orch --> CHV[Cloud Hypervisor<br/>每个 Sandbox 一台 VM]
   CHV --> Guest[Guest Agent<br/>Exec · PTY · Files]
   Guest --> Agent[Agent / 用户进程<br/>不可信工作负载]
   Agent -->|Node relay · mTLS| Gateway[Connection Gateway<br/>授权 · 策略 · 上游调用]
   Gateway --> Credential[(Credential Store<br/>密文与版本)]
-  Node --> Local[(节点本地存储<br/>模板 · 系统盘 · 工作区)]
+  TemplateBuild[Template Build Service] --> Objects[(SeaweedFS S3<br/>模板工件)]
+  Orch -->|按 digest 下载/校验| Objects
+  Orch --> Local[(节点本地存储<br/>模板 · 系统盘 · 工作区 · journal)]
   Control -.后续 Snapshot API.-> Object[(Snapshot Object Store)]
   Nomad[Nomad<br/>平台服务与 Node 部署] -.部署/发现.-> Control
   Nomad -.部署/发现.-> Node
@@ -46,13 +52,15 @@ flowchart LR
 ### 产品责任边界
 
 - **产品入口**负责展示用户拥有的 Sandbox、Task 和连接授权。入口不直接访问 Node、CHV socket 或节点磁盘；操作结果以服务端 operation 和 observed state 为准。
-- **Control API**是租户、鉴权、配额、Sandbox desired state 和异步 operation 的权威入口。它选择 Node 并调用 Node RPC，不操作宿主机资源。
-- **Node Runtime**在单台 Linux/KVM 宿主负责本机 Sandbox VM、CHV 生命周期、实例磁盘、宿主网络策略和恢复。每个 Sandbox 同时只有一个有效 owner/generation。
+- **Control API/Worker**是租户、鉴权、配额、Sandbox 持久资源、desired state 和异步 operation 的权威入口。Placement 选定 Node 后，Worker 通过双向 TLS gRPC 调用 Node Orchestrator；API handler 不直接访问 CHV/宿主机资源。
+- **PostgreSQL**保存持久 Sandbox/tenant 元数据、期望状态、operation、幂等和配额记录。
+- **Redis**是必需的运行态组件：Control Worker 维护在线 Sandbox record 和租户 active index；Node Orchestrator 维护 Sandbox 到 Node 的 routing record。Redis 可从 PostgreSQL assignment 与 Node journal/Inspect 重建，不作为唯一 tenant/desired-state 存储。
+- **Node Orchestrator**在 Linux/KVM 宿主负责本机 Sandbox VM、CHV 生命周期、实例磁盘、宿主网络策略和恢复；通过 gRPC 暴露内部生命周期接口，并在 Guest Ready/停止时维护 Redis route。每个 Sandbox 同时只有一个有效 owner/generation。
 - **Cloud Hypervisor VM**提供 Guest Kernel 边界。每个 Sandbox 一台 VM；Node 通过本机受保护的 CHV API 管理 VM，通过 Vsock 连接 Guest Agent。
 - **Guest Agent**只管理 Guest 内进程、PTY 和文件。它不持有 CHV 控制权、宿主路径、平台长期凭证或其他 Sandbox 的身份。
 - **Agent / 用户进程**是沙箱内不可信负载。它通过受控的 Guest 功能访问文件和进程，通过 Node 到 Gateway 的受限中继调用获批外部服务。
 - **Connection Gateway**位于 Guest/Agent 信任边界之外。它校验 Sandbox 身份、连接授权、策略和凭证版本，再调用固定适配的上游服务。普通公网访问不代表拥有凭证权限。
-- **Storage**分为控制状态、节点临时/持久运行盘和未来对象快照。控制状态不代替本地 VM 证据；节点失联不证明 VM 已停止。
+- **Storage**分为 PostgreSQL 控制状态、Redis 在线 registry/routing、Node 本地 journal 与运行盘、SeaweedFS S3 模板工件与未来产品快照。Redis 路由缺失不证明本地 VM 已停止；Node 失联也不证明 VM 已停止。
 - **Nomad**部署 API/Gateway service job 与 Node system job；不以每个 Sandbox 一个 Nomad Job 的方式创建工作负载。
 
 ### 部署形态
@@ -66,8 +74,9 @@ flowchart LR
 
 ## 核心用户路径
 
-1. 用户选择用途 Template、运行位置和资源，Control API 校验租户配额并创建异步 operation。
-2. Control API 选择 Node。Node 从不可变 Template 准备实例盘与网络、启动 CHV，并等待 Guest Agent Ready；只有真实状态满足条件后 Sandbox 才报告 `running`。
+1. 用户选择用途 Template、运行位置和资源，Control API 校验租户配额，在 PostgreSQL 提交 Sandbox 与异步 operation。
+2. Control Worker 通过 Node Registry/Placement 选定 Node，以 mTLS gRPC 调用其 Orchestrator。Orchestrator 从不可变 Template 准备实例盘与网络、启动 CHV，并等待 Guest Agent Ready。
+3. Guest Ready 后 Orchestrator 在 Redis 发布 Sandbox routing record；Control Worker 将 active Sandbox record 与 tenant index 写入 Redis。两类记录都确认后，Control 才报告 `running`。
 3. 用户在 Sandbox 中启动 Agent 或其他进程。Guest Agent 返回稳定 execution ID；客户端断连只断开观察，不隐式杀掉进程。
 4. Agent 读取/写入 Sandbox 文件或调用 PTY。对外服务请求经 Node relay 到 Gateway；Gateway 按 Sandbox 和 Connection 授权决定是否提供凭证并转发。
 5. Stop 结束运行态但保留原节点工作盘；Start 冷启动并产生新 boot generation。Delete 结束 VM 并回收实例盘。产品 Snapshot 是另外的可恢复工件，不借用 Stop 语义。
