@@ -1,0 +1,7 @@
+*
+!Dockerfile
+!isodo-init
+!isodo-agent
+!inittab
+!power-button
+!isodo-guest

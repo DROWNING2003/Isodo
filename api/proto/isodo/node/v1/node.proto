@@ -1,0 +1,169 @@
+syntax = "proto3";
+
+package isodo.node.v1;
+
+option go_package = "github.com/DROWNING2003/Isodo/internal/api/node/v1;nodev1";
+
+import "google/protobuf/empty.proto";
+import "google/protobuf/timestamp.proto";
+
+// Control-to-Node lifecycle API. It never carries user credentials, shell
+// commands, host paths, or guest I/O streams.
+service NodeOrchestrator {
+  // Persist an idempotent operation intent before returning accepted.
+  rpc ApplyOperation(ApplyOperationRequest) returns (ApplyOperationResponse);
+  rpc GetOperation(GetOperationRequest) returns (Operation);
+  rpc InspectSandbox(InspectSandboxRequest) returns (SandboxInspection);
+  rpc CreateSandboxAppLink(CreateSandboxAppLinkRequest) returns (SandboxAppLink);
+  rpc GetNodeStatus(google.protobuf.Empty) returns (NodeStatus);
+  rpc WatchOperation(WatchOperationRequest) returns (stream NodeEvent);
+}
+
+enum OperationAction {
+  OPERATION_ACTION_UNSPECIFIED = 0;
+  OPERATION_ACTION_CREATE = 1;
+  OPERATION_ACTION_START = 2;
+  OPERATION_ACTION_STOP = 3;
+  OPERATION_ACTION_DELETE = 4;
+}
+
+enum OperationState {
+  OPERATION_STATE_UNSPECIFIED = 0;
+  OPERATION_STATE_ACCEPTED = 1;
+  OPERATION_STATE_RUNNING = 2;
+  OPERATION_STATE_SUCCEEDED = 3;
+  OPERATION_STATE_FAILED = 4;
+}
+
+enum OperationStage {
+  OPERATION_STAGE_UNSPECIFIED = 0;
+  OPERATION_STAGE_INTENT = 1;
+  OPERATION_STAGE_RESERVE = 2;
+  OPERATION_STAGE_MATERIALIZE = 3;
+  OPERATION_STAGE_NETWORK_PREPARE = 4;
+  OPERATION_STAGE_LAUNCH = 5;
+  OPERATION_STAGE_GUEST_READY = 6;
+  OPERATION_STAGE_PUBLISH = 7;
+  OPERATION_STAGE_STOP = 8;
+  OPERATION_STAGE_DELETE = 9;
+  OPERATION_STAGE_CLEANUP = 10;
+}
+
+enum EgressMode {
+  EGRESS_MODE_UNSPECIFIED = 0;
+  EGRESS_MODE_DENY = 1;
+  EGRESS_MODE_ALLOW = 2;
+}
+
+message ResourceSpec {
+  uint32 vcpu = 1;
+  uint64 memory_bytes = 2;
+  uint64 disk_bytes = 3;
+}
+
+message NetworkSpec {
+  EgressMode egress_mode = 1;
+  repeated string allowed_cidrs = 2;
+}
+
+message ApplyOperationRequest {
+  string operation_id = 1;
+  string request_hash = 2;
+  string sandbox_id = 3;
+  uint64 ownership_generation = 4;
+  uint64 revision = 5;
+  OperationAction action = 6;
+  string template_id = 7;
+  ResourceSpec resources = 8;
+  NetworkSpec network = 9;
+  string template_build_id = 10;
+  // Immutable object reference selected by Control after tenant authorization.
+  // Never resolve a mutable template tag on the Node.
+  TemplateArtifact template_artifact = 11;
+}
+
+message TemplateArtifact {
+  string manifest_digest = 1;
+  string bucket = 2;
+  string prefix = 3;
+}
+
+message ApplyOperationResponse {
+  Operation operation = 1;
+  bool already_applied = 2;
+}
+
+message GetOperationRequest {
+  string operation_id = 1;
+  string request_hash = 2;
+}
+
+message Operation {
+  string operation_id = 1;
+  string request_hash = 2;
+  string sandbox_id = 3;
+  uint64 ownership_generation = 4;
+  uint64 revision = 5;
+  OperationAction action = 6;
+  OperationState state = 7;
+  OperationStage stage = 8;
+  string error_code = 9;
+  string message = 10;
+  string boot_id = 11;
+  uint64 event_sequence = 12;
+  google.protobuf.Timestamp created_at = 13;
+  google.protobuf.Timestamp updated_at = 14;
+}
+
+message InspectSandboxRequest {
+  string sandbox_id = 1;
+  uint64 ownership_generation = 2;
+}
+
+message SandboxInspection {
+  string sandbox_id = 1;
+  uint64 ownership_generation = 2;
+  string observed_state = 3;
+  string boot_id = 4;
+  string guest_epoch = 5;
+  string vmm_instance_id = 6;
+  string error_code = 7;
+  google.protobuf.Timestamp observed_at = 8;
+}
+
+message CreateSandboxAppLinkRequest {
+  string sandbox_id = 1;
+  uint64 ownership_generation = 2;
+}
+
+message SandboxAppLink {
+  string url = 1;
+  google.protobuf.Timestamp expires_at = 2;
+}
+
+message NodeStatus {
+  string node_id = 1;
+  string boot_id = 2;
+  uint32 protocol_major = 3;
+  uint32 protocol_minor = 4;
+  string orchestrator_version = 5;
+  string cloud_hypervisor_version = 6;
+  uint32 total_vcpu = 7;
+  uint32 available_vcpu = 8;
+  uint64 total_memory_bytes = 9;
+  uint64 available_memory_bytes = 10;
+  repeated string capabilities = 11;
+  bool draining = 12;
+  google.protobuf.Timestamp observed_at = 13;
+}
+
+message WatchOperationRequest {
+  string operation_id = 1;
+  uint64 after_sequence = 2;
+}
+
+message NodeEvent {
+  uint64 sequence = 1;
+  string node_id = 2;
+  Operation operation = 3;
+}

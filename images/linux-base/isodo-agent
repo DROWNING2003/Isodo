@@ -1,0 +1,5 @@
+#!/bin/sh
+exec setpriv --reuid=1000 --regid=1000 --clear-groups --no-new-privs \
+    env -i PATH=/usr/local/bin:/usr/bin:/bin HOME=/home/isodo \
+    ISODO_TEMPLATE_MODE=true ISODO_GUEST_TRANSPORT=vsock \
+    /usr/local/bin/isodo-guest
