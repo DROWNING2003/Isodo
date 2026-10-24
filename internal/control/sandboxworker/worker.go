@@ -94,14 +94,10 @@ func (w *Worker) runCreate(ctx context.Context, job operation.CreateJob) error {
 	if w.backend == "lima" && job.TemplateRef != sandbox.LocalLimaTemplateReference && job.TemplateRef != "linux-base" {
 		return w.queue.CompleteSandboxCreate(ctx, job, "CAPABILITY_UNSUPPORTED")
 	}
-	request := &nodev1.ApplyOperationRequest{
-		OperationId:         job.OperationID,
-		RequestHash:         job.RequestHash,
-		SandboxId:           job.SandboxID,
-		OwnershipGeneration: job.OwnershipGeneration,
-		Revision:            job.Revision,
-		Action:              nodev1.OperationAction_OPERATION_ACTION_CREATE,
+	if w.backend != "lima" && (job.Resources.VCPU == 0 || job.Resources.MemoryBytes == 0) {
+		return w.queue.CompleteSandboxCreate(ctx, job, "INVALID_RESOURCE_SPEC")
 	}
+	request := createRequest(job, w.backend)
 	if w.backend == "lima" {
 		// The local Lima provider clones its Guest-Agent/T3-enabled Base. It does
 		// not materialize object-store template builds.
@@ -151,6 +147,22 @@ func (w *Worker) runCreate(ctx context.Context, job operation.CreateJob) error {
 			return ctx.Err()
 		}
 	}
+}
+
+func createRequest(job operation.CreateJob, backend string) *nodev1.ApplyOperationRequest {
+	request := &nodev1.ApplyOperationRequest{
+		OperationId:         job.OperationID,
+		RequestHash:         job.RequestHash,
+		SandboxId:           job.SandboxID,
+		OwnershipGeneration: job.OwnershipGeneration,
+		Revision:            job.Revision,
+		Action:              nodev1.OperationAction_OPERATION_ACTION_CREATE,
+	}
+	if backend != "lima" {
+		request.Resources = &nodev1.ResourceSpec{Vcpu: job.Resources.VCPU, MemoryBytes: job.Resources.MemoryBytes}
+		request.Network = &nodev1.NetworkSpec{EgressMode: nodev1.EgressMode_EGRESS_MODE_DENY}
+	}
+	return request
 }
 
 func wait(ctx context.Context, duration time.Duration) bool {

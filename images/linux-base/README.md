@@ -51,7 +51,7 @@ go build -o .tools/isodo-template ./cmd/isodo-template
   --build-id '<published-build-id>' --vmm-binary /usr/local/bin/cloud-hypervisor
 ```
 
-该命令调用真实 CHV Node 后端（直接调用服务实现，不经过公开 HTTP API），检查持久化创建与重复请求、绑定后 Inspect、停止保留写盘、删除写盘和资源预留释放。命令使用临时 Node 状态目录，完成后清理；缓存保留。
+该命令调用真实 CHV Node 后端（直接调用服务实现，不经过公开 HTTP API），顺序检查两个实例的持久化创建、绑定后 Inspect、固定 Python 命令、重复请求、停止保留写盘、删除写盘和资源预留释放，并要求两次 FetchVerified 返回同一进程内校验凭据及不同 boot/Guest epoch。输出分别记录每次 create→Ready 与 create→首命令耗时；第一台包含该进程首次完整校验，第二台复用凭据。该顺序探针验证缓存与生命周期，并发双盘标记隔离另由 `probe-artifact` 验证。命令使用临时 Node 状态目录，完成后清理；缓存保留。
 
 `make node NODE_BACKEND=chv` 现在启用上述 CHV 后端。需要 mTLS 配置、Linux/KVM、Cloud Hypervisor、`ISODO_NODE_STATE_DIR`、S3 endpoint/bucket 与 Node 只读凭证。当前支持 create/stop/delete 与无网卡的 egress deny；未实现磁盘保留后的 start、WatchOperation、自动进程恢复、VMM cgroup/UID 隔离或公开 API 调度回写。发现未完成 journal 或旧运行态记录时启动失败，必须先完成进程核对，不自动启动替代 VM。
 
@@ -74,3 +74,18 @@ ISODO_BASE_MODULES_ROOT=/var/lib/isodo/guest-kernels/6.8.0-147/root \
 ```
 
 需要 `qemu-img`。`--restore-mode` 还支持 `copy`、`ondemand`，应独立复测后报告结果。实验冷启动一次无身份模板，暂停并保存内存/VM 状态，冻结源磁盘，为两个实例建立 QCOW2 写层，重写私有 config/vsock/serial 路径后恢复。通过实际私有内存映射确认 CoW，验证身份、随机样本和两个磁盘的标记隔离，执行固定 Python 探针并记录分段耗时。源快照保留至全部 VM 回收；该临时 PoC 不登记 Registry，也不替代公开创建链路或生产安全验收。
+
+制作并验证自包含的持久化运行态模板：
+
+```sh
+.tools/isodo-template build-warm --dir /var/lib/isodo/template-candidates/base-vmgenid \
+  --digest '<cold-source-manifest-sha256>' \
+  --out-dir /var/lib/isodo/template-candidates/base-runtime \
+  --vmm-binary /usr/local/bin/cloud-hypervisor
+.tools/isodo-template probe-artifact --dir /var/lib/isodo/template-candidates/base-runtime \
+  --digest '<new-warm-manifest-sha256>' --vmm-binary /usr/local/bin/cloud-hypervisor
+```
+
+输出目录必须不存在且位于冷源目录之外。新 manifest 固定暂停时的两盘种子、内存、CHV state/config、内核、精确 VMM binary 摘要及 CPU 指纹；`SourceDigest` 指向冷源 manifest，新 warm manifest 使用独立摘要。`probe-artifact` 经 `StartRuntime` 恢复两个实例，验证身份、随机样本及双盘写入隔离，报告完整校验与缓存恢复/首命令的分别耗时。
+
+持久化工件沿用 `publish-system` 发布；它强制运行上述双实例探针再上传和 CAS 更新 Registry。Node 的 S3Store 首次获取完整验证，随后在同进程内用校验凭据复用只读缓存；Node 重启后重新验证。运行目录与缓存必须在同一文件系统以建立硬链接；资源规格、CPU 或 VMM binary 不匹配会明确拒绝，不回退冷启动。2026-10-24 的 v5 发布与 Node 验证记录见 [预热模板规格](../../specs/warm-template-startup.md)。

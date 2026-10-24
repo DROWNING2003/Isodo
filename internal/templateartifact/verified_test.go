@@ -56,6 +56,27 @@ func TestVerificationReceiptDetectsChanges(t *testing.T) {
 		t.Fatal("modified cache stamp retained receipt")
 	}
 }
+func TestVerificationReceiptDetectsDirectoryMembershipChanges(t *testing.T) {
+	directory, digest := readonlyFixture(t)
+	artifact, err := VerifyArtifact(directory, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	added := filepath.Join(directory, "unexpected")
+	if err = os.WriteFile(added, []byte("unexpected"), 0400); err != nil {
+		t.Fatal(err)
+	}
+	if err = artifact.Check(); err == nil {
+		t.Fatal("receipt accepted an added cache file")
+	}
+	if err = os.Remove(added); err != nil {
+		t.Fatal(err)
+	}
+	if err = artifact.Check(); err == nil {
+		t.Fatal("receipt accepted a cache directory after membership changed")
+	}
+}
+
 func TestCachedReceiptAvoidsNetworkAndRejectsDigestAliases(t *testing.T) {
 	directory, digest := readonlyFixture(t)
 	root := t.TempDir()

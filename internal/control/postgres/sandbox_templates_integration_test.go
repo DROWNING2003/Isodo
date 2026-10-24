@@ -1,13 +1,16 @@
 package postgres
 
 import (
+	"crypto/sha256"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"strings"
 	"testing"
 
 	api "github.com/DROWNING2003/Isodo/internal/api/public"
+	operation "github.com/DROWNING2003/Isodo/internal/control/operation"
 	"github.com/DROWNING2003/Isodo/internal/control/sandbox"
 	"github.com/google/uuid"
 )
@@ -63,6 +66,35 @@ func TestSandboxPinsAuthorizedReadyTemplate(t *testing.T) {
 	}
 	if pinned.TemplateBuildID == nil || *pinned.TemplateBuildID != first || pinned.TemplateDigest == nil || *pinned.TemplateDigest != strings.Repeat("a", 64) {
 		t.Fatalf("incorrect pin: %+v", pinned)
+	}
+	var payload operation.CreatePayload
+	var payloadJSON []byte
+	var storedHash string
+	if err := s.pool.QueryRow(t.Context(), `SELECT request_hash, payload FROM sandbox_operations WHERE sandbox_id = $1::uuid`, pinned.ID).Scan(&storedHash, &payloadJSON); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		t.Fatal(err)
+	}
+	if payload.Resources == nil || *payload.Resources != operation.DefaultResources() {
+		t.Fatalf("persisted resources = %+v, want fixed CHV defaults", payload.Resources)
+	}
+	canonicalPayload, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	requestHash := sha256.Sum256([]byte(strings.Join([]string{pinned.ID, "create", string(canonicalPayload), "1", "1"}, "\x00")))
+	if storedHash != fmt.Sprintf("%x", requestHash) {
+		t.Fatalf("request hash = %s, want payload-bound hash %x", storedHash, requestHash)
+	}
+	payload.Resources.MemoryBytes++
+	changedPayload, err := json.Marshal(payload)
+	if err != nil {
+		t.Fatal(err)
+	}
+	changedHash := sha256.Sum256([]byte(strings.Join([]string{pinned.ID, "create", string(changedPayload), "1", "1"}, "\x00")))
+	if storedHash == fmt.Sprintf("%x", changedHash) {
+		t.Fatal("request hash did not change when persisted resources changed")
 	}
 	if _, err = s.SetTemplateTag(t.Context(), owner, item.ID, "default", api.SetTemplateTag{BuildID: next}); err != nil {
 		t.Fatal(err)

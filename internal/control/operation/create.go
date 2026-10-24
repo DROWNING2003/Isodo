@@ -16,15 +16,31 @@ type CreateJob struct {
 	TemplateDigest      string
 	ArtifactBucket      string
 	ArtifactPrefix      string
+	Resources           Resources
 	OwnershipGeneration uint64
 	Revision            uint64
 }
 
+type Resources struct {
+	VCPU        uint32 `json:"vcpu"`
+	MemoryBytes uint64 `json:"memory_bytes"`
+}
+
+const (
+	DefaultVCPU        = 2
+	DefaultMemoryBytes = 512 << 20
+)
+
+func DefaultResources() Resources {
+	return Resources{VCPU: DefaultVCPU, MemoryBytes: DefaultMemoryBytes}
+}
+
 type CreatePayload struct {
-	TemplateRef     string `json:"template_ref"`
-	TemplateID      string `json:"template_id"`
-	TemplateBuildID string `json:"template_build_id"`
-	TemplateDigest  string `json:"template_digest"`
-	ArtifactBucket  string `json:"artifact_bucket"`
-	ArtifactPrefix  string `json:"artifact_prefix"`
+	TemplateRef     string     `json:"template_ref"`
+	TemplateID      string     `json:"template_id"`
+	TemplateBuildID string     `json:"template_build_id"`
+	TemplateDigest  string     `json:"template_digest"`
+	ArtifactBucket  string     `json:"artifact_bucket"`
+	ArtifactPrefix  string     `json:"artifact_prefix"`
+	Resources       *Resources `json:"resources,omitempty"`
 }
