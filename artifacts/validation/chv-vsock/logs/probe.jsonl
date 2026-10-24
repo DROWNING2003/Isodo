@@ -1,2 +1,0 @@
-{"attempt": 1, "handshake": "OK 1073741824", "output": "READY transport-only\nISODO_GUEST_STDOUT\nISODO_GUEST_STDERR\n5.15.0-46-generic\nEXIT 7\n", "passed": true}
-{"attempt": 2, "handshake": "OK 1073741825", "output": "READY transport-only\nISODO_GUEST_STDOUT\nISODO_GUEST_STDERR\n5.15.0-46-generic\nEXIT 7\n", "passed": true}

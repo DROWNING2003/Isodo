@@ -1,16 +1,35 @@
 # Product prototype and imported workbench reference are kept locally for now.
 /prototype/
 /app/
+/.tools/
+/docs-site/node_modules/
+/docs-site/.next/
+/docs-site/.source/
 
 # Local development artifacts
+/artifacts/
 node_modules/
 dist/
 .DS_Store
 .env
+certs/
 .env.*
 !.env.example
 
 # Go build/test output
 /bin/
+/isodo-api
+/isodo-node
+/isodo-guest
+/isodo-template
 *.test
 coverage.out
+
+# Rendered local identity-provider configuration contains OAuth secrets.
+/deploy/casdoor/*.runtime.json
+
+# Rendered S3 credentials stay local.
+/deploy/seaweedfs/*.runtime.json
+
+# Guest binary is supplied to the isolated base-image build context.
+/images/linux-base/isodo-guest
