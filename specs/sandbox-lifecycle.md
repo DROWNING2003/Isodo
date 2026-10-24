@@ -6,7 +6,8 @@
 
 ## 1. 所有权与状态
 
-- 控制面拥有用户鉴权、配额、desired state、节点归属和 operation；Node 拥有该节点真实 VM、进程托管、磁盘、网络与 journal。
+- Control/PostgreSQL 拥有用户鉴权、配额、持久 Sandbox metadata、desired state、Node assignment 和 operation；Node 拥有该节点真实 VM、进程托管、磁盘、网络与 journal。
+- Redis 是必需的 active-runtime registry：Control 维护在线 Sandbox record/index，Node Orchestrator 维护 Sandbox→Node routing record。Redis 不是租户授权或持久 desired-state 的唯一来源，缺失记录须依据 DB assignment 与 Node Inspect 修复。
 - 首版一个沙箱固定一个节点，不自动跨节点恢复。节点不可达时保留原归属与磁盘占用，不以心跳超时为由创建第二个 VM。
 - 每个 Node 用宿主独占锁保证一个写入实例；每个 sandbox 使用单独的操作锁。进程锁不是跨节点 fencing。
 - `ownership_generation` 控制所有权；`boot_id` 区分冷启动；`guest_epoch` 区分 Guest Agent 生命周期。Node 重启接管不改变这三个值；Guest Agent 实际重启只改变 epoch。
@@ -54,7 +55,7 @@ Delete 是唯一能 supersede 在途生命周期操作的用户动作；不能�
 
 | API | 入参 | 结果 |
 | --- | --- | --- |
-| POST /sandboxes | template_digest、resources、network、可选 metadata | 新沙箱与 Create operation |
+| POST /sandboxes | template_id、可选 template_build/tag、resources、network、可选 metadata | 校验模板权限并固定 build 后创建沙箱与 Create operation |
 | GET /sandboxes/{id} | 身份上下文 | desired/observed、health、时间戳、资源、错误、operation_id |
 | GET /sandboxes | page_size/page_token、state | tenant 内分页，默认 50、最大 200，token 5 分钟 |
 | POST /sandboxes/{id}:stop | 可选 grace_period_seconds（默认 20，0–60） | Stop operation |
@@ -88,7 +89,7 @@ operation 至少保存：id、tenant_id、sandbox_id、action、request_hash、i
 | network_prepare | netns/TAP/IP/策略 revision | 隔离规则已生效，Guest 尚未启动 | 默认拒绝后删除实例网络对象 |
 | launch | unit 名、boot_id、socket 路径、CHV 版本 | 独立 unit 存活，CHV create/boot 成功 | 停止同身份 unit，不按宽泛进程名 kill |
 | guest_ready | 目标 Guest major/能力与 identity | Guest Ready、workspace/cgroup 前置条件满足 | 停止 VM，清理运行态和新实例盘 |
-| publish | 完整资源 inventory 与 observed revision | Node 落盘后，控制面 CAS 发布 running | 回复丢失由 Inspect 恢复，不销毁成功实例 |
+| publish | 完整资源 inventory 与 observed revision | Orchestrator 已发布本 execution 的 Redis routing record，Control 已原子发布 active Sandbox record/index，并 CAS 发布 running | Redis 暂时失败时保持 publish pending/degraded；回复丢失由 Inspect 和 Redis 对账恢复，不销毁成功实例 |
 
 实例盘未写入用户数据的 Create 失败可在停止 VMM 后回收。已经发布 running 的沙箱故障进入 error，不沿用“创建失败删除磁盘”的补偿；用户数据只能经 Delete 明确回收。
 
@@ -101,7 +102,7 @@ operation 至少保存：id、tenant_id、sandbox_id、action、request_hash、i
 1. 落盘 stopped 目标与 revision，拒绝新执行/文件修改。
 2. 调用 CHV `PUT /api/v1/vm.power-button`，由模板的 ACPI/init 关机能力执行优雅停止；现有 GuestService 没有 Shutdown RPC，不编造该方法。宽限期内等待 Guest shutdown。CHV 路径以 [官方 OpenAPI](https://github.com/cloud-hypervisor/cloud-hypervisor/blob/7913750ed89f25192d920d2a1cef8a8c80f638f0/vmm/src/api/openapi/cloud-hypervisor.yaml) 为依据，实际发行版需一并验证。
 3. 到期后调用 CHV vm.shutdown；确认 VMM unit 退出，必要时 systemd TERM/KILL。CHV vm.shutdown 后可能回到 Created，不能只据此报告 stopped。
-4. 停 VMM 后 fsync journal，清理 TAP/netns/路由、socket、运行 cgroup，保留 rootfs/workspace 和 template 引用。
+4. 停 VMM 后 fsync journal，清理 Redis routing record（按 execution_id 条件删除）、active runtime record/index、TAP/netns、socket、运行 cgroup，保留 rootfs/workspace 和 template 引用。
 5. 确认 unit inactive 后释放 CPU/RAM reservation，保留磁盘占用与 template pin；发布 stopped、记录 clean_shutdown 或 forced_stop。强杀后的文件系统仅承诺 crash recovery，不承诺应用一致性。
 
 ### 4.2 Start
@@ -112,7 +113,7 @@ operation 至少保存：id、tenant_id、sandbox_id、action、request_hash、i
 
 ### 4.3 Delete
 
-落盘 deleted 目标→关闭准入/受控出口连接→停止 VM→确认 unit inactive→清理网络与 socket→删除登记实例盘与目录→释放模板 pin/磁盘配额→发布 deleted。
+落盘 deleted 目标→关闭准入/受控出口连接→停止 VM→确认 unit inactive→按 execution_id 删除 Redis route 和 active runtime index/record→清理网络与 socket→删除登记实例盘与目录→释放模板 pin/磁盘配额→发布 deleted。
 
 有任何清理结果未知时保持 deleting+cleanup_pending，不释放对应磁盘/资源占用；可释放已明确证实不存在的资源分项。节点不可达时不伪造 deleted。模板、他人的实例与独立快照不在清理集合。
 
@@ -131,6 +132,8 @@ Node SQLite 使用 WAL+synchronous=FULL，宿主本地持久目录；资源创�
 5. journal 外的疑似 Isodo 资源进入 quarantine，记录操作员可审查清单；身份不明不自动删除。
 
 reconcile 每 5 秒运行；Node 心跳每 5 秒上报，20 秒未收到时控制面标 unknown，恢复后用 generation/revision CAS 更新。GC 只回收 journal 明确登记且无 live unit/operation/pin 的临时资源；首次发现 orphan 至少隔离 10 分钟，不能通过“目录年龄大”判用户盘可删。
+
+Redis reconcile 每 5 秒核对 DB 中应运行的 Sandbox、Node `InspectSandbox`/journal 与 active registry/routing catalog。只有 Node 证明 Guest Ready 且 route target 属于当前 assignment 时才能重建 running record；active record 缺失、`expires_at` 已到或 routing record 的 TTL 到期都只代表 catalog stale，不得直接 Stop VM 或释放配额。Node routing record 按 `execution_id` 条件删除，防止旧实例退出时误删新 boot 的路由。
 
 宿主重启后 unit 可能不再存在；首版不自动启动用户负载。原盘仍在时报告 stopped 或 error，并说明非正常停机，由用户 Start 恢复；不声称内存或进程恢复。
 
