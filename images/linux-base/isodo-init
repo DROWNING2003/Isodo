@@ -1,0 +1,26 @@
+#!/bin/sh
+set -eu
+mkdir -p /dev /proc /sys /run /tmp /workspace
+mountpoint -q /dev || mount -t devtmpfs devtmpfs /dev
+mountpoint -q /proc || mount -t proc proc /proc
+mountpoint -q /sys || mount -t sysfs sysfs /sys
+mountpoint -q /run || mount -t tmpfs -o mode=0755 tmpfs /run
+mountpoint -q /tmp || mount -t tmpfs -o mode=1777 tmpfs /tmp
+# Every instance receives an independent workspace block device.
+for attempt in $(seq 1 100); do
+    [ -b /dev/vdb ] && break
+    sleep 0.1
+done
+mount -t ext4 -o nosuid,nodev /dev/vdb /workspace
+chown 1000:1000 /workspace
+# devtmpfs creates vsock as root-only; grant the unprivileged Agent access.
+for attempt in $(seq 1 100); do
+    [ -c /dev/vsock ] && break
+    sleep 0.1
+done
+test -c /dev/vsock
+chown root:1000 /dev/vsock
+chmod 0660 /dev/vsock
+mkdir -p /run/acpid
+acpid -f &
+exec /bin/busybox init

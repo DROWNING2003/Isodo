@@ -1,0 +1,798 @@
+openapi: 3.0.3
+info:
+  title: Isodo Public API
+  version: 0.1.0
+  description: Public sandbox API. Every operation requires a valid session, Casdoor bearer token, or scoped API key.
+paths:
+  /v1/sandboxes:
+    get:
+      operationId: ListSandboxes
+      summary: List sandboxes
+      description: Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
+      tags:
+        - Sandboxes
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+        - APIKeyAuth: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SandboxList"
+        default:
+          description: Request, authentication, authorization or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      parameters:
+        - name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 10000
+            default: 0
+    post:
+      operationId: CreateSandbox
+      summary: Create a sandbox
+      description: Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime
+        availability depends on the configured backend.
+      tags:
+        - Sandboxes
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+        - APIKeyAuth: []
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sandbox"
+        default:
+          description: Request, authentication, authorization or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateSandbox"
+  /v1/sandboxes/{sandboxID}:
+    get:
+      operationId: GetSandbox
+      summary: Get a sandbox
+      description: Returns one sandbox owned by the authenticated user. A sandbox owned by another user is reported as not found.
+      tags:
+        - Sandboxes
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+        - APIKeyAuth: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sandbox"
+        default:
+          description: Request, authentication, authorization or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      parameters:
+        - name: sandboxID
+          in: path
+          required: true
+          schema:
+            type: string
+    patch:
+      operationId: UpdateSandbox
+      summary: Update a sandbox
+      description: Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+      tags:
+        - Sandboxes
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+        - APIKeyAuth: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sandbox"
+        default:
+          description: Request, authentication, authorization or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchSandbox"
+      parameters:
+        - name: sandboxID
+          in: path
+          required: true
+          schema:
+            type: string
+    delete:
+      operationId: DeleteSandbox
+      summary: Delete a sandbox
+      description: Deletes a sandbox owned by the authenticated user. This operation is idempotent for an already deleted or
+        missing sandbox.
+      tags:
+        - Sandboxes
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+        - APIKeyAuth: []
+      responses:
+        "204":
+          description: Success
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      parameters:
+        - name: sandboxID
+          in: path
+          required: true
+          schema:
+            type: string
+  /v1/sandboxes/{sandboxID}/app:
+    get:
+      operationId: GetSandboxApp
+      summary: Open a sandbox application
+      description: Creates a short-lived T3 pairing link for an authenticated sandbox owner and redirects the browser to the sandbox application.
+      tags:
+        - Sandboxes
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "303":
+          description: Redirects to the sandbox application's T3 pairing page. The pairing credential is short-lived and is carried in the URL fragment.
+          headers:
+            Location:
+              schema:
+                type: string
+        "401":
+          description: Authentication is required
+        "403":
+          description: An interactive Isodo session is required
+        "404":
+          description: Sandbox not found
+        "409":
+          description: Sandbox is not running
+        "503":
+          description: Sandbox application service is unavailable
+      parameters:
+        - name: sandboxID
+          in: path
+          required: true
+          schema:
+            type: string
+  /v1/system-templates:
+    get:
+      operationId: ListSystemTemplates
+      summary: List platform default templates
+      tags:
+        - Templates
+      security: &a1
+        - SessionCookie: []
+        - BearerAuth: []
+        - APIKeyAuth: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateList"
+        default: &a2
+          description: Request, authentication, authorization or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      parameters:
+        - &a3
+          name: limit
+          in: query
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 50
+        - &a4
+          name: offset
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 10000
+            default: 0
+  /v1/templates:
+    get:
+      operationId: ListTemplates
+      summary: List templates visible to the authenticated user
+      tags:
+        - Templates
+      security: *a1
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateList"
+        default: *a2
+      parameters:
+        - *a3
+        - *a4
+        - name: scope
+          in: query
+          schema:
+            type: string
+            enum:
+              - owned
+              - public
+              - system
+              - available
+            default: owned
+    post:
+      operationId: CreateTemplate
+      summary: Create a personal template
+      tags:
+        - Templates
+      security: *a1
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+        default: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateTemplate"
+  /v1/templates/{templateID}:
+    parameters:
+      - name: templateID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: GetTemplate
+      summary: Get a template
+      tags:
+        - Templates
+      security: *a1
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+        default: *a2
+    patch:
+      operationId: UpdateTemplate
+      summary: Update an owned template
+      tags:
+        - Templates
+      security: *a1
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+        default: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchTemplate"
+    delete:
+      operationId: DeleteTemplate
+      summary: Delete an owned template
+      tags:
+        - Templates
+      security: *a1
+      responses:
+        "204":
+          description: Success
+        default: *a2
+  /v1/templates/{templateID}/builds:
+    parameters:
+      - name: templateID
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: CreateTemplateBuild
+      summary: Queue an immutable template build
+      tags:
+        - Templates
+      security: *a1
+      responses:
+        "202":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateBuild"
+        default: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/BuildRecipe"
+  /v1/templates/{templateID}/builds/{buildID}:
+    parameters:
+      - name: templateID
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: buildID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: GetTemplateBuild
+      summary: Get template build status
+      tags:
+        - Templates
+      security: *a1
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateBuild"
+        default: *a2
+  /v1/templates/{templateID}/tags/{tag}:
+    parameters:
+      - name: templateID
+        in: path
+        required: true
+        schema:
+          type: string
+      - name: tag
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: GetTemplateTag
+      summary: Resolve a Ready build tag
+      tags:
+        - Templates
+      security: *a1
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateTag"
+        default: *a2
+    put:
+      operationId: SetTemplateTag
+      summary: Atomically publish a Ready build under a tag
+      tags:
+        - Templates
+      security: *a1
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/TemplateTag"
+        default: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SetTemplateTag"
+    delete:
+      operationId: DeleteTemplateTag
+      summary: Remove a template build tag
+      tags:
+        - Templates
+      security: *a1
+      responses:
+        "204":
+          description: Success
+        default: *a2
+  /v1/templates/{templateID}/fork:
+    parameters:
+      - name: templateID
+        in: path
+        required: true
+        schema:
+          type: string
+    post:
+      operationId: ForkTemplate
+      summary: Fork an accessible Ready build into a personal template
+      tags:
+        - Templates
+      security: *a1
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Template"
+        default: *a2
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ForkTemplate"
+components:
+  securitySchemes:
+    SessionCookie:
+      type: apiKey
+      in: cookie
+      name: isodo_session
+    BearerAuth:
+      type: http
+      scheme: bearer
+    APIKeyAuth:
+      type: apiKey
+      in: header
+      name: X-API-Key
+  schemas:
+    Error:
+      type: object
+      additionalProperties: false
+      properties:
+        error:
+          type: object
+          additionalProperties: false
+          properties:
+            code:
+              type: string
+            message:
+              type: string
+          required:
+            - code
+            - message
+      required:
+        - error
+    Metadata:
+      type: object
+      additionalProperties: true
+      x-go-type: json.RawMessage
+    Sandbox:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          x-go-name: ID
+        name:
+          type: string
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+        template_id:
+          type: string
+          x-go-name: TemplateID
+        template_build_id:
+          type: string
+          x-go-name: TemplateBuildID
+        template_digest:
+          type: string
+        desired_state:
+          type: string
+        observed_state:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - metadata
+        - desired_state
+        - observed_state
+        - created_at
+        - updated_at
+    CreateSandbox:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        template:
+          type: string
+          description: System catalog name or template UUID, optionally followed by :tag. Defaults to linux-base:default. Resolved to an immutable build at creation.
+          example: linux-base
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+          x-go-type-skip-optional-pointer: true
+      required:
+        - name
+    PatchSandbox:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        metadata:
+          $ref: "#/components/schemas/Metadata"
+    SandboxList:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Sandbox"
+        total:
+          type: integer
+          format: int64
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+        - items
+        - total
+        - limit
+        - offset
+    Template:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          x-go-name: ID
+        name:
+          type: string
+        description:
+          type: string
+        scope:
+          type: string
+          enum:
+            - system
+            - personal
+        visibility:
+          type: string
+          enum:
+            - private
+            - public
+        owned:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - description
+        - scope
+        - visibility
+        - owned
+        - created_at
+        - updated_at
+    CreateTemplate:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        description:
+          type: string
+          maxLength: 2048
+        visibility:
+          type: string
+          enum:
+            - private
+            - public
+          default: private
+      required:
+        - name
+    PatchTemplate:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        description:
+          type: string
+          maxLength: 2048
+        visibility:
+          type: string
+          enum:
+            - private
+            - public
+    TemplateList:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/Template"
+        total:
+          type: integer
+          format: int64
+        limit:
+          type: integer
+        offset:
+          type: integer
+      required:
+        - items
+        - total
+        - limit
+        - offset
+    BuildRecipe:
+      type: object
+      additionalProperties: false
+      properties:
+        source_build_id:
+          type: string
+          x-go-name: SourceBuildID
+        commands:
+          type: array
+          maxItems: 32
+          items:
+            type: array
+            minItems: 1
+            maxItems: 128
+            items:
+              type: string
+              maxLength: 8192
+        publish_tag:
+          type: string
+          pattern: ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$
+          default: default
+      required:
+        - source_build_id
+    TemplateBuild:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+          x-go-name: ID
+        template_id:
+          type: string
+          x-go-name: TemplateID
+        operation_id:
+          type: string
+          x-go-name: OperationID
+        source_build_id:
+          type: string
+          x-go-name: SourceBuildID
+        status:
+          type: string
+          enum:
+            - queued
+            - building
+            - validating
+            - ready
+            - failed
+        manifest_digest:
+          type: string
+        error:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        publication_error:
+          type: string
+          description: Present when the Ready build was retained but its requested tag changed during the build.
+      required:
+        - id
+        - template_id
+        - operation_id
+        - source_build_id
+        - status
+        - created_at
+        - updated_at
+    TemplateTag:
+      type: object
+      additionalProperties: false
+      properties:
+        tag:
+          type: string
+        build_id:
+          type: string
+          x-go-name: BuildID
+      required:
+        - tag
+        - build_id
+    SetTemplateTag:
+      type: object
+      additionalProperties: false
+      properties:
+        build_id:
+          type: string
+          x-go-name: BuildID
+        expected_build_id:
+          type: string
+          x-go-name: ExpectedBuildID
+      required:
+        - build_id
+    ForkTemplate:
+      type: object
+      additionalProperties: false
+      properties:
+        build_id:
+          type: string
+          x-go-name: BuildID
+        name:
+          type: string
+          minLength: 1
+          maxLength: 128
+        visibility:
+          type: string
+          enum:
+            - private
+            - public
+          default: private
+      required:
+        - build_id
+        - name

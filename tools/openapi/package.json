@@ -1,0 +1,7 @@
+{
+  "name": "isodo-openapi-tools",
+  "private": true,
+  "type": "module",
+  "scripts": { "generate": "orval --config orval.config.mjs" },
+  "devDependencies": { "orval": "8.42.0" }
+}

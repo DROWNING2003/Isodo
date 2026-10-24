@@ -1,0 +1,87 @@
+services:
+  redis:
+    image: redis:7.4-alpine
+    restart: unless-stopped
+    command: ["redis-server", "--appendonly", "yes"]
+    ports:
+      - "127.0.0.1:${REDIS_PORT:-6379}:6379"
+    volumes:
+      - isodo-redis:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  db:
+    image: postgres:18-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-isodo}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Run `make init` to create .env first}
+      POSTGRES_DB: ${POSTGRES_DB:-isodo}
+      CASDOOR_DATABASE: ${CASDOOR_DATABASE:-casdoor}
+    ports:
+      - "127.0.0.1:${POSTGRES_PORT:-5432}:5432"
+    volumes:
+      - isodo-db:/var/lib/postgresql
+      - ./deploy/postgres/init/01-create-casdoor-db.sh:/docker-entrypoint-initdb.d/01-create-casdoor-db.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER}\" -d \"$${POSTGRES_DB}\""]
+      interval: 5s
+      timeout: 3s
+      retries: 20
+
+  casdoor:
+    image: casbin/casdoor:4.20.0
+    restart: unless-stopped
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      dbName: ${CASDOOR_DATABASE:-casdoor}
+      driverName: postgres
+      dataSourceName: "user=${POSTGRES_USER:-isodo} password=${POSTGRES_PASSWORD:?Run `make init` to create .env first} host=db port=5432 sslmode=disable dbname=${CASDOOR_DATABASE:-casdoor}"
+      httpport: "8000"
+      initDataFile: /init_data.json
+      initDataMerge: "true"
+      initDataWatchInterval: "30"
+      origin: ${CASDOOR_ORIGIN:-http://localhost:${CASDOOR_PORT:-8000}}
+      initAdminPassword: ${CASDOOR_ADMIN_PASSWORD:?Run `make init` to create .env first}
+    volumes:
+      - ./deploy/casdoor/init_data.runtime.json:/init_data.json:ro
+    ports:
+      - "127.0.0.1:${CASDOOR_PORT:-8000}:8000"
+
+  seaweedfs:
+    image: chrislusf/seaweedfs:4.48
+    entrypoint: ["/bin/sh", "/isodo-entrypoint.sh"]
+    restart: unless-stopped
+    command:
+      - mini
+      - -dir=/data
+      - -ip=seaweedfs
+      - -ip.bind=0.0.0.0
+      - -s3.port=8333
+      - -s3.config=/tmp/isodo-s3.json
+      - -bucket=${ISODO_TEMPLATE_S3_BUCKET:-isodo-templates}
+      - -webdav=false
+      - -admin.ui=false
+      - -master.telemetry=false
+    ports:
+      - "127.0.0.1:${SEAWEEDFS_PORT:-8333}:8333"
+    volumes:
+      - isodo-seaweedfs:/data
+      - ./deploy/seaweedfs/s3.runtime.json:/run/isodo-s3-source.json:ro
+      - ./deploy/seaweedfs/entrypoint.sh:/isodo-entrypoint.sh:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8333/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+
+volumes:
+  isodo-db:
+  isodo-redis:
+  isodo-seaweedfs:
