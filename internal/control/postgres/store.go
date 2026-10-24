@@ -138,6 +138,10 @@ func (s *Store) CreateSandbox(ctx context.Context, tenantID, name string, metada
 		TemplateRef: reference, TemplateID: templateID, TemplateBuildID: buildID,
 		TemplateDigest: digest, ArtifactBucket: artifactBucket, ArtifactPrefix: artifactPrefix,
 	}
+	if !localLima {
+		payload.Resources = new(operation.Resources)
+		*payload.Resources = operation.DefaultResources()
+	}
 	payloadJSON, err := json.Marshal(payload)
 	if err != nil {
 		return sandbox.Sandbox{}, err
@@ -200,6 +204,9 @@ func (s *Store) ClaimSandboxCreate(ctx context.Context, workerID, nodeID string)
 	job.TemplateDigest = payload.TemplateDigest
 	job.ArtifactBucket = payload.ArtifactBucket
 	job.ArtifactPrefix = payload.ArtifactPrefix
+	if payload.Resources != nil {
+		job.Resources = *payload.Resources
+	}
 	job.WorkerID = workerID
 	job.OwnershipGeneration = 1
 	job.Revision = 1

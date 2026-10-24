@@ -25,7 +25,7 @@ func main() {
 }
 func run() error {
 	if len(os.Args) < 2 {
-		return errors.New("usage: isodo-template verify|probe|probe-bound|probe-node|probe-warm|build-warm|probe-artifact|publish-system --dir DIRECTORY --digest SHA256 [--vmm-binary PATH]")
+		return errors.New("usage: isodo-template verify|probe|probe-bound|probe-node|probe-control|probe-warm|build-warm|probe-artifact|publish-system --dir DIRECTORY --digest SHA256 [--vmm-binary PATH]")
 	}
 	flags := flag.NewFlagSet(os.Args[1], flag.ContinueOnError)
 	directory := flags.String("dir", "", "candidate artifact directory")
@@ -84,6 +84,14 @@ func run() error {
 		probeCtx, stop := context.WithTimeout(ctx, 15*time.Minute)
 		defer stop()
 		result, err := probeNode(probeCtx, *binary, *cache, *digest, *templateID, *buildID)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(result)
+	case "probe-control":
+		probeCtx, stop := context.WithTimeout(ctx, 30*time.Minute)
+		defer stop()
+		result, err := probeControl(probeCtx, *binary, *cache, *digest, *templateID, *buildID)
 		if err != nil {
 			return err
 		}

@@ -1,6 +1,6 @@
 # 预热模板与快照启动规格 v0.1
 
-状态：实现进行中。磁盘 base 工件、S3 发布/只读获取、双 VM 身份绑定及 CHV Node create/stop/delete 后端已有真实验证。现行 VM 路径仍为冷启动；Pause/Resume/Snapshot/Restore 客户端原语已有代码，且已完成两实例 Runtime Snapshot + CoW PoC，但尚未完成持久化快照产物、生产创建路径与完整安全验收。公开 Control API dispatch、独立网络、恢复和加速仍未完成。
+状态：实现进行中。磁盘 base 工件、S3 发布/只读获取、双 VM 身份绑定及 CHV Node create/stop/delete 后端已有真实验证。持久化 Runtime Snapshot 已通过真实双实例恢复验证，发布为系统 linux-base 默认 build，并通过 Node 只读 S3 获取及 create/stop/delete 验证；公开 Control API 已完成固定资源传递和一次隔离数据库 HTTP→Ready→固定命令→Node 删除联调。公开 Exec/Files/PTY、崩溃恢复、完整安全隔离及性能采样仍未完成。
 
 ## 1. 目标与范围
 
@@ -89,12 +89,24 @@ Isodo 的 durable operation 接收与可运行状态必须分开：如提前返�
 
 真实 isodo-test 节点上，两次 Snapshot + Memory CoW + QCOW2 写层派生到首条固定 Python 命令完成分别为 867ms、781ms；CHV restore 调用分别为 37ms、49ms。确认 `/proc/<pid>/maps` 的私有内存文件映射、不同 Guest epoch/随机样本、rootfs/workspace 标记不串写以及 ACPI 清理。一次性准备模板耗时 52.55 秒，局部克隆指标不含 API、S3 分发与调度。
 
-工件已换用包含 VMGENID 模块的 6.8.0-147 Guest kernel，仍未发布替换系统目录的 base build。运行态快照目前只存在于 PoC 临时目录，尚未作为持久化产物接入生产创建路径。详细证据见 [CoW 快照验证](../artifacts/validation/chv-warm-snapshot-20261024/README.md)。两次样本不能作为分位数或 SLA。
+工件已换用包含 VMGENID 模块的 6.8.0-147 Guest kernel。PoC 的临时快照已进一步制作成自包含、按 digest 固定的持久化 v5 工件，并完成系统发布与 Node 恢复验证，见下文。早期实验详细证据见 [CoW 快照验证](../artifacts/validation/chv-warm-snapshot-20261024/README.md)。两次样本不能作为分位数或 SLA。
 
 ### 持久化运行态产物契约
 
 运行态模板应成为独立不可变 build：manifest 同时固定 kernel/config、暂停时的 rootfs seed、workspace seed、CHV config/state、memory-ranges，以及源 manifest digest、精确 VMM binary digest、Guest 资源规格和宿主 CPU 兼容指纹。所有文件使用扁平文件名、精确大小和 SHA-256，最后发布 manifest；不依赖构建临时目录中的文件。
 
-Node 首次获取/启动时做完整验证。后续创建可复用进程内的已验证只读工件凭据，凭据由校验器创建，使用前检查目录/文件 inode、大小、mtime 和只读权限；变化时必须重新校验，不能仅凭缓存目录存在便跳过哈希。凭据不跨 Node 进程重启持久化。生产 Snapshot restore 不应每次重复读取十几 GiB 模板，否则亚秒级 VMM restore 会被准备阶段淹没。
+Node 首次获取/启动时做完整验证。后续创建可复用进程内的已验证只读工件凭据，凭据由校验器创建，使用前检查目录/文件 inode、大小、mtime 和只读权限；变化时必须重新校验，不能仅凭缓存目录存在便跳过哈希。凭据不跨 Node 进程重启持久化。当前首次 FetchVerified 经 Fetch 后再 VerifyArtifact，仍有重复全量扫描成本；热路径复用凭据避免逐次重复读取十几 GiB。
 
 恢复必须匹配 manifest 记录的 CHV binary、CPU 指纹和资源规格，重写实例私有的磁盘、kernel/initramfs、Vsock、serial 路径，并保留内存/磁盘种子至 VM 回收。初版按严格兼容性拒绝不匹配；不能静默把不兼容运行态当作成功恢复。
+
+### 持久化 v5 发布与 Node 验证（2026-10-24）
+
+在 isodo-test 完成自包含 v5 工件恢复和发布：manifest digest `34e3fa754513676520ceca725ffb22db71eea27aee139682f7ff8b4fe28aca5d`，系统 template ID `66841e6a-ad65-42ee-86f1-3e420f8de53b`，新 build ID `07521f8f-4750-4c7e-81ad-45b00a5e2b6d`。发布前重新读取 Registry 当前 build，以 CAS 替换默认指针；上传与登记成功，未修改旧 build 的工件内容。
+
+首次独立 `probe-artifact` 完整校验耗时 62,625ms，随后两实例 create→Ready 为 496ms / 514ms，create→首条固定命令为 889ms / 888ms。发布命令强制复探针再次通过，完整校验 63,210ms，两实例 create→Ready 为 459ms / 490ms，create→首命令为 825ms / 937ms。每组均确认 Guest epoch/随机样本不同、root/workspace 标记隔离，并在 create context 取消后执行命令。完整校验成本单独列出；这些少量已验证本地缓存样本不包含公开 API、S3 获取、Control 调度或 mTLS 传输，也不是分位数。
+
+Node `probe-node` 通过只读 S3 凭证首次获取该已发布工件，使用真实 CHVServer 执行 create、绑定 Ready/Inspect、同 operation 重放、stop、delete。sandbox `d1a4c849-4225-4480-ba57-14aa6103f012` 的 `replay_verified`、`capacity_released`、`deleted` 均为 true。该探针直接调用服务实现；首次下载校验耗时不归入本地缓存恢复指标。
+
+扩展后的同进程顺序双实例 `probe-node` 也通过：第一实例 create→Ready 405,686ms、create→首命令 406,392ms（包含已有磁盘缓存的该进程首次重复完整校验）；第二实例复用同一 Artifact 校验凭据，create→Ready 765ms、create→首命令 1,206ms。两实例的固定命令、不同 boot/Guest epoch、operation 重放、stop/delete 与容量释放均通过，`cache_reused=true`。结束后无残留 VMM。此探针证明顺序缓存复用；并发双盘标记隔离仍由独立 `probe-artifact` 证明。首次校验已明显慢于本地候选目录校验，需单独优化与分析，不用第二实例指标代表缓存未命中的创建成本。
+
+公开 Control 创建已完成一次真实隔离联调：`result-control-v5.json` 记录 HTTP 创建 38ms、Create→running 3,054ms、Create→首条固定命令 3,538ms；CHV 资源固定为 2 vCPU / 512 MiB，Node 删除成功且容量恢复。HTTP Delete 当前只验证元数据删除，Node 删除由 operator probe 执行。该次首次完整工件验证耗时 231,828ms，不能作为恢复延迟。停止后启动、崩溃核对、完整网络/UID/cgroup 隔离及公开 Exec/PTY/Files 仍不在上述成功证据内。
