@@ -1,0 +1,20 @@
+---
+title: Casdoor
+description: 配置 Casdoor OIDC 登录和本地 GitHub Provider。
+---
+
+# Casdoor 集成
+
+Isodo 通过 Casdoor 统一身份认证，开发者可使用 Casdoor 配置的 GitHub Provider 登录。
+
+## 本地开发
+
+1. 复制 `.env.example` 创建本地 `.env`，使用 `make init` 生成数据库和管理员密码。
+2. 在 `.env` 配置 `GITHUB_CLIENT_ID`、`GITHUB_CLIENT_SECRET`，并设置 `ISODO_CASDOOR_CLIENT_ID` 与 `ISODO_CASDOOR_CLIENT_SECRET`。
+3. 运行 `make infra-up` 启动 Casdoor 和 PostgreSQL。项目会按本地环境生成 Casdoor 配置。
+4. 在 GitHub OAuth App 中将 Casdoor 的 GitHub 回调地址登记为 Authorization callback URL；在 Casdoor 应用中配置 Web 客户端允许的本地回调地址。
+5. 通过 `make api` 和 `make web` 启动 Isodo。
+
+GitHub OAuth App 的回调目标是 Casdoor Provider 回调地址，而不是 Isodo Web 的 `/auth/callback`。本地与 ngrok 场景的实际地址以 `.env` 配置和 Casdoor 应用设置为准。
+
+不要提交 `.env` 或把 OAuth Client Secret 放到浏览器端。

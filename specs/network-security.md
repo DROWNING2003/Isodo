@@ -6,13 +6,13 @@
 
 ## 1. 身份与信任边界
 
-- API 认证使用平台 Bearer API key：只保存高熵 key 的校验摘要，明文仅创建时返回；权限按 tenant 和 scope（sandboxes:read/write、executions:read/write、files:read/write、connections:read/write）校验。首版由管理员 provisioning 用户/key，OAuth 和桌面登录延后。
+- 用户 API 认证使用 Casdoor OAuth 2.0/OIDC access token（Bearer），Casdoor Application 仅允许 GitHub OAuth 登录；本地密码/验证码等登录方式和其他 OAuth Provider 关闭。Isodo 后端经固定 issuer 的 discovery/UserInfo 验证 token，并以 `(issuer, sub)` 映射本地 tenant；email、用户名、GitHub username、客户端传入的 tenant ID 均不构成授权凭据。GitHub-only 限制依赖 Casdoor Application 配置，Isodo 当前不根据 UserInfo 推断上游登录 Provider。完整 R-01 契约见 [Sandbox CRUD 与 Casdoor 鉴权](sandbox-crud-auth.md)。桌面登录和 CLI/device-code 流程延后。
 - API 每次读取/操作先核实对象 tenant。跨租户对象返回 404；GET /nodes 和节点配置仅管理员可见。metadata、资源 ID、IP 不构成授权凭据。
 - Control Plane→Node、Node→Gateway 使用各自服务身份的 mTLS；证书绑定 node/service ID，不能只验证“由同一个 CA 签发”。Node 核实该 sandbox 的 owner generation/revision。
 - Node→Guest 是该实例 Vsock 私有通道，规则见 Guest 协议；Guest 自报 tenant/hostname 不可信，不能据此选择宿主路径或第三方 credential。
 - VMM 是专属非特权 UID 的宿主进程；Node 执行必需的 netns/systemd 操作。Guest workload 无宿主 KVM/socket/目录权限，无 Guest CAP_SYS_ADMIN，无隐式 host 文件共享。
 
-首版配置需要说明 API TLS 终止、CA/证书来源和管理员 bootstrap 的实际步骤。测试 key 也不能写进 Git、镜像、示例配置或日志。CLI/API key 功能不代表 OAuth 已完成。
+首版配置需要说明 API TLS 终止、CA/证书来源、Casdoor 应用配置和新用户开通策略。Casdoor 仅启用 GitHub OAuth Provider，允许通过 GitHub 首次登录/注册以触发 Isodo identity 与个人 tenant 的自动创建；该 Application 上的其他 Provider 和 Casdoor 本地登录方法必须关闭。Casdoor client secret 只能通过部署密钥管理注入，不能写进 Git、镜像、示例配置或日志。Casdoor 用户认证不替代 Control Plane→Node、Node→Gateway 的服务身份认证。
 
 ## 2. 创建时网络参数
 

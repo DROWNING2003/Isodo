@@ -1,0 +1,26 @@
+---
+title: 身份认证
+description: 使用 Casdoor 登录会话、Bearer Token 或 API Key 调用 Isodo。
+---
+
+# 身份认证
+
+Isodo 使用 Casdoor 作为 OAuth/OIDC 身份提供方。Web 登录通过授权码流程建立服务端会话；服务端会校验 OAuth `state`、PKCE 和 OIDC 身份信息。
+
+## 本地 Casdoor
+
+通过 `make infra-up` 启动本地 Casdoor。按 `.env.example` 配置 GitHub Provider 的 Client ID 和 Secret，并在 Casdoor 应用中注册本地 Web 回调地址。客户端 Secret 只保存在本地环境变量中。
+
+在公开 API 请求中，可使用以下任意一种凭证：
+
+- 登录 Web 后由浏览器自动发送的 `isodo_session` Cookie。
+- Casdoor 签发且受 Isodo 校验的 Bearer Token。
+- Web 控制台创建的 API Key，通过 `X-API-Key` 请求头发送。
+
+## API Key
+
+API Key 与创建者绑定，可设置只读或管理权限和过期时间。服务端只保存密钥摘要；创建成功后明文只展示一次。删除密钥会立即撤销其 API 访问能力。
+
+不要把 API Key 放进浏览器代码、源码仓库、命令历史或日志。生产调用应由受信任的服务端安全保存并注入密钥。
+
+管理 API Key 的控制面接口不属于公开 API Reference。

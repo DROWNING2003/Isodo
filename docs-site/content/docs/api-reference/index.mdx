@@ -1,0 +1,12 @@
+---
+title: API Reference
+description: Isodo 用户和 SDK 使用的公开 HTTP API。
+---
+
+# API Reference
+
+接口页面直接由 `api/openapi/openapi-public.yaml` 生成。该契约只包含面向用户和 SDK 的公开 HTTP API；网页登录回调、会话管理和 API Key 管理等控制面接口不在本页中发布。
+
+所有 Sandbox 操作均需要认证，支持浏览器会话 Cookie、Casdoor Bearer Token 或 API Key。创建 API Key 后，请通过 `X-API-Key` 请求头发送。
+
+运行 `make generate` 重新生成本目录下的端点页面和 API 客户端。

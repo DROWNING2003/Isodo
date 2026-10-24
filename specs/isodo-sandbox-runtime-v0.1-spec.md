@@ -83,10 +83,11 @@ isodo/
 │   ├── isodo-guest/         # Guest 内 Agent
 │   ├── isodo-gateway/       # 受控模型/MCP 与凭证边界
 │   └── isodo-builder/       # P1: Golden Image Builder
-├── web/                    # 正式 Web，原型仍在 prototype/
-├── api/
-│   ├── openapi.yaml
-│   └── proto/isodo/guest/v1/guest.proto  # 已定义；Node 契约另行展开
+├── app/apps/web/           # 本地 T3 派生 Web 工作区，当前未纳入提交
+├── api/openapi/
+│   ├── openapi.yaml                  # 控制面/管理 API
+│   └── openapi-public.yaml           # 用户与 SDK 的 Sandbox API
+├── api/proto/isodo/guest/v1/guest.proto  # 已定义；Node 契约另行展开
 ├── internal/
 │   ├── control/{api,auth,scheduler,quotas,repository}/
 │   ├── node/{service,vm,reconcile,storage,network,security}/
@@ -107,7 +108,7 @@ v0.1 可以把 API、Scheduler 放在一个 Go 二进制中，Node Agent 放在�
 
 | ID | 需求 | 优先级 | 验收依据 |
 |---|---|---|---|
-| R-01 | Sandbox CRUD + 鉴权 | P0 | 任何用户不能读取其他用户 Sandbox |
+| R-01 | Sandbox CRUD + Casdoor 鉴权 | P0 | 任何用户不能读取、修改或删除其他 tenant 的 Sandbox；契约见 [R-01 规格](sandbox-crud-auth.md) |
 | R-02 | CHV Process Lifecycle | P0 | API 状态与真实 CHV 进程 / API 一致 |
 | R-03 | Guest Exec | P0 | stdout、stderr、exit code、超时和取消正确 |
 | R-04 | PTY / Web Terminal | P0 | 可启动 bash/codex，支持 Ctrl+C、resize |
@@ -435,7 +436,7 @@ Nomad 资料：[System Job](https://developer.hashicorp.com/nomad/docs/job-speci
 ## 18. 开发 Agent 的约束（可放进 AGENTS.md）
 
 - **禁止用 Mock 冒充集成成功**：unit test 可以 Fake Runtime，integration test 必须查到真实 CHV PID 和 Guest Agent 响应。
-- **按契约开发**：优先编写 `api/openapi.yaml`、`node.proto`、`guest.proto` 与状态机测试；模块内禁止重复造另一套字段和错误模型。
+- **按契约开发**：按接口边界维护 `api/openapi/openapi.yaml`、`api/openapi/openapi-public.yaml`、`api/proto/isodo/node/`、`api/proto/isodo/guest/` 与状态机测试；模块内禁止重复造另一套字段和错误模型。
 - **不编造 CHV API**：只使用经官方 OpenAPI、官方 docs 或源码验证的 endpoint；调用失败必须返回错误和可回滚上下文。
 - **不提前设计 P2**：不加 Redis、etcd、Kafka、K8s、Nomad per-Sandbox Jobs、跨架构内存迁移或复杂分布式存储。
 - **所有宿主权限最小化**：Guest 不能获知 Host Socket 和 Secret；Node Agent 的每个危险操作都有所有权检查、路径检查和审计记录。
@@ -451,7 +452,7 @@ Nomad 资料：[System Job](https://developer.hashicorp.com/nomad/docs/job-speci
 ### 19.1 原型、正式网页与 Runtime 的关系
 
 - `prototype/` 保留全部原型及设计历史；其中 localStorage、OAuth、订阅、审批、上传状态都是 mock。
-- 正式网页位于拟建的 `web/`，只访问公开 API，不接触 CHV、Node 内部 RPC 或第三方长期密钥。沿用原型交互时，逐屏替换数据来源并显示真实 operation 状态。
+- 正式网页当前位于本地 `app/apps/web/` 工作区，未来纳入源码后仍只访问公开 API，不接触 CHV、Node 内部 RPC 或第三方长期密钥。沿用原型交互时，逐屏替换数据来源并显示真实 operation 状态。
 - 产品 Task 是对话/工作记录；Exec 是一次进程；Terminal Session 是一个 PTY；三者都不等于 Sandbox。v0.1 可先在终端运行 CLI Agent，不宣称已实现原型里的对话任务编排与四档审批。
 - Linux CHV 是首个执行后端；macOS 上的网页访问远端 Linux 不应标为“本地沙箱”。产品本地/云端统一 API 是方向，Mac VZ 另立规格。
 

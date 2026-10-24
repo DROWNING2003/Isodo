@@ -1,0 +1,31 @@
+@import 'tailwindcss';
+@import 'fumadocs-ui/css/neutral.css';
+@import 'fumadocs-ui/css/preset.css';
+@import 'fumadocs-openapi/css/preset.css';
+
+:root {
+  --color-fd-primary: #0878e8;
+  --color-fd-primary-foreground: #fff;
+  --isodo-accent: #0878e8;
+}
+
+.isodo-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  color: var(--color-fd-foreground);
+  font-size: 1.05rem;
+  font-weight: 650;
+  letter-spacing: -0.035em;
+}
+
+.isodo-brand-mark {
+  width: 1.65rem;
+  height: 1.65rem;
+  object-fit: contain;
+  border-radius: 0.52rem;
+}
+
+::selection {
+  background: color-mix(in srgb, var(--isodo-accent) 22%, transparent);
+}

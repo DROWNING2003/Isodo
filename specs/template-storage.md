@@ -1,6 +1,8 @@
 # 模板、实例磁盘与存储规格 v0.1
 
-状态：2026-10-24，实现契约草案；正式镜像尚未构建，存储流程尚未验收。主要参考 E2B 的不可变模板和实例隔离思想；首版采用 CHV raw 磁盘、原节点 Stop/Start，不移植 E2B 的 Firecracker/UFFD/NBD 格式。
+状态：2026-10-24，实现契约草案；正式镜像尚未构建，存储流程尚未验收。主要参考 E2B 的不可变模板和实例隔离思想；首版采用 CHV raw 磁盘、原节点 Stop/Start。内部预热 Guest 内存快照另见[预热模板启动规格](warm-template-startup.md)，不等于用户可见的产品 Snapshot，也不移植 E2B 的 Firecracker/NBD 格式。
+
+模板资源与个人 public/private 权限见[模板服务](template-service.md)。模板工件统一保存在 SeaweedFS S3 私有 bucket；Node 本地目录是可校验缓存。
 
 相关：[生命周期](sandbox-lifecycle.md)、[Guest](guest-protocol.md)、[网络安全](network-security.md)、[验证记录](validation.md)。本次已有 BusyBox initramfs 只是探针，不能作为满足本规格的正式模板。
 
@@ -8,17 +10,17 @@
 
 | 对象 | 所有者 | 可变性 | 回收条件 |
 | --- | --- | --- | --- |
-| Template manifest / kernel / rootfs | 平台模板目录 | 按 digest 不可变 | 无 live/stopped 实例、在途 operation、快照引用且超过保留窗口 |
+| Template manifest / kernel / rootfs | SeaweedFS S3 模板仓库 | 按 digest 不可变 | 无 live/stopped 实例、在途 operation、快照引用且超过保留窗口 |
 | 实例系统盘 rootfs.raw | sandbox | 可写，保留用户 home/环境变化 | 仅 Create 未发布失败的安全补偿或明确 Delete |
 | 实例 workspace.raw | sandbox | 可写、独立文件系统，挂载 /workspace | 与实例系统盘同生命周期 |
 | Node staging/download | 在途操作 | 尚未发布 | 失败/取消后确认无使用者再回收 |
 | 产品 Snapshot（后续） | 独立资源 | 发布后不可变 | 显式删除且无引用，不随实例 Delete 回收 |
 
-首版没有独立 Volume API，没有对象存储备份承诺，没有运行态内存快照。一个沙箱停止后仍占实例磁盘和模板引用；停止只释放运行计算/网络资源。
+首版没有独立 Volume API、对象存储备份承诺或用户可见的运行态快照 API。Node 内部可使用预热 VM 内存快照加速新实例启动；用户数据仍保存在每 Sandbox 独立的持久盘。一个沙箱停止后仍占实例磁盘和模板引用；停止只释放运行计算/网络资源。
 
 ## 2. 正式模板清单
 
-模板由管理员发布；租户只选择已发布 digest，不提交任意宿主路径或下载 URL。版本名是展示/查找别名，Create 时解析成 manifest digest 固定保存，Start 不重新解析可变别名。
+系统默认模板由平台发布；用户通过模板服务构建/派生自己的个人模板，并选择 public/private。公开模板只开放服务层的发现和使用权限，底层 S3 bucket 始终私有。用户请求只选择已授权的 template/build，不提交任意宿主路径或下载 URL。版本名是展示/查找别名，Create 时解析成 manifest digest 固定保存，Start 不重新解析可变别名。
 
 ```json
 {
@@ -42,6 +44,7 @@
   },
   "workspace": {"filesystem": "ext4", "minimum_size_bytes": 4294967296},
   "guest_protocol": {"major": 1, "minimum_minor": 0},
+  "guest_agent": {"version": "0.1.0-dev", "capabilities": ["ready.v1"]},
   "workload_user": {"name": "isodo", "uid": 1000, "gid": 1000},
   "minimum_memory_mib": 1024
 }
@@ -92,7 +95,18 @@ sandbox/digest/boot ID 全部经服务端生成与校验，路径不接受用户
 
 `inventory.json` 辅助现场核对，SQLite journal 为 Node 操作事实来源；两者更新不假定原子，要用 operation/revision 匹配并 reconcile。inventory 写临时文件+fsync+rename+目录 fsync；不因 inventory 缺失立即认定磁盘可以删除。
 
-## 5. 下载、校验与缓存
+## 5. SeaweedFS 对象仓库、下载与缓存
+
+开发环境通过 Compose 的 SeaweedFS 单节点服务提供 S3，默认 endpoint 为 `http://127.0.0.1:8333`，bucket 为 `isodo-templates`。平台存储配置由管理员固定；客户端不能覆盖 endpoint/bucket/key。配置和命令见 [SeaweedFS 部署说明](../deploy/seaweedfs/README.md)。
+
+- PostgreSQL 保存 Template/Build 的 owner、visibility、状态、manifest digest 和工件引用；SeaweedFS 保存文件内容，Redis 不保存模板工件。
+- 对象路径为 `templates/sha256/<manifest_digest>/<filename>`。先上传 kernel/rootfs 等文件，最后上传 `manifest.json` 作为完整发布标记；全部验证成功后才能将 DB Build 标为 Ready。
+- 上传使用条件写，拒绝覆盖已有对象；重试命中已有对象时流式校验 SHA-256 和长度，不将 multipart ETag 当作 SHA-256。
+- 使用 AWS SDK v2 S3 Transfer Manager 上传，64 MiB 分片、并发 2；支持大于 5 GiB 的磁盘工件，失败中止 multipart，后台 GC 还需处理进程崩溃遗留分片。
+- 构建服务持有 bucket 范围写入凭证；Node 使用独立的 bucket 范围只读凭证。凭证仅保存在服务配置，不能打进模板/Guest、返回用户或写入日志。个人模板改为 public 不修改 bucket ACL。
+- `/data` 持久卷同时保存 master、volume 与 filer 元数据；停止/重建容器保留卷。开发单节点不构成多副本或备份承诺。
+
+
 
 1. 按 manifest digest 获取下载锁，记录在途引用。
 2. 下载到随机 staging，不覆盖已发布 cache；校验文件类型、大小、hash、架构与 schema。
@@ -139,7 +153,7 @@ Stop 保留两盘与 template pin。正常 Guest shutdown 尽量 flush；强杀�
 
 Workspace Checkpoint 只含工作区，不等于完整环境。产品 Snapshot 含模板 pin、系统盘变化与工作区，不含内存，恢复创建独立 sandbox 并重新授权连接。VM Memory Snapshot 另含 RAM/设备状态和匹配磁盘，必须锁架构/CPU/CHV/设备兼容性。
 
-这三者沿用总体规格定义。首版不暴露捕获 API；运行中复制 raw 文件不作为任何一致快照的实现。后续需要 manifest 原子提交、工件校验/引用、对象存储上传完成与恢复验收，再开放相应 capability。
+这三者沿用总体规格定义。首版不暴露用户可见的捕获 API；运行中复制 raw 文件不作为任何一致快照的实现。内部预热模板快照的构建和恢复契约见[预热模板启动规格](warm-template-startup.md)。对象存储产品快照仍需 manifest 原子提交、工件校验/引用、上传完成与恢复验收，再开放相应 capability。
 
 ## 9. 验收矩阵
 
