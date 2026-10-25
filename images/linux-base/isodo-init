@@ -2,6 +2,11 @@
 set -eu
 mkdir -p /dev /proc /sys /run /tmp /workspace
 mountpoint -q /dev || mount -t devtmpfs devtmpfs /dev
+# PTY allocation requires devpts in addition to devtmpfs. T3 and Agent terminal
+# children run as uid 1000, so expose the multiplexor while retaining slave ownership.
+mkdir -p /dev/pts
+mountpoint -q /dev/pts || mount -t devpts -o gid=5,mode=0620,ptmxmode=0666 devpts /dev/pts
+ln -sfn pts/ptmx /dev/ptmx
 mountpoint -q /proc || mount -t proc proc /proc
 mountpoint -q /sys || mount -t sysfs sysfs /sys
 mountpoint -q /run || mount -t tmpfs -o mode=0755 tmpfs /run

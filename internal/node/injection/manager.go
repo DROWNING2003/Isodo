@@ -14,19 +14,21 @@ import (
 // Manager owns the host-side CA and one proxy listener per sandbox. A proxy is
 // started before T3 so rules can change without restarting the guest runtime.
 type Manager struct {
-	mu          sync.Mutex
-	stateDir    string
-	hostGateway string
-	ca          *CA
-	store       *Store
-	proxies     map[string]*Proxy
-	logger      *slog.Logger
+	publicEgressOnly bool
+	mu               sync.Mutex
+	stateDir         string
+	hostGateway      string
+	ca               *CA
+	store            *Store
+	proxies          map[string]*Proxy
+	logger           *slog.Logger
 }
 
 type ManagerConfig struct {
-	StateDir    string
-	HostGateway string
-	Logger      *slog.Logger
+	PublicEgressOnly bool
+	StateDir         string
+	HostGateway      string
+	Logger           *slog.Logger
 }
 
 func NewManager(config ManagerConfig) (*Manager, error) {
@@ -54,7 +56,7 @@ func NewManager(config ManagerConfig) (*Manager, error) {
 		gateway = "192.168.5.2"
 	}
 	return &Manager{
-		stateDir: stateDir, hostGateway: gateway, ca: ca, store: store,
+		stateDir: stateDir, hostGateway: gateway, ca: ca, store: store, publicEgressOnly: config.PublicEgressOnly,
 		proxies: map[string]*Proxy{}, logger: logger,
 	}, nil
 }
@@ -141,7 +143,13 @@ func (m *Manager) ensureProxyLocked(sandboxID string) (*Proxy, error) {
 	if proxy := m.proxies[sandboxID]; proxy != nil && !proxy.closed.Load() {
 		return proxy, nil
 	}
-	proxy, err := NewProxy(sandboxID, m.ca, m.logger)
+	var proxy *Proxy
+	var err error
+	if m.publicEgressOnly {
+		proxy, err = newProxy(sandboxID, m.ca, m.logger, dialPublic)
+	} else {
+		proxy, err = NewProxy(sandboxID, m.ca, m.logger)
+	}
 	if err != nil {
 		return nil, err
 	}

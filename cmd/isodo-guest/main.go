@@ -11,6 +11,7 @@ import (
 	"syscall"
 
 	guestv1 "github.com/DROWNING2003/Isodo/internal/api/guest/v1"
+	"github.com/DROWNING2003/Isodo/internal/egressproxy"
 	"github.com/DROWNING2003/Isodo/internal/guest/agent"
 	"github.com/mdlayher/vsock"
 	"google.golang.org/grpc"
@@ -25,6 +26,8 @@ func main() {
 }
 
 func run(logger *slog.Logger) error {
+	shutdownCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
+	defer stop()
 	identity, err := agent.IdentityFromEnvironment()
 	if err != nil {
 		return err
@@ -63,17 +66,30 @@ func run(logger *slog.Logger) error {
 		grpc.StreamInterceptor(guestServer.StreamInterceptor()),
 	)
 	guestv1.RegisterGuestServiceServer(server, guestServer)
-	serveErrors := make(chan error, 1)
+	serveErrors := make(chan error, 2)
+	if transport == "vsock" {
+		proxyListener, err := net.Listen("tcp", "127.0.0.1:1080")
+		if err != nil {
+			return fmt.Errorf("listen for Guest egress proxy: %w", err)
+		}
+		defer proxyListener.Close()
+		go func() {
+			serveErrors <- egressproxy.Serve(shutdownCtx, proxyListener, func(ctx context.Context) (net.Conn, error) {
+				if err := ctx.Err(); err != nil {
+					return nil, err
+				}
+				return vsock.Dial(vsock.Host, egressproxy.Port, nil)
+			})
+		}()
+	}
 	go func() {
 		serveErrors <- server.Serve(listener)
 	}()
 	logger.Info("guest agent ready", "transport", transport)
 
-	shutdownCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	defer stop()
 	select {
 	case err := <-serveErrors:
-		if errors.Is(err, grpc.ErrServerStopped) {
+		if errors.Is(err, grpc.ErrServerStopped) || shutdownCtx.Err() != nil {
 			return nil
 		}
 		return err

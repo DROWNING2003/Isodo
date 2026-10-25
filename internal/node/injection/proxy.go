@@ -25,6 +25,7 @@ import (
 // tunnelled untouched; matching hosts are terminated with a locally issued
 // certificate so authentication headers can be added outside the guest.
 type Proxy struct {
+	dial      func(context.Context, string, string) (net.Conn, error)
 	sandboxID string
 	token     string
 	ca        *CA
@@ -44,6 +45,9 @@ type Proxy struct {
 }
 
 func NewProxy(sandboxID string, ca *CA, logger *slog.Logger) (*Proxy, error) {
+	return newProxy(sandboxID, ca, logger, (&net.Dialer{Timeout: 10 * time.Second}).DialContext)
+}
+func newProxy(sandboxID string, ca *CA, logger *slog.Logger, dial func(context.Context, string, string) (net.Conn, error)) (*Proxy, error) {
 	if ca == nil {
 		return nil, errors.New("injection CA is required")
 	}
@@ -57,6 +61,7 @@ func NewProxy(sandboxID string, ca *CA, logger *slog.Logger) (*Proxy, error) {
 		return nil, fmt.Errorf("listen for injection proxy: %w", err)
 	}
 	transport := &http.Transport{
+		DialContext:           dial,
 		Proxy:                 nil,
 		ForceAttemptHTTP2:     false,
 		TLSNextProto:          map[string]func(string, *tls.Conn) http.RoundTripper{},
@@ -67,7 +72,7 @@ func NewProxy(sandboxID string, ca *CA, logger *slog.Logger) (*Proxy, error) {
 		ExpectContinueTimeout: time.Second,
 	}
 	proxy := &Proxy{
-		sandboxID: sandboxID, token: token, ca: ca, listener: listener, transport: transport,
+		sandboxID: sandboxID, token: token, ca: ca, listener: listener, transport: transport, dial: dial,
 		logger: logger,
 	}
 	proxy.server = &http.Server{
@@ -267,7 +272,7 @@ func (p *Proxy) handlePlain(w http.ResponseWriter, r *http.Request) {
 }
 
 func (p *Proxy) tunnel(w http.ResponseWriter, r *http.Request, target string) {
-	upstream, err := net.DialTimeout("tcp", target, 10*time.Second)
+	upstream, err := p.dial(r.Context(), "tcp", target)
 	if err != nil {
 		http.Error(w, "upstream connection failed", http.StatusBadGateway)
 		return
