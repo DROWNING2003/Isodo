@@ -17,4 +17,12 @@ API 模型区分期望状态（`desired_state`）和观测状态（`observed_sta
 
 ## 生命周期 API
 
-公开 HTTP API 当前定义 Sandbox 列表、创建、读取、更新和删除操作。详细的鉴权方案、字段和错误模型见 [API Reference](/docs/api-reference)。
+公开 HTTP API 定义列表、创建、读取、更新、启动、停止和删除。App 的本地 IPC 与云端 HTTP 使用同构契约。
+
+每次生命周期动作有递增 `revision` 和 `last_action`。客户端等待接受响应中的同一 revision；失败、超时和动作被替代分别处理。名称与 metadata 更新不改变生命周期 revision。
+
+停止保留工作盘。删除先记录意图并拒绝新准入，只有资源清理确认后的 `deletion.completed_at` 才表示完成。详细鉴权、字段和错误模型见 [API Reference](/docs/api-reference)。
+
+## Agent 工作台
+
+运行态沙箱通过短期应用入口连接 Agent 工作台。任务、文件与终端属于当前沙箱；页面导航不自动停止沙箱。Agent 配置由通用 Files 写入，真实模型凭证在沙箱外按规则注入。
