@@ -185,5 +185,5 @@ func validProviderEndpoint(raw string) bool {
 }
 
 func isLoopbackHost(host string) bool {
-	return strings.EqualFold(host, "localhost") || host == "127.0.0.1" || host == "::1" || host == "[::1]"
+	return strings.EqualFold(host, "localhost") || strings.HasSuffix(strings.ToLower(host), ".localhost") || host == "127.0.0.1" || host == "::1" || host == "[::1]"
 }

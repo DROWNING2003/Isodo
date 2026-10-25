@@ -5,7 +5,102 @@
  * Public sandbox API. Every operation requires a valid session, Casdoor bearer token, or scoped API key.
  * OpenAPI spec version: 0.1.0
  */
-import { isodoFetch } from "./transport";
+import { isodoFetch } from './transport';
+
+// https://stackoverflow.com/questions/49579094/typescript-conditional-types-filter-out-readonly-properties-pick-only-requir/49579497#49579497
+type IfEquals<X, Y, A = X, B = never> = (<T>() => T extends X ? 1 : 2) extends <
+T,
+>() => T extends Y ? 1 : 2
+? A
+: B;
+
+type WritableKeys<T> = {
+[P in keyof T]-?: IfEquals<
+  { [Q in P]: T[P] },
+  { -readonly [Q in P]: T[P] },
+  P
+>;
+}[keyof T];
+
+type UnionToIntersection<U> =
+  (U extends any ? (k: U)=>void : never) extends ((k: infer I)=>void) ? I : never;
+type DistributeReadOnlyOverUnions<T> = T extends any ? NonReadonly<T> : never;
+
+type Writable<T> = Pick<T, WritableKeys<T>>;
+type NonReadonly<T> = [T] extends [UnionToIntersection<T>] ? {
+  [P in keyof Writable<T>]: T[P] extends object
+    ? NonReadonly<NonNullable<T[P]>>
+    : T[P];
+} : DistributeReadOnlyOverUnions<T>;
+
+export interface FileWriteResult {
+  path: string;
+  bytes: number;
+  /** @pattern ^[0-9a-f]{64}$ */
+  sha256: string;
+}
+
+export type SandboxInjectionKind = typeof SandboxInjectionKind[keyof typeof SandboxInjectionKind];
+
+
+export const SandboxInjectionKind = {
+  persistent: 'persistent',
+  'one-off': 'one-off',
+} as const;
+
+export type SandboxInjectionSpecIfHeaders = {[key: string]: string};
+
+export type SandboxInjectionSpecIfQueries = {[key: string]: string};
+
+export type InjectionRuleType = typeof InjectionRuleType[keyof typeof InjectionRuleType];
+
+
+export const InjectionRuleType = {
+  http: 'http',
+  mcp: 'mcp',
+  openai: 'openai',
+  anthropic: 'anthropic',
+  gemini: 'gemini',
+  qiniu: 'qiniu',
+  github: 'github',
+} as const;
+
+export type SandboxInjectionSpec = {
+  type: InjectionRuleType;
+  base_url?: string;
+  header_name?: string;
+  if_headers?: SandboxInjectionSpecIfHeaders;
+  if_queries?: SandboxInjectionSpecIfQueries;
+};
+
+export type SandboxInjectionSecretHeaders = {[key: string]: string};
+
+export type SandboxInjectionSecret = {
+  api_key?: string;
+  token?: string;
+  headers?: SandboxInjectionSecretHeaders;
+};
+
+export interface SandboxInjection {
+  key: string;
+  name: string;
+  kind: SandboxInjectionKind;
+  persistent_id?: string;
+  readonly secret_hint?: string;
+  spec: SandboxInjectionSpec;
+  secret?: SandboxInjectionSecret;
+}
+
+export type SandboxInjectionStateStats = {
+  injected: number;
+};
+
+export interface SandboxInjectionState {
+  rules: SandboxInjection[];
+  enabled: boolean;
+  stats: SandboxInjectionStateStats;
+}
+
 export type ErrorError = {
   code: string;
   message: string;
@@ -18,8 +113,77 @@ export interface Error {
   error: ErrorError;
 }
 
-export interface Metadata {
-  [key: string]: unknown;
+export interface Metadata { [key: string]: unknown }
+
+export type SandboxDesiredState = typeof SandboxDesiredState[keyof typeof SandboxDesiredState];
+
+
+export const SandboxDesiredState = {
+  running: 'running',
+  stopped: 'stopped',
+} as const;
+
+export type SandboxObservedState = typeof SandboxObservedState[keyof typeof SandboxObservedState];
+
+
+export const SandboxObservedState = {
+  requested: 'requested',
+  preparing: 'preparing',
+  starting: 'starting',
+  running: 'running',
+  stopping: 'stopping',
+  stopped: 'stopped',
+  error: 'error',
+  unknown: 'unknown',
+} as const;
+
+export type SandboxActionType = typeof SandboxActionType[keyof typeof SandboxActionType];
+
+
+export const SandboxActionType = {
+  create: 'create',
+  start: 'start',
+  stop: 'stop',
+  delete: 'delete',
+} as const;
+
+export type SandboxActionStatus = typeof SandboxActionStatus[keyof typeof SandboxActionStatus];
+
+
+export const SandboxActionStatus = {
+  accepted: 'accepted',
+  running: 'running',
+  succeeded: 'succeeded',
+  failed: 'failed',
+  superseded: 'superseded',
+} as const;
+
+export interface ActionError {
+  code: string;
+  message: string;
+  retryable: boolean;
+  request_id?: string;
+}
+
+export interface SandboxAction {
+  /** @pattern ^[1-9][0-9]*$ */
+  revision: string;
+  type: SandboxActionType;
+  status: SandboxActionStatus;
+  stage?: string;
+  error?: ActionError;
+  updated_at: string;
+}
+
+export interface SandboxDeletion {
+  requested_at: string;
+  completed_at?: string;
+}
+
+export interface SandboxResources {
+  vcpu?: number;
+  memory_bytes?: number;
+  disk_bytes?: number;
 }
 
 export interface Sandbox {
@@ -29,18 +193,29 @@ export interface Sandbox {
   template_id?: string;
   template_build_id?: string;
   template_digest?: string;
-  desired_state: string;
-  observed_state: string;
+  /**
+     * Lifecycle intent revision. PATCH name or metadata does not change it.
+     * @pattern ^[1-9][0-9]*$
+     */
+  revision?: string;
+  last_action?: SandboxAction;
+  deletion?: SandboxDeletion;
+  observed_at?: string;
+  /** Opaque handle for the current running instance, never caller-selected. */
+  runtime_id?: string;
+  resources?: SandboxResources;
+  desired_state: SandboxDesiredState;
+  observed_state: SandboxObservedState;
   created_at: string;
   updated_at: string;
 }
 
 export interface CreateSandbox {
   /**
-   * @minLength 1
-   * @maxLength 128
-   */
-  name: string;
+     * @minLength 1
+     * @maxLength 128
+     */
+  name?: string;
   /** System catalog name or template UUID, optionally followed by :tag. Defaults to base:default. Resolved to an immutable build at creation. */
   template?: string;
   metadata?: Metadata;
@@ -48,9 +223,9 @@ export interface CreateSandbox {
 
 export interface PatchSandbox {
   /**
-   * @minLength 1
-   * @maxLength 128
-   */
+     * @minLength 1
+     * @maxLength 128
+     */
   name?: string;
   metadata?: Metadata;
 }
@@ -65,21 +240,22 @@ export interface SandboxList {
 /**
  * The named Guest service this link targets.
  */
-export type SandboxAppLinkService =
-  (typeof SandboxAppLinkService)[keyof typeof SandboxAppLinkService];
+export type SandboxAppLinkService = typeof SandboxAppLinkService[keyof typeof SandboxAppLinkService];
+
 
 export const SandboxAppLinkService = {
-  t3: "t3",
+  t3: 't3',
 } as const;
 
-export type SandboxAppLinkStatus = (typeof SandboxAppLinkStatus)[keyof typeof SandboxAppLinkStatus];
+export type SandboxAppLinkStatus = typeof SandboxAppLinkStatus[keyof typeof SandboxAppLinkStatus];
+
 
 export const SandboxAppLinkStatus = {
-  ready: "ready",
-  pending: "pending",
-  stopped: "stopped",
-  failed: "failed",
-  unsupported: "unsupported",
+  ready: 'ready',
+  pending: 'pending',
+  stopped: 'stopped',
+  failed: 'failed',
+  unsupported: 'unsupported',
 } as const;
 
 export interface SandboxAppLink {
@@ -88,7 +264,7 @@ export interface SandboxAppLink {
   service: SandboxAppLinkService;
   /** The application base URL. Clients must treat this value as opaque and must not construct or rewrite it. */
   url: string;
-  /** A ready-to-open URL whose fragment carries the short-lived T3 pairing credential. */
+  /** A ready-to-open URL whose fragment carries the short-lived Agent workbench pairing credential. */
   pairing_url: string;
   status: SandboxAppLinkStatus;
   expires_at: string;
@@ -98,21 +274,9 @@ export interface SandboxAppLink {
   capabilities?: string[];
 }
 
-export type InjectionRuleType = (typeof InjectionRuleType)[keyof typeof InjectionRuleType];
+export type InjectionRuleIfHeaders = {[key: string]: string};
 
-export const InjectionRuleType = {
-  http: "http",
-  mcp: "mcp",
-  openai: "openai",
-  anthropic: "anthropic",
-  gemini: "gemini",
-  qiniu: "qiniu",
-  github: "github",
-} as const;
-
-export type InjectionRuleIfHeaders = { [key: string]: string };
-
-export type InjectionRuleIfQueries = { [key: string]: string };
+export type InjectionRuleIfQueries = {[key: string]: string};
 
 export interface InjectionRule {
   id: string;
@@ -128,15 +292,15 @@ export interface InjectionRule {
   updated_at: string;
 }
 
-export type CreateInjectionRuleIfHeaders = { [key: string]: string };
+export type CreateInjectionRuleIfHeaders = {[key: string]: string};
 
-export type CreateInjectionRuleIfQueries = { [key: string]: string };
+export type CreateInjectionRuleIfQueries = {[key: string]: string};
 
 export interface CreateInjectionRule {
   /**
-   * @minLength 1
-   * @maxLength 64
-   */
+     * @minLength 1
+     * @maxLength 64
+     */
   name: string;
   type: InjectionRuleType;
   /** @maxLength 2048 */
@@ -146,21 +310,21 @@ export interface CreateInjectionRule {
   if_headers?: CreateInjectionRuleIfHeaders;
   if_queries?: CreateInjectionRuleIfQueries;
   /**
-   * @minLength 1
-   * @maxLength 8192
-   */
+     * @minLength 1
+     * @maxLength 8192
+     */
   secret: string;
 }
 
-export type PatchInjectionRuleIfHeaders = { [key: string]: string };
+export type PatchInjectionRuleIfHeaders = {[key: string]: string};
 
-export type PatchInjectionRuleIfQueries = { [key: string]: string };
+export type PatchInjectionRuleIfQueries = {[key: string]: string};
 
 export interface PatchInjectionRule {
   /**
-   * @minLength 1
-   * @maxLength 64
-   */
+     * @minLength 1
+     * @maxLength 64
+     */
   name?: string;
   /** @maxLength 2048 */
   base_url?: string;
@@ -177,11 +341,11 @@ export interface InjectionRuleList {
   total: number;
 }
 
-export type InjectionRuleMaterialIfHeaders = { [key: string]: string };
+export type InjectionRuleMaterialIfHeaders = {[key: string]: string};
 
-export type InjectionRuleMaterialIfQueries = { [key: string]: string };
+export type InjectionRuleMaterialIfQueries = {[key: string]: string};
 
-export type InjectionRuleMaterialHeaders = { [key: string]: string };
+export type InjectionRuleMaterialHeaders = {[key: string]: string};
 
 export interface InjectionRuleMaterial {
   id: string;
@@ -195,18 +359,20 @@ export interface InjectionRuleMaterial {
   headers?: InjectionRuleMaterialHeaders;
 }
 
-export type TemplateScope = (typeof TemplateScope)[keyof typeof TemplateScope];
+export type TemplateScope = typeof TemplateScope[keyof typeof TemplateScope];
+
 
 export const TemplateScope = {
-  system: "system",
-  personal: "personal",
+  system: 'system',
+  personal: 'personal',
 } as const;
 
-export type TemplateVisibility = (typeof TemplateVisibility)[keyof typeof TemplateVisibility];
+export type TemplateVisibility = typeof TemplateVisibility[keyof typeof TemplateVisibility];
+
 
 export const TemplateVisibility = {
-  private: "private",
-  public: "public",
+  private: 'private',
+  public: 'public',
 } as const;
 
 export interface Template {
@@ -220,38 +386,38 @@ export interface Template {
   updated_at: string;
 }
 
-export type CreateTemplateVisibility =
-  (typeof CreateTemplateVisibility)[keyof typeof CreateTemplateVisibility];
+export type CreateTemplateVisibility = typeof CreateTemplateVisibility[keyof typeof CreateTemplateVisibility];
+
 
 export const CreateTemplateVisibility = {
-  private: "private",
-  public: "public",
+  private: 'private',
+  public: 'public',
 } as const;
 
 export interface CreateTemplate {
   /**
-   * @minLength 1
-   * @maxLength 128
-   */
+     * @minLength 1
+     * @maxLength 128
+     */
   name: string;
   /** @maxLength 2048 */
   description?: string;
   visibility?: CreateTemplateVisibility;
 }
 
-export type PatchTemplateVisibility =
-  (typeof PatchTemplateVisibility)[keyof typeof PatchTemplateVisibility];
+export type PatchTemplateVisibility = typeof PatchTemplateVisibility[keyof typeof PatchTemplateVisibility];
+
 
 export const PatchTemplateVisibility = {
-  private: "private",
-  public: "public",
+  private: 'private',
+  public: 'public',
 } as const;
 
 export interface PatchTemplate {
   /**
-   * @minLength 1
-   * @maxLength 128
-   */
+     * @minLength 1
+     * @maxLength 128
+     */
   name?: string;
   /** @maxLength 2048 */
   description?: string;
@@ -268,24 +434,25 @@ export interface TemplateList {
 export interface BuildRecipe {
   source_build_id: string;
   /**
-   * @maxItems 32
-   * @items.minItems 1
-   * @items.maxItems 128
-   * @items.items.maxLength 8192
-   */
+     * @maxItems 32
+     * @items.minItems 1
+     * @items.maxItems 128
+     * @items.items.maxLength 8192
+     */
   commands?: string[][];
   /** @pattern ^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$ */
   publish_tag?: string;
 }
 
-export type TemplateBuildStatus = (typeof TemplateBuildStatus)[keyof typeof TemplateBuildStatus];
+export type TemplateBuildStatus = typeof TemplateBuildStatus[keyof typeof TemplateBuildStatus];
+
 
 export const TemplateBuildStatus = {
-  queued: "queued",
-  building: "building",
-  validating: "validating",
-  ready: "ready",
-  failed: "failed",
+  queued: 'queued',
+  building: 'building',
+  validating: 'validating',
+  ready: 'ready',
+  failed: 'failed',
 } as const;
 
 export interface TemplateBuild {
@@ -312,23 +479,56 @@ export interface SetTemplateTag {
   expected_build_id?: string;
 }
 
-export type ForkTemplateVisibility =
-  (typeof ForkTemplateVisibility)[keyof typeof ForkTemplateVisibility];
+export type ForkTemplateVisibility = typeof ForkTemplateVisibility[keyof typeof ForkTemplateVisibility];
+
 
 export const ForkTemplateVisibility = {
-  private: "private",
-  public: "public",
+  private: 'private',
+  public: 'public',
 } as const;
 
 export interface ForkTemplate {
   build_id: string;
   /**
-   * @minLength 1
-   * @maxLength 128
-   */
+     * @minLength 1
+     * @maxLength 128
+     */
   name: string;
   visibility?: ForkTemplateVisibility;
 }
+
+export type UploadSandboxFileParams = {
+/**
+ * Canonical absolute path under /workspace
+ */
+path: string;
+overwrite?: boolean;
+};
+
+export type UploadSandboxFileBody = {
+  file: Blob | File;
+};
+
+export type DownloadSandboxFileParams = {
+/**
+ * Canonical absolute path under /workspace
+ */
+path: string;
+};
+
+export type MakeSandboxDirectoryBody = {
+  path: string;
+  parents?: boolean;
+};
+
+export type MakeSandboxDirectory200 = {
+  path: string;
+};
+
+export type SetSandboxInjectionsBody = {
+  /** @maxItems 32 */
+  rules: SandboxInjection[];
+};
 
 export type ListCredentialDocuments200ItemsItemValue = { [key: string]: unknown };
 
@@ -351,97 +551,277 @@ export type PutCredentialDocument200 = {
 };
 
 export type ListSandboxesParams = {
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  /**
-   * @minimum 0
-   * @maximum 10000
-   */
-  offset?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+/**
+ * @minimum 0
+ * @maximum 10000
+ */
+offset?: number;
 };
 
 export type ListSystemTemplatesParams = {
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  /**
-   * @minimum 0
-   * @maximum 10000
-   */
-  offset?: number;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+/**
+ * @minimum 0
+ * @maximum 10000
+ */
+offset?: number;
 };
 
 export type ListTemplatesParams = {
-  /**
-   * @minimum 1
-   * @maximum 100
-   */
-  limit?: number;
-  /**
-   * @minimum 0
-   * @maximum 10000
-   */
-  offset?: number;
-  scope?: ListTemplatesScope;
+/**
+ * @minimum 1
+ * @maximum 100
+ */
+limit?: number;
+/**
+ * @minimum 0
+ * @maximum 10000
+ */
+offset?: number;
+scope?: ListTemplatesScope;
 };
 
-export type ListTemplatesScope = (typeof ListTemplatesScope)[keyof typeof ListTemplatesScope];
+export type ListTemplatesScope = typeof ListTemplatesScope[keyof typeof ListTemplatesScope];
+
 
 export const ListTemplatesScope = {
-  owned: "owned",
-  public: "public",
-  system: "system",
-  available: "available",
+  owned: 'owned',
+  public: 'public',
+  system: 'system',
+  available: 'available',
 } as const;
 
-export const getListCredentialDocumentsUrl = (kind: string) => {
-  return `/v1/credential-documents/${kind}`;
-};
+export const getUploadSandboxFileUrl = (sandboxID: string,
+    params: UploadSandboxFileParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/v1/sandboxes/${sandboxID}/files?${stringifiedParams}` : `/v1/sandboxes/${sandboxID}/files`
+}
+
+/**
+ * Defaults to overwrite=true. One multipart part named file, up to 256 MiB. Upload bytes are staged in bounded private temporary storage before forwarding through Node and Guest. Success means Guest confirmed the SHA256 and atomic commit. COMMIT_UNKNOWN must be verified by reading the target before retrying.
+ * @summary Upload and atomically commit one file
+ */
+export const uploadSandboxFile = async (sandboxID: string,
+    uploadSandboxFileBody: UploadSandboxFileBody,
+    params: UploadSandboxFileParams, options?: Parameters<typeof isodoFetch>[1]): Promise<FileWriteResult> => {
+    const formData = new FormData();
+formData.append(`file`, uploadSandboxFileBody.file);
+
+  return isodoFetch<FileWriteResult>(getUploadSandboxFileUrl(sandboxID,params),
+  {
+    ...options,
+    method: 'POST'
+    ,
+    body: formData
+  }
+);}
+
+
+
+export const getDownloadSandboxFileUrl = (sandboxID: string,
+    params: DownloadSandboxFileParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/v1/sandboxes/${sandboxID}/files?${stringifiedParams}` : `/v1/sandboxes/${sandboxID}/files`
+}
+
+/**
+ * Stages at most 256 MiB in private temporary storage and verifies the Guest completion digest before responding. X-Content-SHA256 describes the complete response body.
+ * @summary Download a verified binary file
+ */
+export const downloadSandboxFile = async (sandboxID: string,
+    params: DownloadSandboxFileParams, options?: Parameters<typeof isodoFetch>[1]): Promise<Blob> => {
+
+  return isodoFetch<Blob>(getDownloadSandboxFileUrl(sandboxID,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getMakeSandboxDirectoryUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}/directories`
+}
+
+/**
+ * @summary Create a workspace directory
+ */
+export const makeSandboxDirectory = async (sandboxID: string,
+    makeSandboxDirectoryBody: MakeSandboxDirectoryBody, options?: Parameters<typeof isodoFetch>[1]): Promise<MakeSandboxDirectory200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return isodoFetch<MakeSandboxDirectory200>(getMakeSandboxDirectoryUrl(sandboxID),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(makeSandboxDirectoryBody)
+  }
+);}
+
+
+
+export const getGetSandboxInjectionsUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}/injections`
+}
+
+/**
+ * @summary Read masked host-side injection configuration
+ */
+export const getSandboxInjections = async (sandboxID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<SandboxInjectionState> => {
+
+  return isodoFetch<SandboxInjectionState>(getGetSandboxInjectionsUrl(sandboxID),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getSetSandboxInjectionsUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}/injections`
+}
+
+/**
+ * Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+ * @summary Replace sandbox host-side injection rules
+ */
+export const setSandboxInjections = async (sandboxID: string,
+    setSandboxInjectionsBody: NonReadonly<SetSandboxInjectionsBody>, options?: Parameters<typeof isodoFetch>[1]): Promise<SandboxInjectionState> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return isodoFetch<SandboxInjectionState>(getSetSandboxInjectionsUrl(sandboxID),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(setSandboxInjectionsBody)
+  }
+);}
+
+
+
+export const getListCredentialDocumentsUrl = (kind: string,) => {
+
+
+
+
+  return `/v1/credential-documents/${kind}`
+}
 
 /**
  * Interactive login required. Kind is agents or sandboxes. Values are decrypted only for the owning account.
  * @summary List encrypted account credential configurations
  */
-export const listCredentialDocuments = async (
-  kind: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<ListCredentialDocuments200> => {
-  return isodoFetch<ListCredentialDocuments200>(getListCredentialDocumentsUrl(kind), {
-    ...options,
-    method: "GET",
-  });
-};
+export const listCredentialDocuments = async (kind: string, options?: Parameters<typeof isodoFetch>[1]): Promise<ListCredentialDocuments200> => {
 
-export const getPutCredentialDocumentUrl = (kind: string, id: string) => {
-  return `/v1/credential-documents/${kind}/${id}`;
-};
+  return isodoFetch<ListCredentialDocuments200>(getListCredentialDocumentsUrl(kind),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getPutCredentialDocumentUrl = (kind: string,
+    id: string,) => {
+
+
+
+
+  return `/v1/credential-documents/${kind}/${id}`
+}
 
 /**
  * Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
  * @summary Save an account Agent configuration or sandbox credential selection
  */
-export const putCredentialDocument = async (
-  kind: string,
-  id: string,
-  putCredentialDocumentBody: PutCredentialDocumentBody,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<PutCredentialDocument200> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const putCredentialDocument = async (kind: string,
+    id: string,
+    putCredentialDocumentBody: PutCredentialDocumentBody, options?: Parameters<typeof isodoFetch>[1]): Promise<PutCredentialDocument200> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
@@ -450,83 +830,95 @@ export const putCredentialDocument = async (
     }
     return headers;
   };
-  return isodoFetch<PutCredentialDocument200>(getPutCredentialDocumentUrl(kind, id), {
+return isodoFetch<PutCredentialDocument200>(getPutCredentialDocumentUrl(kind,id),
+  {
     ...options,
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
-    body: JSON.stringify(putCredentialDocumentBody),
-  });
-};
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(putCredentialDocumentBody)
+  }
+);}
 
-export const getDeleteCredentialDocumentUrl = (kind: string, id: string) => {
-  return `/v1/credential-documents/${kind}/${id}`;
-};
+
+
+export const getDeleteCredentialDocumentUrl = (kind: string,
+    id: string,) => {
+
+
+
+
+  return `/v1/credential-documents/${kind}/${id}`
+}
 
 /**
  * @summary Delete one configuration owned by the current account
  */
-export const deleteCredentialDocument = async (
-  kind: string,
-  id: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<void> => {
-  return isodoFetch<void>(getDeleteCredentialDocumentUrl(kind, id), {
-    ...options,
-    method: "DELETE",
-  });
-};
+export const deleteCredentialDocument = async (kind: string,
+    id: string, options?: Parameters<typeof isodoFetch>[1]): Promise<void> => {
 
-export const getListSandboxesUrl = (params?: ListSandboxesParams) => {
+  return isodoFetch<void>(getDeleteCredentialDocumentUrl(kind,id),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+export const getListSandboxesUrl = (params?: ListSandboxesParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
+
     if (value !== undefined) {
-      normalizedParams.append(key, value === null ? "null" : String(value));
+      normalizedParams.append(key, value === null ? 'null' : String(value))
     }
   });
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/v1/sandboxes?${stringifiedParams}` : `/v1/sandboxes`;
-};
+  return stringifiedParams.length > 0 ? `/v1/sandboxes?${stringifiedParams}` : `/v1/sandboxes`
+}
 
 /**
  * Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
  * @summary List sandboxes
  */
-export const listSandboxes = async (
-  params?: ListSandboxesParams,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<SandboxList> => {
-  return isodoFetch<SandboxList>(getListSandboxesUrl(params), {
+export const listSandboxes = async (params?: ListSandboxesParams, options?: Parameters<typeof isodoFetch>[1]): Promise<SandboxList> => {
+
+  return isodoFetch<SandboxList>(getListSandboxesUrl(params),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
 
 export const getCreateSandboxUrl = () => {
-  return `/v1/sandboxes`;
-};
+
+
+
+
+  return `/v1/sandboxes`
+}
 
 /**
  * Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
  * @summary Create a sandbox
  */
-export const createSandbox = async (
-  createSandboxBody: CreateSandbox,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<Sandbox> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const createSandbox = async (createSandboxBody: CreateSandbox, options?: Parameters<typeof isodoFetch>[1]): Promise<Sandbox> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
@@ -535,56 +927,63 @@ export const createSandbox = async (
     }
     return headers;
   };
-  return isodoFetch<Sandbox>(getCreateSandboxUrl(), {
+return isodoFetch<Sandbox>(getCreateSandboxUrl(),
+  {
     ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
-    body: JSON.stringify(createSandboxBody),
-  });
-};
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createSandboxBody)
+  }
+);}
 
-export const getGetSandboxUrl = (sandboxID: string) => {
-  return `/v1/sandboxes/${sandboxID}`;
-};
+
+
+export const getGetSandboxUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}`
+}
 
 /**
  * Returns one sandbox owned by the authenticated user. A sandbox owned by another user is reported as not found.
  * @summary Get a sandbox
  */
-export const getSandbox = async (
-  sandboxID: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<Sandbox> => {
-  return isodoFetch<Sandbox>(getGetSandboxUrl(sandboxID), {
-    ...options,
-    method: "GET",
-  });
-};
+export const getSandbox = async (sandboxID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<Sandbox> => {
 
-export const getUpdateSandboxUrl = (sandboxID: string) => {
-  return `/v1/sandboxes/${sandboxID}`;
-};
+  return isodoFetch<Sandbox>(getGetSandboxUrl(sandboxID),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getUpdateSandboxUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}`
+}
 
 /**
  * Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
  * @summary Update a sandbox
  */
-export const updateSandbox = async (
-  sandboxID: string,
-  patchSandbox: PatchSandbox,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<Sandbox> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const updateSandbox = async (sandboxID: string,
+    patchSandbox: PatchSandbox, options?: Parameters<typeof isodoFetch>[1]): Promise<Sandbox> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
@@ -593,144 +992,187 @@ export const updateSandbox = async (
     }
     return headers;
   };
-  return isodoFetch<Sandbox>(getUpdateSandboxUrl(sandboxID), {
+return isodoFetch<Sandbox>(getUpdateSandboxUrl(sandboxID),
+  {
     ...options,
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
-    body: JSON.stringify(patchSandbox),
-  });
-};
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(patchSandbox)
+  }
+);}
 
-export const getDeleteSandboxUrl = (sandboxID: string) => {
-  return `/v1/sandboxes/${sandboxID}`;
-};
+
+
+export const getDeleteSandboxUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}`
+}
 
 /**
- * Deletes a sandbox owned by the authenticated user. This operation is idempotent for an already deleted or missing sandbox.
+ * Requests Node cleanup. The resource remains readable until cleanup completes; repeated deletion returns the same action while pending or completed. Missing resources return 204.
  * @summary Delete a sandbox
  */
-export const deleteSandbox = async (
-  sandboxID: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<void> => {
-  return isodoFetch<void>(getDeleteSandboxUrl(sandboxID), {
-    ...options,
-    method: "DELETE",
-  });
-};
+export const deleteSandbox = async (sandboxID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<Sandbox | void> => {
 
-export const getStartSandboxUrl = (sandboxID: string) => {
-  return `/v1/sandboxes/${sandboxID}/start`;
-};
+  return isodoFetch<Sandbox | void>(getDeleteSandboxUrl(sandboxID),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+export const getStartSandboxUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}/start`
+}
 
 /**
  * Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
  * @summary Start a stopped sandbox
  */
-export const startSandbox = async (
-  sandboxID: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<Sandbox> => {
-  return isodoFetch<Sandbox>(getStartSandboxUrl(sandboxID), {
-    ...options,
-    method: "POST",
-  });
-};
+export const startSandbox = async (sandboxID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<Sandbox> => {
 
-export const getStopSandboxUrl = (sandboxID: string) => {
-  return `/v1/sandboxes/${sandboxID}/stop`;
-};
+  return isodoFetch<Sandbox>(getStartSandboxUrl(sandboxID),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+export const getStopSandboxUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}/stop`
+}
 
 /**
  * Requests a graceful stop for a cloud sandbox owned by the authenticated user while preserving its instance disks. The operation is asynchronous; poll the sandbox until observed_state becomes stopped.
  * @summary Stop a running sandbox
  */
-export const stopSandbox = async (
-  sandboxID: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<Sandbox> => {
-  return isodoFetch<Sandbox>(getStopSandboxUrl(sandboxID), {
-    ...options,
-    method: "POST",
-  });
-};
+export const stopSandbox = async (sandboxID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<Sandbox> => {
 
-export const getGetSandboxAppUrl = (sandboxID: string) => {
-  return `/v1/sandboxes/${sandboxID}/app`;
-};
+  return isodoFetch<Sandbox>(getStopSandboxUrl(sandboxID),
+  {
+    ...options,
+    method: 'POST'
+
+
+  }
+);}
+
+
+
+export const getGetSandboxAppUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}/app`
+}
 
 /**
- * Creates a short-lived T3 pairing link for an authenticated sandbox owner and redirects the browser to the sandbox application.
+ * Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and redirects the browser to the sandbox application.
  * @summary Open a sandbox application
  */
-export const getSandboxApp = async (
-  sandboxID: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<unknown> => {
-  return isodoFetch<unknown>(getGetSandboxAppUrl(sandboxID), {
-    ...options,
-    method: "GET",
-  });
-};
+export const getSandboxApp = async (sandboxID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<unknown> => {
 
-export const getCreateSandboxAppLinkUrl = (sandboxID: string) => {
-  return `/v1/sandboxes/${sandboxID}/app-link`;
-};
+  return isodoFetch<unknown>(getGetSandboxAppUrl(sandboxID),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getCreateSandboxAppLinkUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}/app-link`
+}
 
 /**
- * Creates a short-lived T3 pairing link for an authenticated sandbox owner and returns it as JSON. Desktop clients and SDKs use this endpoint; browsers can use `GET /v1/sandboxes/{sandboxID}/app` instead. The pairing credential is carried in the `pairing_url` fragment and is never sent to the Isodo API.
+ * Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and returns it as JSON. Desktop clients and SDKs use this endpoint; browsers can use `GET /v1/sandboxes/{sandboxID}/app` instead. The pairing credential is carried in the `pairing_url` fragment and is never sent to the Isodo API.
  * @summary Create a sandbox application link
  */
-export const createSandboxAppLink = async (
-  sandboxID: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<SandboxAppLink> => {
-  return isodoFetch<SandboxAppLink>(getCreateSandboxAppLinkUrl(sandboxID), {
+export const createSandboxAppLink = async (sandboxID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<SandboxAppLink> => {
+
+  return isodoFetch<SandboxAppLink>(getCreateSandboxAppLinkUrl(sandboxID),
+  {
     ...options,
-    method: "POST",
-  });
-};
+    method: 'POST'
+
+
+  }
+);}
+
+
 
 export const getListInjectionRulesUrl = () => {
-  return `/v1/injection-rules`;
-};
+
+
+
+
+  return `/v1/injection-rules`
+}
 
 /**
  * Returns the authenticated account's persistent injection rules. Secrets are never returned; only a short masked hint is exposed.
  * @summary List account injection rules
  */
-export const listInjectionRules = async (
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<InjectionRuleList> => {
-  return isodoFetch<InjectionRuleList>(getListInjectionRulesUrl(), {
+export const listInjectionRules = async ( options?: Parameters<typeof isodoFetch>[1]): Promise<InjectionRuleList> => {
+
+  return isodoFetch<InjectionRuleList>(getListInjectionRulesUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
 
 export const getCreateInjectionRuleUrl = () => {
-  return `/v1/injection-rules`;
-};
+
+
+
+
+  return `/v1/injection-rules`
+}
 
 /**
  * Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
  * @summary Create an account injection rule
  */
-export const createInjectionRule = async (
-  createInjectionRuleBody: CreateInjectionRule,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<InjectionRule> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const createInjectionRule = async (createInjectionRuleBody: CreateInjectionRule, options?: Parameters<typeof isodoFetch>[1]): Promise<InjectionRule> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
@@ -739,55 +1181,62 @@ export const createInjectionRule = async (
     }
     return headers;
   };
-  return isodoFetch<InjectionRule>(getCreateInjectionRuleUrl(), {
+return isodoFetch<InjectionRule>(getCreateInjectionRuleUrl(),
+  {
     ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
-    body: JSON.stringify(createInjectionRuleBody),
-  });
-};
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createInjectionRuleBody)
+  }
+);}
 
-export const getGetInjectionRuleUrl = (ruleID: string) => {
-  return `/v1/injection-rules/${ruleID}`;
-};
+
+
+export const getGetInjectionRuleUrl = (ruleID: string,) => {
+
+
+
+
+  return `/v1/injection-rules/${ruleID}`
+}
 
 /**
  * @summary Get an account injection rule
  */
-export const getInjectionRule = async (
-  ruleID: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<InjectionRule> => {
-  return isodoFetch<InjectionRule>(getGetInjectionRuleUrl(ruleID), {
-    ...options,
-    method: "GET",
-  });
-};
+export const getInjectionRule = async (ruleID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<InjectionRule> => {
 
-export const getUpdateInjectionRuleUrl = (ruleID: string) => {
-  return `/v1/injection-rules/${ruleID}`;
-};
+  return isodoFetch<InjectionRule>(getGetInjectionRuleUrl(ruleID),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getUpdateInjectionRuleUrl = (ruleID: string,) => {
+
+
+
+
+  return `/v1/injection-rules/${ruleID}`
+}
 
 /**
  * Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
  * @summary Update an account injection rule
  */
-export const updateInjectionRule = async (
-  ruleID: string,
-  patchInjectionRule: PatchInjectionRule,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<InjectionRule> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const updateInjectionRule = async (ruleID: string,
+    patchInjectionRule: PatchInjectionRule, options?: Parameters<typeof isodoFetch>[1]): Promise<InjectionRule> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
@@ -796,127 +1245,147 @@ export const updateInjectionRule = async (
     }
     return headers;
   };
-  return isodoFetch<InjectionRule>(getUpdateInjectionRuleUrl(ruleID), {
+return isodoFetch<InjectionRule>(getUpdateInjectionRuleUrl(ruleID),
+  {
     ...options,
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
-    body: JSON.stringify(patchInjectionRule),
-  });
-};
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(patchInjectionRule)
+  }
+);}
 
-export const getDeleteInjectionRuleUrl = (ruleID: string) => {
-  return `/v1/injection-rules/${ruleID}`;
-};
+
+
+export const getDeleteInjectionRuleUrl = (ruleID: string,) => {
+
+
+
+
+  return `/v1/injection-rules/${ruleID}`
+}
 
 /**
  * @summary Delete an account injection rule
  */
-export const deleteInjectionRule = async (
-  ruleID: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<void> => {
-  return isodoFetch<void>(getDeleteInjectionRuleUrl(ruleID), {
-    ...options,
-    method: "DELETE",
-  });
-};
+export const deleteInjectionRule = async (ruleID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<void> => {
 
-export const getGetInjectionRuleMaterialUrl = (ruleID: string) => {
-  return `/v1/injection-rules/${ruleID}/material`;
-};
+  return isodoFetch<void>(getDeleteInjectionRuleUrl(ruleID),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+export const getGetInjectionRuleMaterialUrl = (ruleID: string,) => {
+
+
+
+
+  return `/v1/injection-rules/${ruleID}/material`
+}
 
 /**
  * Returns the plaintext header/key for the authenticated owner so a trusted local runtime can apply it. The response is never cached; secrets are never logged.
  * @summary Read injection material
  */
-export const getInjectionRuleMaterial = async (
-  ruleID: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<InjectionRuleMaterial> => {
-  return isodoFetch<InjectionRuleMaterial>(getGetInjectionRuleMaterialUrl(ruleID), {
-    ...options,
-    method: "GET",
-  });
-};
+export const getInjectionRuleMaterial = async (ruleID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<InjectionRuleMaterial> => {
 
-export const getListSystemTemplatesUrl = (params?: ListSystemTemplatesParams) => {
+  return isodoFetch<InjectionRuleMaterial>(getGetInjectionRuleMaterialUrl(ruleID),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getListSystemTemplatesUrl = (params?: ListSystemTemplatesParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
+
     if (value !== undefined) {
-      normalizedParams.append(key, value === null ? "null" : String(value));
+      normalizedParams.append(key, value === null ? 'null' : String(value))
     }
   });
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0
-    ? `/v1/system-templates?${stringifiedParams}`
-    : `/v1/system-templates`;
-};
+  return stringifiedParams.length > 0 ? `/v1/system-templates?${stringifiedParams}` : `/v1/system-templates`
+}
 
 /**
  * @summary List platform default templates
  */
-export const listSystemTemplates = async (
-  params?: ListSystemTemplatesParams,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<TemplateList> => {
-  return isodoFetch<TemplateList>(getListSystemTemplatesUrl(params), {
-    ...options,
-    method: "GET",
-  });
-};
+export const listSystemTemplates = async (params?: ListSystemTemplatesParams, options?: Parameters<typeof isodoFetch>[1]): Promise<TemplateList> => {
 
-export const getListTemplatesUrl = (params?: ListTemplatesParams) => {
+  return isodoFetch<TemplateList>(getListSystemTemplatesUrl(params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getListTemplatesUrl = (params?: ListTemplatesParams,) => {
   const normalizedParams = new URLSearchParams();
 
   Object.entries(params || {}).forEach(([key, value]) => {
+
     if (value !== undefined) {
-      normalizedParams.append(key, value === null ? "null" : String(value));
+      normalizedParams.append(key, value === null ? 'null' : String(value))
     }
   });
 
   const stringifiedParams = normalizedParams.toString();
 
-  return stringifiedParams.length > 0 ? `/v1/templates?${stringifiedParams}` : `/v1/templates`;
-};
+  return stringifiedParams.length > 0 ? `/v1/templates?${stringifiedParams}` : `/v1/templates`
+}
 
 /**
  * @summary List templates visible to the authenticated user
  */
-export const listTemplates = async (
-  params?: ListTemplatesParams,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<TemplateList> => {
-  return isodoFetch<TemplateList>(getListTemplatesUrl(params), {
+export const listTemplates = async (params?: ListTemplatesParams, options?: Parameters<typeof isodoFetch>[1]): Promise<TemplateList> => {
+
+  return isodoFetch<TemplateList>(getListTemplatesUrl(params),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
 
 export const getCreateTemplateUrl = () => {
-  return `/v1/templates`;
-};
+
+
+
+
+  return `/v1/templates`
+}
 
 /**
  * @summary Create a personal template
  */
-export const createTemplate = async (
-  createTemplateBody: CreateTemplate,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<Template> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const createTemplate = async (createTemplateBody: CreateTemplate, options?: Parameters<typeof isodoFetch>[1]): Promise<Template> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
@@ -925,54 +1394,61 @@ export const createTemplate = async (
     }
     return headers;
   };
-  return isodoFetch<Template>(getCreateTemplateUrl(), {
+return isodoFetch<Template>(getCreateTemplateUrl(),
+  {
     ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
-    body: JSON.stringify(createTemplateBody),
-  });
-};
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createTemplateBody)
+  }
+);}
 
-export const getGetTemplateUrl = (templateID: string) => {
-  return `/v1/templates/${templateID}`;
-};
+
+
+export const getGetTemplateUrl = (templateID: string,) => {
+
+
+
+
+  return `/v1/templates/${templateID}`
+}
 
 /**
  * @summary Get a template
  */
-export const getTemplate = async (
-  templateID: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<Template> => {
-  return isodoFetch<Template>(getGetTemplateUrl(templateID), {
-    ...options,
-    method: "GET",
-  });
-};
+export const getTemplate = async (templateID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<Template> => {
 
-export const getUpdateTemplateUrl = (templateID: string) => {
-  return `/v1/templates/${templateID}`;
-};
+  return isodoFetch<Template>(getGetTemplateUrl(templateID),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getUpdateTemplateUrl = (templateID: string,) => {
+
+
+
+
+  return `/v1/templates/${templateID}`
+}
 
 /**
  * @summary Update an owned template
  */
-export const updateTemplate = async (
-  templateID: string,
-  patchTemplate: PatchTemplate,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<Template> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const updateTemplate = async (templateID: string,
+    patchTemplate: PatchTemplate, options?: Parameters<typeof isodoFetch>[1]): Promise<Template> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
@@ -981,54 +1457,61 @@ export const updateTemplate = async (
     }
     return headers;
   };
-  return isodoFetch<Template>(getUpdateTemplateUrl(templateID), {
+return isodoFetch<Template>(getUpdateTemplateUrl(templateID),
+  {
     ...options,
-    method: "PATCH",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
-    body: JSON.stringify(patchTemplate),
-  });
-};
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(patchTemplate)
+  }
+);}
 
-export const getDeleteTemplateUrl = (templateID: string) => {
-  return `/v1/templates/${templateID}`;
-};
+
+
+export const getDeleteTemplateUrl = (templateID: string,) => {
+
+
+
+
+  return `/v1/templates/${templateID}`
+}
 
 /**
  * @summary Delete an owned template
  */
-export const deleteTemplate = async (
-  templateID: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<void> => {
-  return isodoFetch<void>(getDeleteTemplateUrl(templateID), {
-    ...options,
-    method: "DELETE",
-  });
-};
+export const deleteTemplate = async (templateID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<void> => {
 
-export const getCreateTemplateBuildUrl = (templateID: string) => {
-  return `/v1/templates/${templateID}/builds`;
-};
+  return isodoFetch<void>(getDeleteTemplateUrl(templateID),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+export const getCreateTemplateBuildUrl = (templateID: string,) => {
+
+
+
+
+  return `/v1/templates/${templateID}/builds`
+}
 
 /**
  * @summary Queue an immutable template build
  */
-export const createTemplateBuild = async (
-  templateID: string,
-  buildRecipe: BuildRecipe,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<TemplateBuild> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const createTemplateBuild = async (templateID: string,
+    buildRecipe: BuildRecipe, options?: Parameters<typeof isodoFetch>[1]): Promise<TemplateBuild> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
@@ -1037,74 +1520,91 @@ export const createTemplateBuild = async (
     }
     return headers;
   };
-  return isodoFetch<TemplateBuild>(getCreateTemplateBuildUrl(templateID), {
+return isodoFetch<TemplateBuild>(getCreateTemplateBuildUrl(templateID),
+  {
     ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
-    body: JSON.stringify(buildRecipe),
-  });
-};
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(buildRecipe)
+  }
+);}
 
-export const getGetTemplateBuildUrl = (templateID: string, buildID: string) => {
-  return `/v1/templates/${templateID}/builds/${buildID}`;
-};
+
+
+export const getGetTemplateBuildUrl = (templateID: string,
+    buildID: string,) => {
+
+
+
+
+  return `/v1/templates/${templateID}/builds/${buildID}`
+}
 
 /**
  * @summary Get template build status
  */
-export const getTemplateBuild = async (
-  templateID: string,
-  buildID: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<TemplateBuild> => {
-  return isodoFetch<TemplateBuild>(getGetTemplateBuildUrl(templateID, buildID), {
-    ...options,
-    method: "GET",
-  });
-};
+export const getTemplateBuild = async (templateID: string,
+    buildID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<TemplateBuild> => {
 
-export const getGetTemplateTagUrl = (templateID: string, tag: string) => {
-  return `/v1/templates/${templateID}/tags/${tag}`;
-};
+  return isodoFetch<TemplateBuild>(getGetTemplateBuildUrl(templateID,buildID),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getGetTemplateTagUrl = (templateID: string,
+    tag: string,) => {
+
+
+
+
+  return `/v1/templates/${templateID}/tags/${tag}`
+}
 
 /**
  * @summary Resolve a Ready build tag
  */
-export const getTemplateTag = async (
-  templateID: string,
-  tag: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<TemplateTag> => {
-  return isodoFetch<TemplateTag>(getGetTemplateTagUrl(templateID, tag), {
-    ...options,
-    method: "GET",
-  });
-};
+export const getTemplateTag = async (templateID: string,
+    tag: string, options?: Parameters<typeof isodoFetch>[1]): Promise<TemplateTag> => {
 
-export const getSetTemplateTagUrl = (templateID: string, tag: string) => {
-  return `/v1/templates/${templateID}/tags/${tag}`;
-};
+  return isodoFetch<TemplateTag>(getGetTemplateTagUrl(templateID,tag),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getSetTemplateTagUrl = (templateID: string,
+    tag: string,) => {
+
+
+
+
+  return `/v1/templates/${templateID}/tags/${tag}`
+}
 
 /**
  * @summary Atomically publish a Ready build under a tag
  */
-export const setTemplateTag = async (
-  templateID: string,
-  tag: string,
-  setTemplateTagBody: SetTemplateTag,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<TemplateTag> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const setTemplateTag = async (templateID: string,
+    tag: string,
+    setTemplateTagBody: SetTemplateTag, options?: Parameters<typeof isodoFetch>[1]): Promise<TemplateTag> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
@@ -1113,55 +1613,63 @@ export const setTemplateTag = async (
     }
     return headers;
   };
-  return isodoFetch<TemplateTag>(getSetTemplateTagUrl(templateID, tag), {
+return isodoFetch<TemplateTag>(getSetTemplateTagUrl(templateID,tag),
+  {
     ...options,
-    method: "PUT",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
-    body: JSON.stringify(setTemplateTagBody),
-  });
-};
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(setTemplateTagBody)
+  }
+);}
 
-export const getDeleteTemplateTagUrl = (templateID: string, tag: string) => {
-  return `/v1/templates/${templateID}/tags/${tag}`;
-};
+
+
+export const getDeleteTemplateTagUrl = (templateID: string,
+    tag: string,) => {
+
+
+
+
+  return `/v1/templates/${templateID}/tags/${tag}`
+}
 
 /**
  * @summary Remove a template build tag
  */
-export const deleteTemplateTag = async (
-  templateID: string,
-  tag: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<void> => {
-  return isodoFetch<void>(getDeleteTemplateTagUrl(templateID, tag), {
-    ...options,
-    method: "DELETE",
-  });
-};
+export const deleteTemplateTag = async (templateID: string,
+    tag: string, options?: Parameters<typeof isodoFetch>[1]): Promise<void> => {
 
-export const getForkTemplateUrl = (templateID: string) => {
-  return `/v1/templates/${templateID}/fork`;
-};
+  return isodoFetch<void>(getDeleteTemplateTagUrl(templateID,tag),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+export const getForkTemplateUrl = (templateID: string,) => {
+
+
+
+
+  return `/v1/templates/${templateID}/fork`
+}
 
 /**
  * @summary Fork an accessible Ready build into a personal template
  */
-export const forkTemplate = async (
-  templateID: string,
-  forkTemplateBody: ForkTemplate,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<Template> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+export const forkTemplate = async (templateID: string,
+    forkTemplateBody: ForkTemplate, options?: Parameters<typeof isodoFetch>[1]): Promise<Template> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
@@ -1170,10 +1678,11 @@ export const forkTemplate = async (
     }
     return headers;
   };
-  return isodoFetch<Template>(getForkTemplateUrl(templateID), {
+return isodoFetch<Template>(getForkTemplateUrl(templateID),
+  {
     ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
-    body: JSON.stringify(forkTemplateBody),
-  });
-};
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(forkTemplateBody)
+  }
+);}

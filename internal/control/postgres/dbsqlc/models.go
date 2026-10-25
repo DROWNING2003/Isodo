@@ -21,6 +21,15 @@ type ApiKey struct {
 	RevokedAt  pgtype.Timestamptz
 }
 
+type CredentialDocument struct {
+	TenantID   pgtype.UUID
+	Kind       string
+	ID         string
+	Nonce      []byte
+	Ciphertext []byte
+	UpdatedAt  pgtype.Timestamptz
+}
+
 type InjectionRule struct {
 	ID               pgtype.UUID
 	TenantID         pgtype.UUID
@@ -60,6 +69,7 @@ type Sandbox struct {
 	NodeID              *string
 	OwnershipGeneration int64
 	Revision            int64
+	DeletionRequestedAt pgtype.Timestamptz
 }
 
 type SandboxOperation struct {

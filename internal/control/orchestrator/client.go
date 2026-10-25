@@ -21,9 +21,10 @@ type TLSFiles struct {
 }
 
 type Client struct {
-	connection *grpc.ClientConn
-	service    nodev1.NodeOrchestratorClient
-	nodeID     string
+	sandboxRuntime nodev1.SandboxRuntimeClient
+	connection     *grpc.ClientConn
+	service        nodev1.NodeOrchestratorClient
+	nodeID         string
 }
 
 func NewClient(target string, files TLSFiles) (*Client, error) {
@@ -39,9 +40,10 @@ func NewClient(target string, files TLSFiles) (*Client, error) {
 		return nil, fmt.Errorf("create node gRPC connection: %w", err)
 	}
 	return &Client{
-		connection: connection,
-		service:    nodev1.NewNodeOrchestratorClient(connection),
-		nodeID:     files.NodeID,
+		connection:     connection,
+		sandboxRuntime: nodev1.NewSandboxRuntimeClient(connection),
+		service:        nodev1.NewNodeOrchestratorClient(connection),
+		nodeID:         files.NodeID,
 	}, nil
 }
 
@@ -172,4 +174,32 @@ func (c *Client) Close() error {
 		return nil
 	}
 	return c.connection.Close()
+}
+
+// NodeID is the configured identity, checked by GetNodeStatus before runtime RPCs.
+func (c *Client) NodeID() string { return c.nodeID }
+func (c *Client) GetInjections(ctx context.Context, target *nodev1.SandboxTarget) (*nodev1.SandboxInjections, error) {
+	if _, err := c.GetNodeStatus(ctx); err != nil {
+		return nil, err
+	}
+	ctx, cancel := withDefaultTimeout(ctx)
+	defer cancel()
+	return c.sandboxRuntime.GetInjections(ctx, target)
+}
+func (c *Client) SetInjections(ctx context.Context, request *nodev1.SetInjectionsRequest) (*nodev1.SandboxInjections, error) {
+	if _, err := c.GetNodeStatus(ctx); err != nil {
+		return nil, err
+	}
+	ctx, cancel := withDefaultTimeout(ctx)
+	defer cancel()
+	return c.sandboxRuntime.SetInjections(ctx, request)
+}
+func (c *Client) RevokeInjectionCredential(ctx context.Context, id string) error {
+	if _, err := c.GetNodeStatus(ctx); err != nil {
+		return err
+	}
+	ctx, cancel := withDefaultTimeout(ctx)
+	defer cancel()
+	_, err := c.sandboxRuntime.RevokeCredential(ctx, &nodev1.RevokeCredentialRequest{PersistentId: id})
+	return err
 }

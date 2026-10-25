@@ -12,6 +12,7 @@ import (
 
 	guestv1 "github.com/DROWNING2003/Isodo/internal/api/guest/v1"
 	nodev1 "github.com/DROWNING2003/Isodo/internal/api/node/v1"
+	"github.com/DROWNING2003/Isodo/internal/node/injection"
 	"github.com/DROWNING2003/Isodo/internal/node/templatebuilder"
 	"github.com/DROWNING2003/Isodo/internal/templateartifact"
 	"github.com/google/uuid"
@@ -46,8 +47,11 @@ type CHVConfig struct {
 	NetworkBridge             string
 }
 type CHVServer struct {
-	stateLock *os.File
+	injections *injection.Manager
+	egress     map[string]*egressBinding
+	stateLock  *os.File
 	nodev1.UnimplementedNodeOrchestratorServer
+	nodev1.UnimplementedSandboxRuntimeServer
 	status     *StatusServer
 	config     CHVConfig
 	journal    *limaJournal
@@ -151,8 +155,8 @@ func (s *CHVServer) validate(request *nodev1.ApplyOperationRequest) error {
 			if request.Network.EgressMode != nodev1.EgressMode_EGRESS_MODE_DENY && request.Network.EgressMode != nodev1.EgressMode_EGRESS_MODE_ALLOW {
 				return status.Error(codes.FailedPrecondition, "unsupported CHV egress mode")
 			}
-			if request.Network.EgressMode == nodev1.EgressMode_EGRESS_MODE_ALLOW && s.config.NetworkBridge == "" {
-				return status.Error(codes.FailedPrecondition, "CHV egress bridge is not configured")
+			if request.Network.EgressMode == nodev1.EgressMode_EGRESS_MODE_ALLOW && s.config.NetworkBridge == "" && s.injections == nil {
+				return status.Error(codes.FailedPrecondition, "CHV egress proxy or bridge is not configured")
 			}
 			if len(request.Network.AllowedCidrs) > 0 {
 				return status.Error(codes.FailedPrecondition, "CHV per-sandbox CIDR allowlists are not implemented")
@@ -227,7 +231,7 @@ func (s *CHVServer) ApplyOperation(ctx context.Context, request *nodev1.ApplyOpe
 		record.VCPU = request.Resources.Vcpu
 		record.MemoryBytes = request.Resources.MemoryBytes
 		record.EgressAllowed = request.Network == nil || request.Network.EgressMode == nodev1.EgressMode_EGRESS_MODE_ALLOW
-		if record.EgressAllowed {
+		if record.EgressAllowed && s.config.NetworkBridge != "" {
 			if err := s.ensureSandboxNetwork(&record); err != nil {
 				return nil, status.Error(codes.Unavailable, "CHV egress network could not be prepared")
 			}
@@ -237,7 +241,7 @@ func (s *CHVServer) ApplyOperation(ctx context.Context, request *nodev1.ApplyOpe
 	}
 	if request.Action == nodev1.OperationAction_OPERATION_ACTION_START {
 		record.State = "starting"
-		if record.EgressAllowed {
+		if record.EgressAllowed && s.config.NetworkBridge != "" {
 			if err := s.ensureSandboxNetwork(&record); err != nil {
 				return nil, status.Error(codes.Unavailable, "CHV egress network could not be prepared")
 			}
@@ -346,6 +350,9 @@ func (s *CHVServer) execute(entry journalOperation, record sandboxRecord) {
 			}
 		} else if entry.Operation.Action == nodev1.OperationAction_OPERATION_ACTION_DELETE {
 			err = os.RemoveAll(filepath.Join(s.config.Directory, "vms", record.SandboxID))
+		}
+		if err == nil && entry.Operation.Action == nodev1.OperationAction_OPERATION_ACTION_DELETE && s.injections != nil {
+			err = s.injections.Delete(record.SandboxID)
 		}
 	}
 	s.mu.Lock()
@@ -490,6 +497,9 @@ func (s *CHVServer) Close() {
 	}
 	for id := range s.appLinks {
 		s.closeAppLinkLocked(id)
+	}
+	for id := range s.egress {
+		s.closeEgressLocked(id)
 	}
 	s.endLife()
 	_ = s.stateLock.Close()

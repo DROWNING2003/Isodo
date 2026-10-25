@@ -75,16 +75,21 @@ func run(logger *slog.Logger) error {
 	}
 	access := &auth.Access{Bearer: casdoor, Keys: store, Web: web}
 	sandboxHandler := sandbox.NewHandlerForBackendWithWebOrigin(store, os.Getenv("ISODO_NODE_BACKEND"), os.Getenv("ISODO_WEB_ORIGIN"), nodeClient)
+	if nodeClient != nil {
+		sandboxHandler.SetRuntime(nodeClient)
+		sandboxHandler.SetFiles(nodeClient)
+	}
 	var relay preview.RelayDialer
 	if nodeClient != nil && os.Getenv("ISODO_NODE_BACKEND") != "lima" {
 		relay = nodeClient
 	}
 	publisher, err := preview.New(preview.Config{
-		Secret:  os.Getenv("ISODO_PREVIEW_SECRET"),
-		Domain:  os.Getenv("ISODO_PREVIEW_DOMAIN"),
-		Scheme:  os.Getenv("ISODO_PREVIEW_SCHEME"),
-		APIPort: listenPort(listenAddr),
-		Relay:   relay,
+		Secret:    os.Getenv("ISODO_PREVIEW_SECRET"),
+		Domain:    os.Getenv("ISODO_PREVIEW_DOMAIN"),
+		Scheme:    os.Getenv("ISODO_PREVIEW_SCHEME"),
+		APIPort:   listenPort(listenAddr),
+		AppOrigin: os.Getenv("ISODO_WEB_ORIGIN"),
+		Relay:     relay,
 	})
 	if err != nil {
 		return fmt.Errorf("configure sandbox preview gateway: %w", err)
@@ -101,6 +106,9 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	injectionHandler := injection.NewHandler(injection.NewPostgresStore(store.Pool()), sealer)
+	if nodeClient != nil {
+		injectionHandler.SetRuntimeRevoker(nodeClient)
+	}
 	publicHandler := httpapi.NewHandlerWithInjections(web, auth.NewAPIKeyHandler(store), sandboxHandler, access, injectionHandler, template.NewHandler(store))
 	if publisher != nil {
 		publicHandler = publisher.Wrap(publicHandler)

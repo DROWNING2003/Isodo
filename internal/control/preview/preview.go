@@ -30,11 +30,12 @@ const (
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 type Config struct {
-	Secret  string
-	Domain  string
-	Scheme  string
-	APIPort string
-	TTL     time.Duration
+	Secret    string
+	Domain    string
+	Scheme    string
+	APIPort   string
+	AppOrigin string
+	TTL       time.Duration
 	// Relay, when set, dials the Guest port through the Node gRPC stream
 	// instead of assuming the API and Node share a loopback address.
 	Relay RelayDialer
@@ -47,11 +48,12 @@ type RelayDialer interface {
 }
 
 type Publisher struct {
-	secret  []byte
-	domain  string
-	scheme  string
-	apiPort string
-	ttl     time.Duration
+	secret    []byte
+	domain    string
+	scheme    string
+	apiPort   string
+	appOrigin string
+	ttl       time.Duration
 
 	relay        RelayDialer
 	mu           sync.RWMutex
@@ -76,6 +78,12 @@ func New(config Config) (*Publisher, error) {
 	if scheme != "http" && scheme != "https" {
 		return nil, errors.New("preview scheme must be http or https")
 	}
+	if config.AppOrigin != "" {
+		origin, err := url.Parse(config.AppOrigin)
+		if err != nil || origin.Host == "" || origin.User != nil || (origin.Scheme != "http" && origin.Scheme != "https") || origin.Path != "" || origin.RawQuery != "" || origin.Fragment != "" {
+			return nil, errors.New("preview AppOrigin must be an HTTP origin")
+		}
+	}
 	ttl := config.TTL
 	if ttl <= 0 {
 		ttl = time.Hour
@@ -85,6 +93,7 @@ func New(config Config) (*Publisher, error) {
 		domain:       strings.Trim(strings.ToLower(config.Domain), "."),
 		scheme:       scheme,
 		apiPort:      strings.TrimSpace(config.APIPort),
+		appOrigin:    config.AppOrigin,
 		ttl:          ttl,
 		relay:        config.Relay,
 		targets:      make(map[string]*url.URL),
@@ -151,6 +160,7 @@ func (p *Publisher) relayTarget(sandboxID string) (uint16, bool) {
 
 func (p *Publisher) proxyRelay(w http.ResponseWriter, r *http.Request, sandboxID string, port uint16) {
 	proxy := &httputil.ReverseProxy{
+		ModifyResponse: stripUpstreamCORS,
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.Out.URL.Scheme = "http"
 			pr.Out.URL.Host = "sandbox-relay"
@@ -189,6 +199,22 @@ func (p *Publisher) Wrap(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		if origin := r.Header.Get("Origin"); origin != "" {
+			w.Header().Add("Vary", "Origin")
+			if origin != p.appOrigin && origin != p.scheme+"://"+r.Host {
+				http.Error(w, "preview origin is not allowed", http.StatusForbidden)
+				return
+			}
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			if r.Method == http.MethodOptions && r.Header.Get("Access-Control-Request-Method") != "" {
+				w.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, POST, PUT, PATCH, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", r.Header.Get("Access-Control-Request-Headers"))
+				w.Header().Add("Vary", "Access-Control-Request-Headers")
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
+		}
 		if strings.HasPrefix(r.URL.Path, authPrefix) {
 			p.authenticate(w, r, sandboxID, port)
 			return
@@ -196,6 +222,11 @@ func (p *Publisher) Wrap(next http.Handler) http.Handler {
 		current, ok := p.readCookie(r)
 		if !ok || current.SandboxID != sandboxID || current.Port != port {
 			http.Error(w, "preview authorization required", http.StatusUnauthorized)
+			return
+		}
+		if r.URL.Path == "/__isodo/ready" {
+			w.Header().Set("Cache-Control", "no-store")
+			w.WriteHeader(http.StatusNoContent)
 			return
 		}
 		if p.relay != nil {
@@ -249,6 +280,7 @@ func (p *Publisher) readCookie(r *http.Request) (claims, bool) {
 
 func (p *Publisher) proxy(w http.ResponseWriter, r *http.Request, target *url.URL) {
 	proxy := &httputil.ReverseProxy{
+		ModifyResponse: stripUpstreamCORS,
 		Rewrite: func(pr *httputil.ProxyRequest) {
 			pr.SetURL(target)
 			pr.Out.Host = pr.In.Host
@@ -260,6 +292,14 @@ func (p *Publisher) proxy(w http.ResponseWriter, r *http.Request, target *url.UR
 		},
 	}
 	proxy.ServeHTTP(w, r)
+}
+
+// The gateway owns the browser origin policy; upstream wildcard CORS must not
+// produce duplicate headers or broaden access to a credentialed preview.
+func stripUpstreamCORS(response *http.Response) error {
+	response.Header.Del("Access-Control-Allow-Origin")
+	response.Header.Del("Access-Control-Allow-Credentials")
+	return nil
 }
 
 func stripInternalCookies(request *http.Request) {

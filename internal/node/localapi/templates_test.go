@@ -98,7 +98,7 @@ func TestListTemplatesHidesCommandsAndReportsReadiness(t *testing.T) {
 	server, catalog := newTemplateServer(t, builder)
 
 	response := httptest.NewRecorder()
-	server.Handler().ServeHTTP(response, authorizedRequest(http.MethodGet, "/templates", ""))
+	server.Handler().ServeHTTP(response, authorizedRequest(http.MethodGet, "/v1/templates", ""))
 	if response.Code != http.StatusOK {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusOK)
 	}
@@ -124,7 +124,7 @@ func TestListTemplatesHidesCommandsAndReportsReadiness(t *testing.T) {
 	spec, _ := catalog.Find("node")
 	builder.built["node/"+spec.BuildID()] = true
 	response = httptest.NewRecorder()
-	server.Handler().ServeHTTP(response, authorizedRequest(http.MethodGet, "/templates", ""))
+	server.Handler().ServeHTTP(response, authorizedRequest(http.MethodGet, "/v1/templates", ""))
 	if !strings.Contains(response.Body.String(), `"ready":true`) {
 		t.Fatalf("built template still reported unbuilt: %s", response.Body.String())
 	}
@@ -135,7 +135,7 @@ func TestBuildTemplateReturnsImmediatelyAndBecomesReady(t *testing.T) {
 	server, _ := newTemplateServer(t, builder)
 
 	response := httptest.NewRecorder()
-	server.Handler().ServeHTTP(response, authorizedRequest(http.MethodPost, "/templates/node/build", ""))
+	server.Handler().ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/templates/node/build", ""))
 	if response.Code != http.StatusAccepted {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusAccepted)
 	}
@@ -152,7 +152,7 @@ func TestBuildTemplateReturnsImmediatelyAndBecomesReady(t *testing.T) {
 func TestCreateSandboxRejectsUnbuiltTemplate(t *testing.T) {
 	server, _ := newTemplateServer(t, &fakeBuilder{built: map[string]bool{}})
 	response := httptest.NewRecorder()
-	server.Handler().ServeHTTP(response, authorizedRequest(http.MethodPost, "/sandboxes", `{"template":"node"}`))
+	server.Handler().ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/sandboxes", `{"template":"node"}`))
 	if response.Code != http.StatusConflict {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusConflict)
 	}
@@ -161,7 +161,7 @@ func TestCreateSandboxRejectsUnbuiltTemplate(t *testing.T) {
 func TestCreateSandboxRejectsUnknownTemplate(t *testing.T) {
 	server, _ := newTemplateServer(t, &fakeBuilder{built: map[string]bool{}})
 	response := httptest.NewRecorder()
-	server.Handler().ServeHTTP(response, authorizedRequest(http.MethodPost, "/sandboxes", `{"template":"missing"}`))
+	server.Handler().ServeHTTP(response, authorizedRequest(http.MethodPost, "/v1/sandboxes", `{"template":"missing"}`))
 	if response.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", response.Code, http.StatusBadRequest)
 	}

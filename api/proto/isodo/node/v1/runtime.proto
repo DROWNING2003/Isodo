@@ -1,0 +1,77 @@
+syntax = "proto3";
+package isodo.node.v1;
+import "google/protobuf/empty.proto";
+import "isodo/guest/v1/guest.proto";
+option go_package = "github.com/DROWNING2003/Isodo/internal/api/node/v1;nodev1";
+
+// SandboxRuntime is the mTLS-only data/configuration plane. Secret material
+// terminates at Node's host proxy and must never be forwarded to Guest files.
+service SandboxRuntime {
+ rpc WriteFile(stream RuntimeWriteFrame) returns (isodo.guest.v1.WriteFileResponse);
+ rpc ReadFile(RuntimeReadRequest) returns (stream isodo.guest.v1.ReadFileFrame);
+ rpc MakeDirectory(RuntimeDirectoryRequest) returns (isodo.guest.v1.FileInfo);
+ rpc RevokeCredential(RevokeCredentialRequest) returns (google.protobuf.Empty);
+ rpc GetInjections(SandboxTarget) returns (SandboxInjections);
+ rpc SetInjections(SetInjectionsRequest) returns (SandboxInjections);
+}
+message SandboxTarget {
+ string sandbox_id = 1;
+ uint64 ownership_generation = 2;
+ uint64 revision = 3;
+}
+message InjectionSpec {
+ string type = 1;
+ string base_url = 2;
+ string header_name = 3;
+ map<string,string> if_headers = 4;
+ map<string,string> if_queries = 5;
+}
+message InjectionSecret {
+ string api_key = 1;
+ string token = 2;
+ map<string,string> headers = 3;
+}
+message InjectionMaterial {
+ string key = 1;
+ string name = 2;
+ string kind = 3;
+ string persistent_id = 4;
+ InjectionSpec spec = 5;
+ InjectionSecret secret = 6;
+}
+message InjectionView {
+ string key = 1;
+ string name = 2;
+ string kind = 3;
+ string persistent_id = 4;
+ InjectionSpec spec = 5;
+ string secret_hint = 6;
+}
+message SetInjectionsRequest {
+ SandboxTarget target = 1;
+ repeated InjectionMaterial rules = 2;
+}
+message SandboxInjections {
+ repeated InjectionView rules = 1;
+ bool enabled = 2;
+ int64 injected = 3;
+}
+
+message RevokeCredentialRequest { string persistent_id = 1; }
+
+message RuntimeWriteHeader {
+ SandboxTarget target = 1;
+ string path = 2;
+ uint64 size_bytes = 3;
+ bytes sha256 = 4;
+ bool overwrite = 5;
+ string request_id = 6;
+}
+message RuntimeWriteFrame {
+ oneof frame {
+  RuntimeWriteHeader header = 1;
+  isodo.guest.v1.FileChunk chunk = 2;
+ }
+}
+message RuntimeReadRequest { SandboxTarget target = 1; string path = 2; }
+message RuntimeDirectoryRequest { SandboxTarget target = 1; string path = 2; bool parents = 3; string request_id = 4; }
