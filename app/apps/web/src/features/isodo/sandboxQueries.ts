@@ -1,5 +1,6 @@
+import { localSandboxClient, remoteSandboxClient } from "./sandboxTransports";
 import { QueryClient, queryOptions, useQuery } from "@tanstack/react-query";
-import { listSandboxes, type Sandbox } from "../../api/public.generated";
+import { type Sandbox } from "../../api/public.generated";
 import { getAuthGeneration, useAuth } from "./auth";
 
 export interface LocalSandboxItem {
@@ -11,6 +12,10 @@ export interface LocalSandboxItem {
     readonly memory_bytes?: number;
     readonly disk_bytes?: number;
   };
+}
+
+export function toLocalSandboxItem(item: Sandbox): LocalSandboxItem {
+  return { id: item.id, name: item.name, state: item.observed_state, ...(item.resources ? { resources: item.resources } : {}) };
 }
 
 // One cache for the list, workspace and sidebar, retained across route changes.
@@ -29,13 +34,11 @@ export const platformSandboxesPrefix = ["isodo", "sandboxes", "cloud"] as const;
 export const localSandboxesOptions = queryOptions({
   queryKey: localSandboxesKey,
   queryFn: async (): Promise<LocalSandboxItem[]> => {
-    const bridge = window.isodoDesktop;
-    if (!bridge) return [];
-    const result = (await bridge.listLocalSandboxes()) as { items?: LocalSandboxItem[] };
-    return result.items ?? [];
+    if (!window.isodoDesktop) return [];
+    return (await localSandboxClient.list()).items.map(toLocalSandboxItem);
   },
   refetchInterval: (query) =>
-    query.state.data?.some((item) => ["creating", "starting"].includes(item.state ?? ""))
+    query.state.data?.some((item) => ["requested", "preparing", "starting", "stopping"].includes(item.state ?? ""))
       ? 2_000
       : false,
 });
@@ -71,7 +74,7 @@ export function usePlatformSandboxes(enabled = true) {
     {
       queryKey,
       enabled: enabled && auth.status === "authenticated",
-      queryFn: async (): Promise<Sandbox[]> => (await listSandboxes({ limit: 100 })).items,
+      queryFn: async (): Promise<Sandbox[]> => (await remoteSandboxClient.list({ limit: 100 })).items,
       refetchInterval: (query) => platformSandboxRefetchInterval(query.state.data),
     },
     sandboxQueryClient,

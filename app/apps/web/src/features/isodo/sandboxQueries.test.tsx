@@ -21,7 +21,10 @@ function Harness() {
 }
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
-  vi.stubGlobal("window", { isodoDesktop: { listLocalSandboxes: list } });
+  vi.stubGlobal("window", { isodoDesktop: { sandboxRequest: async () => {
+    const page = await list();
+    return { total: page.items.length, limit: 100, offset: 0, items: page.items.map((item: { id: string; name?: string; state?: string }) => ({ ...item, name: item.name ?? item.id, desired_state: "running", observed_state: item.state ?? "running" })) };
+  } } });
   list.mockReset().mockResolvedValue({ items: [{ id: "sandbox-a", name: "A", state: "running" }] });
 });
 afterEach(async () => {
@@ -72,26 +75,23 @@ it.each([
   ["running", "requested"],
   ["running", "preparing"],
   ["stopped", "stopping"],
-  ["starting", "starting"],
-])("polls cloud rows until %s converges from %s", (desired_state, observed_state) => {
+] as const)("polls cloud rows until %s converges from %s", (desired_state, observed_state) => {
   expect(platformSandboxRefetchInterval([{ desired_state, observed_state }])).toBe(2_000);
 });
 
 it.each([
   ["running", "running"],
   ["stopped", "stopped"],
-  ["running", "failed"],
   ["running", "error"],
-  ["stopped", "failed"],
   ["stopped", "error"],
-])("stops polling settled or failed cloud rows: %s / %s", (desired_state, observed_state) => {
+] as const)("stops polling settled or failed cloud rows: %s / %s", (desired_state, observed_state) => {
   expect(platformSandboxRefetchInterval([{ desired_state, observed_state }])).toBe(false);
 });
 
 it("continues polling other transitioning rows even when one sandbox failed", () => {
   expect(
     platformSandboxRefetchInterval([
-      { desired_state: "running", observed_state: "failed" },
+      { desired_state: "running", observed_state: "error" },
       { desired_state: "stopped", observed_state: "running" },
     ]),
   ).toBe(2_000);

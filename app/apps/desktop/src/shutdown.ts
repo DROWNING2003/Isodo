@@ -1,7 +1,7 @@
 interface Sandbox {
   id: string;
   name?: string;
-  state?: string;
+  observed_state?: string;
 }
 type Request = (path: string, init?: RequestInit) => Promise<unknown>;
 
@@ -9,19 +9,19 @@ type Request = (path: string, init?: RequestInit) => Promise<unknown>;
 export async function pauseManagedSandboxes(request: Request, timeoutMs = 90_000): Promise<void> {
   const deadline = Date.now() + timeoutMs;
   const read = async () => {
-    const result = (await request("/sandboxes", {
+    const result = (await request("/v1/sandboxes", {
       signal: AbortSignal.timeout(Math.max(1, Math.min(10_000, deadline - Date.now()))),
     })) as { items?: Sandbox[] };
     if (!Array.isArray(result.items)) throw new Error("无法读取本地沙箱状态。");
     return result.items;
   };
   const active = (await read()).filter(
-    (item) => item.state !== "stopped" && item.state !== "paused",
+    (item) => item.observed_state !== "stopped" && item.observed_state !== "paused",
   );
   const stopBatch = async (targets: Sandbox[]) => {
     const outcomes = await Promise.allSettled(
       targets.map(async (item) => {
-        await request(`/sandboxes/${encodeURIComponent(item.id)}/stop`, {
+        await request(`/v1/sandboxes/${encodeURIComponent(item.id)}/stop`, {
           method: "POST",
           signal: AbortSignal.timeout(Math.max(1, Math.min(15_000, deadline - Date.now()))),
         });
@@ -38,8 +38,8 @@ export async function pauseManagedSandboxes(request: Request, timeoutMs = 90_000
     const items = await read();
     const added = items.filter(
       (item) =>
-        item.state !== "stopped" &&
-        item.state !== "paused" &&
+        item.observed_state !== "stopped" &&
+        item.observed_state !== "paused" &&
         !active.some((target) => target.id === item.id),
     );
     if (added.length) {
@@ -49,7 +49,7 @@ export async function pauseManagedSandboxes(request: Request, timeoutMs = 90_000
     const remaining = active.filter((target) => {
       const item = items.find((candidate) => candidate.id === target.id);
       // Missing ownership is not proof that the VM stopped.
-      return !item || (item.state !== "stopped" && item.state !== "paused");
+      return !item || (item.observed_state !== "stopped" && item.observed_state !== "paused");
     });
     if (!remaining.length) return;
     if (Date.now() >= deadline)

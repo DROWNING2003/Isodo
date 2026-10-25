@@ -1,9 +1,12 @@
+import { setSandboxInjections } from "../../api/public.generated";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
 import { LoaderIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
-import { createSandbox as createPlatformSandbox } from "../../api/public.generated";
+import type { Sandbox } from "../../api/public.generated";
+import { localSandboxClient, remoteSandboxClient } from "./sandboxTransports";
+import { waitForSandboxAction } from "./sandboxClient";
 import { loadCloudAppTemplates } from "./cloudAppTemplates";
 import { connectPairing } from "../../connection/onboarding";
 import { isElectron } from "../../env";
@@ -69,21 +72,6 @@ function describeSandboxError(reason: unknown): string {
   return cleaned || "创建沙箱失败，请稍后重试。";
 }
 
-interface LocalSandboxAccepted {
-  readonly sandbox_id: string;
-  // The local API serializes protobuf structs with encoding/json, so field
-  // names stay snake_case and enum states stay numeric.
-  readonly operation: {
-    readonly operation_id?: string;
-    readonly operationId?: string;
-    readonly state?: number;
-  };
-}
-
-/** Platform operation states: 3 succeeded, 4 failed. */
-const OPERATION_SUCCEEDED = 3;
-const OPERATION_FAILED = 4;
-
 export function CreateSandboxDialog() {
   const navigate = useNavigate();
   const authState = useAuth();
@@ -95,7 +83,7 @@ export function CreateSandboxDialog() {
     EMPTY_CREDENTIAL_SELECTION,
   );
   const [credentialStage, setCredentialStage] = useState("");
-  const acceptedLocal = useRef<LocalSandboxAccepted | null>(null);
+  const acceptedSandbox = useRef<Sandbox | null>(null);
   const [runtime, setRuntime] = useState<Runtime>(isElectron ? "local" : "cloud");
   const [templateID, setTemplateID] = useState(BASE_TEMPLATE.id);
   const [templates, setTemplates] = useState<readonly TemplateOption[]>([BASE_TEMPLATE]);
@@ -188,7 +176,7 @@ export function CreateSandboxDialog() {
   const createLocal = async (): Promise<void> => {
     const bridge = window.isodoDesktop;
     if (!bridge) throw new Error("本地沙箱只能在桌面应用中创建");
-    if (!acceptedLocal.current && selectedTemplate && !selectedTemplate.ready) {
+    if (!acceptedSandbox.current && selectedTemplate && !selectedTemplate.ready) {
       await bridge.buildLocalTemplate(selectedTemplate.id);
       const buildDeadline = Date.now() + LOCAL_TEMPLATE_BUILD_TIMEOUT_MS;
       for (;;) {
@@ -201,43 +189,35 @@ export function CreateSandboxDialog() {
       }
     }
     const accepted =
-      acceptedLocal.current ??
-      ((await bridge.createLocalSandbox({
+      acceptedSandbox.current ??
+      (await localSandboxClient.create({
         name: name.trim(),
-        ...(selectedTemplate ? { template: selectedTemplate.id } : {}),
-      })) as LocalSandboxAccepted);
-    acceptedLocal.current = accepted;
-    const operationID = accepted.operation?.operation_id ?? accepted.operation?.operationId;
-    if (!operationID) throw new Error("本地沙箱创建没有返回 operation ID");
-    let state = accepted.operation.state ?? 0;
-    const deadline = Date.now() + LOCAL_OPERATION_TIMEOUT_MS;
-    while (state !== OPERATION_SUCCEEDED && state !== OPERATION_FAILED) {
-      if (Date.now() > deadline) throw new Error("本地沙箱创建超时");
-      await new Promise((resolve) => setTimeout(resolve, 1000));
-      const operation = (await bridge.getLocalOperation(operationID)) as { state?: number };
-      state = operation.state ?? state;
-    }
-    if (state === OPERATION_FAILED) throw new Error("本地沙箱创建失败");
+        template: selectedTemplate?.id ?? "base",
+      }));
+    acceptedSandbox.current = accepted;
+    await waitForSandboxAction(localSandboxClient, accepted, {
+      timeoutMs: LOCAL_OPERATION_TIMEOUT_MS,
+    });
     if (credentialSelection.agentIds.length || credentialSelection.credentialIds.length) {
       await applySandboxCredentials({
-        sandboxId: accepted.sandbox_id,
+        sandboxId: accepted.id,
         selection: credentialSelection,
         configs: agentConfigs,
         credentials: credentials.data ?? [],
         oneOff: [],
-        write: (rules) => bridge.setSandboxInjections(accepted.sandbox_id, rules),
+        write: (rules) => bridge.setSandboxInjections(accepted.id, rules),
         onStage: setCredentialStage,
       });
-      await saveSandboxCredentialSelection(accepted.sandbox_id, credentialSelection, agentConfigs);
+      await saveSandboxCredentialSelection(accepted.id, credentialSelection, agentConfigs);
       setCredentialStage("");
     }
-    const link = (await bridge.getLocalSandboxApp(accepted.sandbox_id)) as { url: string };
-    const connected = await connectPairingEnv({ pairingUrl: link.url });
-    if (connected._tag !== "Success") throw new Error("本地 T3 连接失败");
-    rememberSandboxEnvironment(connected.value as EnvironmentId, accepted.sandbox_id);
+    const link = await localSandboxClient.createAppLink(accepted.id);
+    const connected = await connectPairingEnv({ pairingUrl: link.pairing_url });
+    if (connected._tag !== "Success") throw new Error("本地 Agent 工作台连接失败");
+    rememberSandboxEnvironment(connected.value as EnvironmentId, accepted.id);
     updateLocalSandboxCache((items) => [
-      ...(items ?? []).filter((item) => item.id !== accepted.sandbox_id),
-      { id: accepted.sandbox_id, name: name.trim(), state: "running" },
+      ...(items ?? []).filter((item) => item.id !== accepted.id),
+      { id: accepted.id, name: name.trim(), state: "running" },
     ]);
     invalidateSandboxLists();
     setActiveEnvironmentId(connected.value as EnvironmentId);
@@ -259,9 +239,26 @@ export function CreateSandboxDialog() {
     if (!templatesLoaded || !selectedTemplate?.ready) {
       throw new Error("请选择已发布的 Ready 模板");
     }
-    await createPlatformSandbox({ name: name.trim(), template: selectedTemplate.id });
+    const accepted =
+      acceptedSandbox.current ??
+      (await remoteSandboxClient.create({ name: name.trim(), template: selectedTemplate.id }));
+    acceptedSandbox.current = accepted;
+    await waitForSandboxAction(remoteSandboxClient, accepted);
+    if (credentialSelection.agentIds.length || credentialSelection.credentialIds.length) {
+      await applySandboxCredentials({
+        sandboxId: accepted.id,
+        selection: credentialSelection,
+        configs: agentConfigs,
+        credentials: credentials.data ?? [],
+        oneOff: [],
+        write: (rules) => setSandboxInjections(accepted.id, { rules: [...rules] }),
+        onStage: setCredentialStage,
+      });
+      await saveSandboxCredentialSelection(accepted.id, credentialSelection, agentConfigs);
+      setCredentialStage("");
+    }
     invalidateSandboxLists();
-    await navigate({ to: "/sandboxes" });
+    await navigate({ to: "/sandboxes/$sandboxId", params: { sandboxId: accepted.id } });
   };
 
   const submit = async () => {
@@ -273,7 +270,7 @@ export function CreateSandboxDialog() {
       else await createCloud();
     } catch (reason) {
       setError(
-        `${acceptedLocal.current ? "沙箱已创建，后续配置或连接失败；重试会继续使用此沙箱。" : ""}${describeSandboxError(reason)}`,
+        `${acceptedSandbox.current ? "沙箱已创建，后续配置或连接失败；重试会继续使用此沙箱。" : ""}${describeSandboxError(reason)}`,
       );
       setCredentialStage("");
       setCreating(false);
@@ -306,7 +303,7 @@ export function CreateSandboxDialog() {
                 <Button
                   type="button"
                   variant={local ? "default" : "outline"}
-                  disabled={!isElectron || creating || Boolean(acceptedLocal.current)}
+                  disabled={!isElectron || creating || Boolean(acceptedSandbox.current)}
                   aria-pressed={local}
                   onClick={() => setRuntime("local")}
                 >
@@ -315,7 +312,7 @@ export function CreateSandboxDialog() {
                 <Button
                   type="button"
                   variant={local ? "outline" : "default"}
-                  disabled={creating || Boolean(acceptedLocal.current)}
+                  disabled={creating || Boolean(acceptedSandbox.current)}
                   aria-pressed={!local}
                   onClick={() => setRuntime("cloud")}
                 >
@@ -339,7 +336,7 @@ export function CreateSandboxDialog() {
                 disabled={creating}
               >
                 <SelectTrigger id="sandbox-template" className="w-full">
-                  <SelectValue />
+                  <SelectValue>{selectedTemplate?.label ?? "请选择模板"}</SelectValue>
                 </SelectTrigger>
                 <SelectPopup align="start">
                   {templates.map((template) => (
@@ -373,9 +370,7 @@ export function CreateSandboxDialog() {
                 <p className="text-sm text-muted-foreground">
                   选择要在沙箱中使用的凭证，也可以稍后添加。
                 </p>
-                {!local ? (
-                  <p className="text-sm text-muted-foreground">云端暂不支持配置凭证。</p>
-                ) : credentials.isError ? (
+                {credentials.isError ? (
                   <p role="alert" className="text-sm text-destructive">
                     {credentials.error instanceof Error
                       ? credentials.error.message
@@ -428,7 +423,7 @@ export function CreateSandboxDialog() {
           >
             {creating
               ? "正在创建…"
-              : acceptedLocal.current
+              : acceptedSandbox.current
                 ? "重试配置并连接"
                 : local
                   ? "创建本地沙箱"

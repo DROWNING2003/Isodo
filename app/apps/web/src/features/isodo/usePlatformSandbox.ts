@@ -1,8 +1,10 @@
+import { sandboxClientFor } from "./sandboxTransports";
+import { bootstrapSandboxPreview } from "../../api/preview";
 import { useMemo } from "react";
 import { useLocalSandboxes, usePlatformSandboxes } from "./sandboxQueries";
 
 import type { CloudSandbox } from "@t3tools/sandbox-client/cloud";
-import { createSandboxAppLink, type Sandbox as PlatformSandbox } from "../../api/public.generated";
+import { type Sandbox as PlatformSandbox } from "../../api/public.generated";
 
 /**
  * Platform sandboxes live in the cloud control plane, not in the local mock
@@ -33,7 +35,7 @@ export function toPlatformRecord(sandbox: PlatformSandbox): PlatformSandboxRecor
           : ["failed", "error"].includes(sandbox.observed_state)
             ? "failed"
             : "stopped",
-    description: sandbox.template_id ? "模板沙箱" : "T3 沙箱应用",
+    description: sandbox.template_id ? "模板沙箱" : "Agent 工作台",
   };
 }
 
@@ -77,17 +79,8 @@ export async function resolvePairingUrl(
   sandboxId: string,
   options: { readonly local: boolean },
 ): Promise<string> {
-  // Ask only the runtime that actually owns the sandbox: the desktop runtime has
-  // no record of control-plane sandboxes, and probing it first produced a
-  // NotFound for every cloud sandbox.
-  if (options.local) {
-    const bridge = window.isodoDesktop;
-    if (!bridge) throw new Error("本地沙箱需要在桌面应用中打开");
-    const link = (await bridge.getLocalSandboxApp(sandboxId)) as { url?: string };
-    if (!link?.url) throw new Error("本地运行时没有返回这个沙箱的入口");
-    return link.url;
-  }
-  const link = await createSandboxAppLink(sandboxId);
+  const link = await sandboxClientFor(options.local ? "local" : "cloud").createAppLink(sandboxId);
+  await bootstrapSandboxPreview(link.pairing_url);
   return link.pairing_url;
 }
 
@@ -106,9 +99,9 @@ export function useLocalRuntimeSandbox(sandboxId: string): {
           status:
             match.state === "running"
               ? "running"
-              : ["creating", "starting"].includes(match.state ?? "")
+              : ["requested", "preparing", "starting"].includes(match.state ?? "")
                 ? "starting"
-                : match.state === "failed"
+                : match.state === "error"
                   ? "failed"
                   : "stopped",
           description: "本地沙箱",

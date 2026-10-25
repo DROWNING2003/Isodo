@@ -1,9 +1,12 @@
+import { writeAgentConfigurationFile } from "./sandboxFiles";
 import { useCallback } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   createInjectionRule,
   deleteInjectionRule,
   getInjectionRuleMaterial,
+  getSandboxInjections as getRemoteSandboxInjections,
+  setSandboxInjections as setRemoteSandboxInjections,
   listInjectionRules,
   updateInjectionRule,
   type CreateInjectionRule,
@@ -118,10 +121,14 @@ export function useInjectionSummary() {
 export function useSandboxInjections(sandboxId: string, enabled = true) {
   return useQuery({
     queryKey: ["isodo", "sandbox-injections", sandboxId],
-    enabled: enabled && Boolean(window.isodoDesktop) && Boolean(sandboxId),
+    enabled:
+      enabled &&
+      Boolean(sandboxId) &&
+      (!sandboxId.startsWith("local-") || Boolean(window.isodoDesktop)),
     queryFn: async (): Promise<LocalSandboxInjections> => {
+      if (!sandboxId.startsWith("local-")) return getRemoteSandboxInjections(sandboxId);
       const bridge = window.isodoDesktop;
-      if (!bridge) return { rules: [], enabled: false, stats: { injected: 0 } };
+      if (!bridge) throw new Error("本地运行时不可用");
       return (await bridge.getSandboxInjections(sandboxId)) as LocalSandboxInjections;
     },
     staleTime: 5_000,
@@ -133,11 +140,10 @@ export function useSandboxInjectionWriter(sandboxId: string) {
   return useCallback(
     async (rules: readonly LocalInjectionRule[]): Promise<LocalSandboxInjections> => {
       const bridge = window.isodoDesktop;
-      if (!bridge) throw new Error("安全连接需要在 isodo 桌面应用中配置");
-      const result = (await bridge.setSandboxInjections(
-        sandboxId,
-        rules,
-      )) as LocalSandboxInjections;
+      if (sandboxId.startsWith("local-") && !bridge) throw new Error("本地运行时不可用");
+      const result = sandboxId.startsWith("local-")
+        ? ((await bridge!.setSandboxInjections(sandboxId, rules)) as LocalSandboxInjections)
+        : await setRemoteSandboxInjections(sandboxId, { rules: [...rules] });
       client.setQueryData(["isodo", "sandbox-injections", sandboxId], result);
       // The write is complete. Background refreshes must not hold the save button.
       void client.invalidateQueries({ queryKey: ["isodo", "injection-summary"] }).catch(() => {});
@@ -147,19 +153,7 @@ export function useSandboxInjectionWriter(sandboxId: string) {
   );
 }
 
-export async function writeSandboxAgentConfig(
-  sandboxId: string,
-  input: { path: string; content: string },
-): Promise<{ path: string; sha256: string; bytes: number; requires_restart: boolean }> {
-  const bridge = window.isodoDesktop;
-  if (!bridge) throw new Error("Agent 配置写入需要在 isodo 桌面应用中执行");
-  return (await bridge.writeAgentConfig(sandboxId, input)) as {
-    path: string;
-    sha256: string;
-    bytes: number;
-    requires_restart: boolean;
-  };
-}
+export const writeSandboxAgentConfig = writeAgentConfigurationFile;
 
 export async function fetchInjectionMaterials(
   ids: readonly string[],
