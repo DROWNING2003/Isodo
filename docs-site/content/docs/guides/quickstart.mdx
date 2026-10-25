@@ -1,69 +1,71 @@
 ---
 title: 快速开始
-description: 在本地启动 Isodo 并调用公开 Sandbox API。
+description: 准备开发环境，在 Isodo App 中创建并连接沙箱。
 ---
 
 # 快速开始
 
-## 准备环境
+## 环境要求
 
-需要 Node.js 22.12 或更新版本、Go 工具链、Docker Compose，以及 Casdoor 的 GitHub Provider 配置。
+App 使用 Node.js 24.13.1 和 pnpm 11.10.0；Go 版本见根目录 `go.mod`（当前 1.26.9）。本地沙箱需要 macOS 和 Lima，开发依赖需要 Docker Compose。云端 CHV 另需 Linux x86_64/KVM 主机、匹配的 Cloud Hypervisor 和已发布的模板工件。
 
-在仓库根目录初始化环境并启动依赖：
+## 初始化与认证
+
+在仓库根目录执行：
 
 ```bash
 make init
-# 按 .env.example 中的说明配置 Casdoor 客户端信息
+# 按 .env.example 配置 GitHub OAuth / Casdoor；秘密只保存在本地。
 make infra-up
+cd app
+corepack pnpm@11.10.0 install
+cd ..
 ```
 
-启动 API 和 Web：
+认证需要在 Casdoor 中注册 App 的精确回调地址。只演示本地 Lima 时可以使用默认 `http://127.0.0.1:5734`。同时使用云端 Preview Cookie 的配置见[运行环境接入](/docs/guides/runtime)。
+
+## 准备桌面运行时
+
+```bash
+go build -o isodo-node ./cmd/isodo-node
+mkdir -p .tools
+# Apple Silicon 使用 arm64；Intel Mac 改为 amd64。
+GOOS=linux GOARCH=arm64 go build -o .tools/isodo-guest-linux-arm64 ./cmd/isodo-guest
+make t3-app-bundle
+```
+
+Guest Agent 与 Agent 工作台 bundle 是本地构建产物，不提交 Git。Electron 自动启动本地 Lima sidecar，使用用户数据目录保存 journal；已有实例应复用，不额外启动第二份桌面 Node。
+
+## 启动 App
+
+在不同终端运行：
 
 ```bash
 make api
 make web
+make electron
 ```
 
-Web 默认监听 `http://127.0.0.1:5734`，控制 API 默认监听 `http://127.0.0.1:8080`。本地 Casdoor 的地址和回调配置见 [身份认证](./authentication)。
+默认 Web 地址为 `http://127.0.0.1:5734`，Control API 为 `http://127.0.0.1:8080`。云端演示时先配置 Control 到独立 Node 的 mTLS/SSH 连接，不能将远端 Node 地址作为 App 的公开 API 地址。
 
-## 生成 API 客户端和文档
+GitHub 登录后，进入“创建沙箱”，选择本地、选择 base，再选择已有 Agent 配置。等待运行态后进入 Agent 工作台，提交一个模型任务，检查生成文件与真实测试输出。模型服务由用户自己的连接提供。
 
-修改 `api/openapi/openapi-public.yaml` 后，在仓库根目录运行：
+## API 与文档
+
+API Key 在“开发者 → API 密钥”创建，明文仅展示一次。示例中的密钥应通过安全的环境变量提供：
 
 ```bash
-make generate
+curl http://127.0.0.1:8080/v1/sandboxes -H "X-API-Key: $ISODO_API_KEY"
+curl 'http://127.0.0.1:8080/v1/templates?scope=available' -H "X-API-Key: $ISODO_API_KEY"
 ```
 
-这会更新 Go 路由绑定、Web TypeScript 客户端和 API Reference 的 MDX 页面。生成代码不应手动编辑。运行文档站：
+远端创建需要可创建的 Ready 模板：`POST /v1/sandboxes` 返回 `202 Sandbox`，随后等待同一 `revision` 的 `last_action.status=succeeded` 和 `observed_state=running`。HTTP 接受请求不等于 Guest 已就绪。
+
+公开接口、Files 与错误模型见 [API Reference](/docs/api-reference)。修改协议后使用根目录 `make generate` 更新生成代码；只更新接口文档可执行 `npm --prefix docs-site run generate:openapi`。
 
 ```bash
+npm ci --prefix docs-site
 make docs
 ```
 
-然后打开 `http://127.0.0.1:3000/docs`。
-
-## 调用公开 API
-
-公开 API 需要有效会话、Casdoor Bearer Token 或 API Key。登录后可以在 Web 的“开发者 → API 密钥”创建 Key，并通过 `X-API-Key` 请求头发送。密钥仅在创建时展示一次。
-
-```bash
-curl http://127.0.0.1:8080/v1/sandboxes \
-  -H 'X-API-Key: <your-api-key>'
-```
-
-端点和请求响应模型以 [API Reference](/docs/api-reference) 中从 OpenAPI 契约生成的内容为准。
-
-## 指定模板
-
-创建时使用系统目录名称或个人模板 UUID，可追加 `:tag`；省略时选择 `linux-base:default`。平台需先在 Linux/KVM 节点完成 base 工件构建和发布，步骤见仓库 `images/linux-base/README.md`。
-
-```bash
-curl -X POST http://127.0.0.1:8080/v1/sandboxes \
-  -H 'X-API-Key: <your-api-key>' \
-  -H 'Content-Type: application/json' \
-  -d '{"name":"my-workspace","template":"linux-base"}'
-```
-
-响应中的 `template_id`、`template_build_id` 和 `template_digest` 是创建事务固定的来源。更新模板 tag 不会修改已有沙箱的来源。私有、已删除或没有 Ready build 的模板不能用于新建；统一返回 `TEMPLATE_NOT_FOUND`，避免暴露其他用户的模板信息。
-
-当前创建接口登记沙箱并固定来源，仍需以 `observed_state` 判断运行状态；Node 启动和路由发布链路尚在接入，创建记录不能视为 Guest 已可执行命令。
+文档站地址为 `http://127.0.0.1:3000/docs`。

@@ -68,3 +68,5 @@
 - [网页登录与 API Key](web-auth-api-keys.md)：GitHub-only Casdoor 授权码登录、服务端会话、CSRF、密钥创建/调用/撤销及本地验证。
 
 - [工程技术栈与 API 生成约定](engineering-stack.md)：keel 模板对照、OpenAPI 生成链路和后续接入顺序。
+
+- [本地与远端 Sandbox API 统一（待审）](unified-sandbox-api.md)：E2B Control/envd 整体对照、管理与文件契约、配置文件通用写入、客户端边界和验收。

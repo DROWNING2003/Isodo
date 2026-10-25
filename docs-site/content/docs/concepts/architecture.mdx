@@ -1,0 +1,42 @@
+---
+title: MVP 架构与模块分工
+description: 当前实现的模块规格、调用边界、数据归属与开发分工。
+---
+
+# MVP 架构与模块分工
+
+Isodo 以沙箱为主体，任务、文件、Agent 配置和外部连接属于沙箱上下文。App 使用同一个 SandboxClient 管理本地 Lima 与云端 CHV，差异集中在 Transport Adapter 和 Node Runtime。
+
+## 模块规格
+
+| 模块 | 输入与输出 | 主要职责与源码 |
+| --- | --- | --- |
+| App / SandboxClient | 同构 Sandbox DTO、revision、动作状态 | 列表、创建、更新、启停、删除、模板和应用入口；`app/apps/web/src/features/isodo` |
+| Electron | IPC 请求、分块文件消息 | 管理本地 Node、限制允许路由、上传 ACK 与退出暂停；`app/apps/desktop/src` |
+| Control | 账号 HTTP → 数据库意图 / outbox → Node RPC | OAuth、归属、模板固定、异步动作与完成确认；`internal/control` |
+| Node Runtime | mTLS gRPC / 本地 HTTP → Lima 或 CHV | 实例生命周期、journal、运行身份、Guest 连接与流转发；`internal/node` |
+| Guest Agent | 绑定运行身份的 gRPC | 进程、工作区文件、端口转发；路径边界、长度与摘要校验；`internal/guest` |
+| Agent 工作台 | 配对后的 HTTP / WebSocket | 任务、模型驱动、终端与文件界面；`app/apps/server`、`app/apps/web` |
+| 凭证代理 | 占位符请求 → 按规则注入的上游请求 | 真实密钥停留在宿主侧；CHV 使用 Vsock 出站；`internal/node/injection`、`internal/egressproxy` |
+| 工件存储 | 不可变 manifest 与工件 | S3 上传、下载、校验、Node 缓存；`internal/templateartifact` |
+| 持久数据 | PostgreSQL、Node journal、实例盘 | 账号与期望状态、操作记录、运行时事实与工作文件各自归属 |
+
+## 生命周期与数据流
+
+云端创建先在 PostgreSQL 事务中固定模板 build、Sandbox 与 outbox。Worker 向指定 Node 发出动作，Node 使用校验后的工件启动 CHV，绑定 Guest 运行身份，完成后由 Control 更新该 revision 的结果。
+
+`desired_state` 表示用户目标，`observed_state` 表示运行事实。App 等待接受响应中的同一 revision；更高 revision、失败动作和超时分别处理，不因某次 HTTP 成功就认定 VM 已运行。删除也需要实际清理确认，列表隐藏本身不是清理证据。
+
+文件路径限定在 `/workspace`。写入分块携带长度与 SHA-256，Guest 校验后原子提交；默认允许覆盖，可显式禁止覆盖。配置文件复用这条通用 Files 链路，真实密钥由独立注入规则提供。
+
+## 访问与安全边界
+
+用户先通过 Control 的账号鉴权和归属检查获取短期应用入口。Preview Gateway 建立 Cookie 后，通过 Node Relay 访问当前 Guest 的 Agent 工作台；工作台本身仍执行自己的配对和连接协议。
+
+远端控制链路是 SSH 加 mTLS，Guest 入站与模型出站使用 Vsock。实机验证中的 Guest 与终端以 UID/GID 1000、NoNewPrivs=1 运行。此结果不等于完成所有越权、撤销、旧实例凭证与生产安全场景的验收。
+
+## 开发与维护分工
+
+仓库维护入口为 DROWNING2003；现有 Git 提交显示名包括 DROWNING、DROWNING2003，具体贡献以提交和 PR 为依据。模块按上表划分职责；本轮 Codex 辅助实现统一 API、联调、测试及文档整理。最终交付应保留真实提交与 PR 过程记录。
+
+原始基线使用现有 `v0` tag，指向 `05d0b8c`。不移动该 tag。公开 SDK、App 快照流转、跨节点自动接管及生产调度治理属于后续范围，不能作为当前 MVP 的已交付能力。
