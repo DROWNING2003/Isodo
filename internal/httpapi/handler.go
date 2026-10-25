@@ -10,6 +10,7 @@ import (
 	adminapi "github.com/DROWNING2003/Isodo/internal/api/admin"
 	publicapi "github.com/DROWNING2003/Isodo/internal/api/public"
 	"github.com/DROWNING2003/Isodo/internal/control/auth"
+	"github.com/DROWNING2003/Isodo/internal/control/injection"
 	"github.com/DROWNING2003/Isodo/internal/control/sandbox"
 	"github.com/DROWNING2003/Isodo/internal/control/template"
 )
@@ -26,15 +27,27 @@ type templateHandlers = template.Handler
 type publicHandlers struct {
 	*sandboxHandlers
 	*templateHandlers
+	*injection.Handler
 }
 
 var _ publicapi.ServerInterface = (*publicHandlers)(nil)
 
 // NewHandler registers both the control-plane and public API contracts.
 func NewHandler(web *auth.Web, keys *auth.APIKeyHandler, sandboxes *sandbox.Handler, access *auth.Access, templates ...*template.Handler) http.Handler {
+	return NewHandlerWithInjections(web, keys, sandboxes, access, nil, templates...)
+}
+
+// NewHandlerWithInjections adds account-level secure-connection routes. A nil
+// injection handler keeps the routes registered but returns 503, so tests that
+// only exercise sandboxes and templates do not need a secret store.
+func NewHandlerWithInjections(web *auth.Web, keys *auth.APIKeyHandler, sandboxes *sandbox.Handler, access *auth.Access, injections *injection.Handler, templates ...*template.Handler) http.Handler {
 	templateHandler := template.NewHandler(nil)
 	if len(templates) > 0 && templates[0] != nil {
 		templateHandler = templates[0]
+	}
+	injectionHandler := injections
+	if injectionHandler == nil {
+		injectionHandler = injection.NewHandler(nil, nil)
 	}
 	mux := http.NewServeMux()
 	adminapi.HandlerWithOptions(&adminHandlers{Web: web, APIKeyHandler: keys}, adminapi.StdHTTPServerOptions{
@@ -49,7 +62,7 @@ func NewHandler(web *auth.Web, keys *auth.APIKeyHandler, sandboxes *sandbox.Hand
 			})
 		}},
 	})
-	publicapi.HandlerWithOptions(&publicHandlers{sandboxHandlers: sandboxes, templateHandlers: templateHandler}, publicapi.StdHTTPServerOptions{
+	publicapi.HandlerWithOptions(&publicHandlers{sandboxHandlers: sandboxes, templateHandlers: templateHandler, Handler: injectionHandler}, publicapi.StdHTTPServerOptions{
 		BaseRouter: mux,
 		Middlewares: []publicapi.MiddlewareFunc{func(next http.Handler) http.Handler {
 			return auth.Middleware(access, next)

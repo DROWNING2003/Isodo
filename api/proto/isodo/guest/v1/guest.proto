@@ -27,6 +27,8 @@ service GuestService {
   rpc MakeDirectory(MakeDirectoryRequest) returns (FileInfo);
   rpc Remove(RemoveRequest) returns (google.protobuf.Empty);
   rpc Move(MoveRequest) returns (FileInfo);
+  // Relay one approved Guest-local TCP service over the existing Guest transport.
+  rpc PortForward(stream PortForwardFrame) returns (stream PortForwardFrame);
 }
 
 message RuntimeIdentity {
@@ -318,6 +320,36 @@ message MoveRequest {
   string source = 3;
   string destination = 4;
   bool overwrite = 5; // Default false; directories never replaced.
+}
+
+message PortForwardOpen {
+  RuntimeIdentity identity = 1;
+  string request_id = 2;
+  uint32 port = 3;
+  string service = 4;
+}
+
+message PortForwardData {
+  bytes data = 1;
+}
+
+message PortForwardEnd {
+  bool write = 1;
+}
+
+message PortForwardError {
+  string code = 1;
+  string message = 2;
+  bool retryable = 3;
+}
+
+message PortForwardFrame {
+  oneof frame {
+    PortForwardOpen open = 1;
+    PortForwardData data = 2;
+    PortForwardEnd end = 3;
+    PortForwardError error = 4;
+  }
 }
 
 // Serialized in google.rpc.Status.details as this protobuf Any type.

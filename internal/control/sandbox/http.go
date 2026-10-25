@@ -18,6 +18,8 @@ import (
 )
 
 var ErrNotFound = errors.New("sandbox not found")
+var ErrConflict = errors.New("sandbox state conflict")
+var ErrLifecycleUnsupported = errors.New("sandbox lifecycle unsupported")
 
 var sandboxIDPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
@@ -51,17 +53,26 @@ type Store interface {
 	GetSandbox(ctx context.Context, tenantID, sandboxID string) (Sandbox, error)
 	UpdateSandbox(ctx context.Context, tenantID, sandboxID string, patch Patch) (Sandbox, error)
 	DeleteSandbox(ctx context.Context, tenantID, sandboxID string) error
+	StartSandbox(ctx context.Context, tenantID, sandboxID string) (Sandbox, error)
+	StopSandbox(ctx context.Context, tenantID, sandboxID string) (Sandbox, error)
 }
 
 type Handler struct {
 	store     Store
 	appLink   AppLinkIssuer
+	publisher AppLinkPublisher
 	localLima bool
 	webOrigin string
 }
 
 type AppLinkIssuer interface {
 	CreateSandboxAppLink(context.Context, string) (string, time.Time, error)
+}
+
+// AppLinkPublisher maps a Node-local application link to the public preview
+// host. It also remembers the Node target used by the preview gateway.
+type AppLinkPublisher interface {
+	Publish(sandboxID string, port uint16, nodeURL string) (baseURL, pairingURL string, err error)
 }
 
 func NewHandler(store Store, appLinks ...AppLinkIssuer) *Handler {
@@ -80,6 +91,12 @@ func NewHandlerForBackendWithWebOrigin(store Store, backend, webOrigin string, a
 	handler := NewHandlerForBackend(store, backend, appLinks...)
 	handler.webOrigin = strings.TrimRight(webOrigin, "/")
 	return handler
+}
+
+// SetAppLinkPublisher enables public preview URLs. Without it, the API keeps
+// returning the Node-local link, which is only reachable on the same host.
+func (h *Handler) SetAppLinkPublisher(publisher AppLinkPublisher) {
+	h.publisher = publisher
 }
 
 type createRequest = publicapi.CreateSandboxJSONRequestBody
@@ -187,60 +204,92 @@ func (h *Handler) GetSandbox(w http.ResponseWriter, r *http.Request, id string) 
 	writeJSON(w, http.StatusOK, sandboxResponse(sandbox))
 }
 
-// GetSandboxApp redirects an authenticated sandbox owner into T3's own pairing
-// flow. The short-lived T3 credential stays in the URL fragment and is never
-// sent back to this API in an HTTP request.
-func (h *Handler) GetSandboxApp(w http.ResponseWriter, r *http.Request, id string) {
+// issueSandboxAppLink authorizes the caller and asks the Node for a short-lived
+// T3 pairing URL. It writes the HTTP error itself and reports whether the link
+// is usable.
+func (h *Handler) issueSandboxAppLink(w http.ResponseWriter, r *http.Request, id string) (string, time.Time, bool) {
 	identity, ok := auth.IdentityFromContext(r.Context())
 	if !ok || identity.TenantID == "" {
 		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "A valid Isodo session is required.")
-		return
+		return "", time.Time{}, false
 	}
 	if identity.Credential == "api_key" {
 		writeError(w, http.StatusForbidden, "INTERACTIVE_SESSION_REQUIRED", "Open the sandbox app from an authenticated Isodo session.")
-		return
+		return "", time.Time{}, false
 	}
 	if !sandboxIDPattern.MatchString(id) {
 		writeSandboxNotFound(w)
-		return
+		return "", time.Time{}, false
 	}
 	if _, err := h.store.GetSandbox(r.Context(), identity.TenantID, id); errors.Is(err, ErrNotFound) {
 		writeSandboxNotFound(w)
-		return
+		return "", time.Time{}, false
 	} else if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "The sandbox could not be loaded.")
-		return
+		return "", time.Time{}, false
 	}
 	if h.appLink == nil {
 		writeError(w, http.StatusServiceUnavailable, "SANDBOX_APP_UNAVAILABLE", "The sandbox application service is not configured.")
-		return
+		return "", time.Time{}, false
 	}
 	appURL, expiresAt, err := h.appLink.CreateSandboxAppLink(r.Context(), id)
 	if err != nil {
-		code, message := http.StatusBadGateway, "The sandbox application could not be opened."
+		code, errorCode, message := http.StatusBadGateway, "SANDBOX_APP_UNAVAILABLE", "The sandbox application could not be opened."
 		if grpcStatus, ok := status.FromError(err); ok {
 			switch grpcStatus.Code() {
 			case codes.NotFound:
 				writeSandboxNotFound(w)
-				return
+				return "", time.Time{}, false
+			case codes.Unimplemented:
+				code, errorCode, message = http.StatusNotImplemented, "SANDBOX_APP_UNSUPPORTED", "The sandbox backend does not support application links yet."
 			case codes.FailedPrecondition:
 				code, message = http.StatusConflict, "The sandbox must be running before its application can be opened."
 			case codes.Unavailable, codes.DeadlineExceeded:
 				code, message = http.StatusServiceUnavailable, "The sandbox application is temporarily unavailable."
 			}
 		}
-		writeError(w, code, "SANDBOX_APP_UNAVAILABLE", message)
+		writeError(w, code, errorCode, message)
+		return "", time.Time{}, false
+	}
+	return appURL, expiresAt, true
+}
+
+func parseSandboxAppLink(appURL string, expiresAt time.Time) (*url.URL, bool) {
+	parsed, err := url.Parse(appURL)
+	if err != nil || (parsed.Scheme != "http" && parsed.Scheme != "https") || parsed.Host == "" || parsed.Path != "/pair" || parsed.Fragment == "" || !expiresAt.After(time.Now()) {
+		return nil, false
+	}
+	return parsed, true
+}
+
+// GetSandboxApp redirects an authenticated sandbox owner into T3's own pairing
+// flow. The short-lived T3 credential stays in the URL fragment and is never
+// sent back to this API in an HTTP request.
+func (h *Handler) GetSandboxApp(w http.ResponseWriter, r *http.Request, id string) {
+	appURL, expiresAt, ok := h.issueSandboxAppLink(w, r, id)
+	if !ok {
 		return
 	}
-	parsed, err := url.Parse(appURL)
-	if err != nil || parsed.Scheme != "http" || !strings.HasSuffix(parsed.Hostname(), ".localhost") || parsed.Path != "/pair" || parsed.Fragment == "" || !expiresAt.After(time.Now()) {
+	parsed, ok := parseSandboxAppLink(appURL, expiresAt)
+	if !ok {
 		writeError(w, http.StatusBadGateway, "INVALID_SANDBOX_APP_LINK", "The Node returned an invalid sandbox application link.")
 		return
 	}
-	// The Node issues a one-time T3 credential and a direct Guest URL. Open
-	// hosted pairing in Isodo instead: that existing T3 flow stores the remote
-	// environment in the signed-in browser and then opens its workspace.
-	if h.webOrigin != "" {
+	if h.publisher != nil {
+		_, pairingURL, err := h.publisher.Publish(id, 8080, appURL)
+		if err != nil {
+			writeError(w, http.StatusBadGateway, "INVALID_SANDBOX_APP_LINK", "The sandbox application link could not be published.")
+			return
+		}
+		parsed, err = url.Parse(pairingURL)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "SANDBOX_APP_UNAVAILABLE", "The published sandbox application link is invalid.")
+			return
+		}
+	} else if h.webOrigin != "" {
+		// The Node issues a one-time T3 credential and a direct Guest URL. Open
+		// hosted pairing in Isodo instead: that existing T3 flow stores the remote
+		// environment in the signed-in browser and then opens its workspace.
 		webURL, err := url.Parse(h.webOrigin)
 		if err != nil || webURL.Scheme == "" || webURL.Host == "" {
 			writeError(w, http.StatusInternalServerError, "SANDBOX_APP_UNAVAILABLE", "The Isodo web origin is invalid.")
@@ -254,6 +303,47 @@ func (h *Handler) GetSandboxApp(w http.ResponseWriter, r *http.Request, id strin
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	http.Redirect(w, r, parsed.String(), http.StatusSeeOther)
+}
+
+// CreateSandboxAppLink returns the same short-lived T3 pairing link as
+// GetSandboxApp, but as JSON for desktop clients and SDKs that manage the
+// navigation themselves. The pairing credential remains in the fragment.
+func (h *Handler) CreateSandboxAppLink(w http.ResponseWriter, r *http.Request, id string) {
+	appURL, expiresAt, ok := h.issueSandboxAppLink(w, r, id)
+	if !ok {
+		return
+	}
+	parsed, ok := parseSandboxAppLink(appURL, expiresAt)
+	if !ok {
+		writeError(w, http.StatusBadGateway, "INVALID_SANDBOX_APP_LINK", "The Node returned an invalid sandbox application link.")
+		return
+	}
+	base := *parsed
+	base.Path = "/"
+	base.RawPath = ""
+	base.RawQuery = ""
+	base.Fragment = ""
+	base.RawFragment = ""
+	baseURL := base.String()
+	pairingURL := parsed.String()
+	if h.publisher != nil {
+		publishedBase, publishedPairing, publishErr := h.publisher.Publish(id, 8080, appURL)
+		if publishErr != nil {
+			writeError(w, http.StatusBadGateway, "INVALID_SANDBOX_APP_LINK", "The sandbox application link could not be published.")
+			return
+		}
+		baseURL, pairingURL = publishedBase, publishedPairing
+	}
+	capabilities := []string{"terminal", "files"}
+	writeJSON(w, http.StatusOK, publicapi.SandboxAppLink{
+		SandboxId:    id,
+		Service:      publicapi.SandboxAppLinkService("t3"),
+		Url:          baseURL,
+		PairingUrl:   pairingURL,
+		Status:       publicapi.SandboxAppLinkStatusReady,
+		ExpiresAt:    expiresAt,
+		Capabilities: &capabilities,
+	})
 }
 
 func (h *Handler) UpdateSandbox(w http.ResponseWriter, r *http.Request, id string) {
@@ -301,6 +391,47 @@ func (h *Handler) UpdateSandbox(w http.ResponseWriter, r *http.Request, id strin
 		return
 	}
 	writeJSON(w, http.StatusOK, sandboxResponse(sandbox))
+}
+
+func (h *Handler) StartSandbox(w http.ResponseWriter, r *http.Request, id string) {
+	h.lifecycle(w, r, id, "start")
+}
+
+func (h *Handler) StopSandbox(w http.ResponseWriter, r *http.Request, id string) {
+	h.lifecycle(w, r, id, "stop")
+}
+
+func (h *Handler) lifecycle(w http.ResponseWriter, r *http.Request, id, action string) {
+	identity, ok := auth.IdentityFromContext(r.Context())
+	if !ok || identity.TenantID == "" {
+		writeError(w, http.StatusUnauthorized, "UNAUTHENTICATED", "A valid Casdoor bearer token is required.")
+		return
+	}
+	if !sandboxIDPattern.MatchString(id) {
+		writeSandboxNotFound(w)
+		return
+	}
+	var (
+		item Sandbox
+		err  error
+	)
+	if action == "start" {
+		item, err = h.store.StartSandbox(r.Context(), identity.TenantID, id)
+	} else {
+		item, err = h.store.StopSandbox(r.Context(), identity.TenantID, id)
+	}
+	switch {
+	case errors.Is(err, ErrNotFound):
+		writeSandboxNotFound(w)
+	case errors.Is(err, ErrConflict):
+		writeError(w, http.StatusConflict, "SANDBOX_STATE_CONFLICT", "The sandbox is not in a state that allows this action.")
+	case errors.Is(err, ErrLifecycleUnsupported):
+		writeError(w, http.StatusNotImplemented, "SANDBOX_LIFECYCLE_UNSUPPORTED", "This sandbox backend does not support lifecycle operations.")
+	case err != nil:
+		writeError(w, http.StatusInternalServerError, "INTERNAL", "The sandbox lifecycle operation could not be requested.")
+	default:
+		writeJSON(w, http.StatusAccepted, sandboxResponse(item))
+	}
 }
 
 func (h *Handler) DeleteSandbox(w http.ResponseWriter, r *http.Request, id string) {

@@ -1,0 +1,785 @@
+/* Isodo surfaces follow the visual language of the standalone prototype. */
+.isodo-dashboard-shell {
+  width: 100% !important;
+  height: 100dvh !important;
+  min-height: 0 !important;
+  margin: 0;
+  overflow: hidden;
+  border: 0;
+  border-radius: 0;
+  background: #f7f8f6;
+  color: #282b26;
+  color-scheme: light;
+}
+
+.isodo-dashboard-shell [data-app-sidebar] {
+  border-color: #e7e9e2;
+  background: #fafbf8;
+  color: #56605a;
+}
+
+.isodo-dashboard-shell [data-slot="sidebar-header"] {
+  padding: 20px 12px 8px;
+}
+
+.isodo-dashboard-shell [data-slot="sidebar-menu-button"] {
+  min-height: 44px;
+  border-radius: 6px;
+  color: #72766e;
+  font-size: 14px;
+}
+
+.isodo-dashboard-shell [data-slot="sidebar-menu-button"]:hover {
+  background: color-mix(in srgb, var(--primary) 6%, white);
+  color: var(--primary);
+}
+
+.isodo-dashboard-shell [data-slot="sidebar-menu-button"][data-active="true"] {
+  background: color-mix(in srgb, var(--primary) 10%, white);
+  color: var(--primary);
+}
+
+.isodo-dashboard-shell [data-slot="sidebar-footer"] {
+  border-color: #e7e9e2;
+  color: #72766e;
+}
+
+.isodo-cloud-page {
+  height: 100%;
+  min-height: 0;
+  background: #f7f8f6;
+  color: #282b26;
+}
+
+.isodo-cloud-page .workspace-topbar {
+  min-height: 60px;
+  height: 60px;
+  border-color: #e9ebe6;
+  background: #f7f8f6;
+  color: #434c46;
+  padding-right: 20px;
+}
+
+.isodo-workspace .workspace-topbar {
+  min-height: 60px;
+  height: 60px;
+  padding-right: 16px;
+}
+
+.isodo-workspace .protected {
+  border-radius: 999px;
+  background: #edf7f0;
+  padding: 5px 9px;
+  color: #168045;
+  font-size: 11px;
+}
+
+.isodo-workspace .toolbar-resources {
+  white-space: nowrap;
+}
+
+.isodo-page-main {
+  max-width: 1440px;
+  margin-inline: auto;
+  padding: 40px clamp(24px, 4vw, 64px) 32px;
+  color: #282b26;
+}
+
+.isodo-overview-summary {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  padding-bottom: 24px;
+  color: #65706a;
+  font-size: 14px;
+}
+
+.isodo-overview-summary span + span {
+  border-left: 1px solid #e6e9e7;
+  padding-left: 18px;
+}
+
+.isodo-overview-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 20px;
+  border-bottom: 1px solid #e9edeb;
+}
+
+.isodo-overview-tabs {
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.isodo-overview-tab {
+  position: relative;
+  min-height: 43px;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  color: #69736d;
+  font-size: 14px;
+}
+
+.isodo-overview-tab.is-active {
+  color: #202522;
+  font-weight: 600;
+}
+
+.isodo-overview-tab.is-active::after {
+  position: absolute;
+  right: 0;
+  bottom: -1px;
+  left: 0;
+  height: 2px;
+  background: #303a34;
+  content: "";
+}
+
+.isodo-overview-search {
+  display: flex;
+  width: min(220px, 42%);
+  align-items: center;
+  gap: 8px;
+  color: #7b847e;
+}
+
+.isodo-overview-search input {
+  height: 34px;
+  border: 0;
+  background: transparent;
+  box-shadow: none;
+}
+
+.isodo-overview-grid {
+  display: block;
+  border-top: 1px solid #e8edeb;
+}
+
+.isodo-overview-card {
+  position: relative;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: "identity action" "meta action";
+  align-items: center;
+  gap: 9px 20px;
+  min-height: 0;
+  padding: 18px 14px;
+  border: 0;
+  border-bottom: 1px solid #e8edeb;
+  border-radius: 0;
+  background: #fff;
+  transition: background 150ms ease;
+}
+
+.isodo-overview-card:hover {
+  background: #f8fbff;
+}
+
+.isodo-overview-card-header {
+  display: flex;
+  grid-area: identity;
+  min-width: 0;
+  align-items: center;
+  gap: 13px;
+  padding: 0;
+}
+
+.isodo-overview-card-title-line {
+  display: flex;
+  min-width: 0;
+  align-items: center;
+  gap: 9px;
+}
+
+.isodo-overview-icon {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  place-items: center;
+  border-radius: 9px;
+  background: #eef6ff;
+  color: #246da9;
+}
+
+.isodo-location-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border-radius: 6px;
+  background: #f1f3f2;
+  padding: 4px 7px;
+  color: #616a65;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+.isodo-overview-card-description {
+  overflow: hidden;
+  padding-top: 4px;
+  color: #737f88;
+  font-size: 11px;
+  line-height: 1.45;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.isodo-overview-status {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  gap: 7px;
+  color: #18834a;
+  font-size: 11px;
+}
+
+.isodo-status-dot {
+  width: 8px;
+  height: 8px;
+  flex: none;
+  border-radius: 999px;
+  background: #a6b2a3;
+}
+
+.isodo-status-dot.is-running {
+  background: #4eaa68;
+}
+
+.isodo-overview-card-details {
+  display: flex;
+  grid-area: meta;
+  min-width: 0;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 7px 18px;
+  padding: 0 0 0 49px;
+  color: #69736d;
+  font-size: 10px;
+}
+
+.isodo-overview-card-details p span {
+  padding: 0 3px;
+  color: #bbc4bd;
+}
+
+.isodo-overview-card-meta,
+.isodo-overview-card-meta > span {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+.isodo-overview-card-meta {
+  gap: 18px;
+}
+
+.isodo-overview-card-meta > span:first-child {
+  color: #49554e;
+}
+
+.isodo-overview-card-footer {
+  display: flex;
+  grid-area: action;
+  align-items: center;
+  justify-content: space-between;
+  gap: 7px;
+  margin: 0;
+  border: 0;
+  background: transparent;
+  padding: 0;
+}
+
+.isodo-overview-empty {
+  border-top: 1px solid #e8edeb;
+  padding: 28px 0;
+  color: #69736d;
+  font-size: 13px;
+}
+
+.isodo-summary-chip {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  border: 1px solid #e4e9df;
+  border-radius: 999px;
+  background: #fbfcfa;
+  padding: 0 12px;
+}
+
+.isodo-sandbox-card {
+  min-height: 240px;
+  transition:
+    border-color 150ms ease,
+    transform 150ms ease;
+}
+
+.isodo-sandbox-card:hover {
+  transform: translateY(-2px);
+  border-color: #cbd9bf;
+}
+
+.isodo-cloud-page [data-slot="card"] {
+  border-color: #e7e9e2;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: none;
+}
+
+.isodo-cloud-page .isodo-overview-grid .isodo-overview-card {
+  border-radius: 0;
+  background: #fff;
+}
+
+.isodo-api-key-table {
+  border-color: #e4e9df;
+}
+
+.isodo-api-key-table thead {
+  background: #f7f8f6;
+}
+
+.isodo-cloud-page button:focus-visible,
+.isodo-cloud-page a:focus-visible,
+.isodo-dashboard-shell [data-slot="sidebar-menu-button"]:focus-visible {
+  outline-color: var(--primary);
+}
+
+@media (max-width: 1024px) {
+  .isodo-workspace .toolbar-resources {
+    display: none;
+  }
+}
+
+@media (max-width: 720px) {
+  .isodo-dashboard-shell {
+    width: 100% !important;
+    height: 100dvh !important;
+    margin: 0;
+    border: 0;
+    border-radius: 0;
+  }
+
+  .isodo-page-main {
+    padding: 28px 20px max(24px, env(safe-area-inset-bottom));
+  }
+}
+
+@media (max-width: 600px) {
+  .isodo-page-main {
+    padding: 24px 16px max(24px, env(safe-area-inset-bottom));
+  }
+
+  .isodo-overview-summary {
+    font-size: 12px;
+    padding-bottom: 18px;
+  }
+
+  .isodo-overview-summary span + span {
+    padding-left: 12px;
+  }
+
+  .isodo-overview-toolbar {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+
+  .isodo-overview-tabs {
+    gap: 18px;
+  }
+
+  .isodo-overview-tab {
+    min-height: 39px;
+    font-size: 13px;
+  }
+
+  .isodo-overview-search {
+    width: 100%;
+    padding-bottom: 8px;
+  }
+
+  .isodo-overview-card {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "identity" "meta" "action";
+    gap: 9px;
+    padding: 15px 9px;
+  }
+
+  .isodo-overview-card-header {
+    padding-right: 34px;
+  }
+
+  .isodo-overview-card-details {
+    gap: 6px 12px;
+    padding-left: 49px;
+  }
+
+  .isodo-overview-card-footer {
+    justify-content: flex-end;
+    margin-left: 49px;
+  }
+}
+
+.isodo-login-page {
+  display: flex;
+  min-height: 100dvh;
+  width: 100%;
+  max-width: 1400px;
+  margin-inline: auto;
+  flex-direction: column;
+  background: #f7f8f7;
+  color: #202522;
+}
+
+.isodo-login-header,
+.isodo-login-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 30px 45px;
+}
+
+.isodo-login-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.isodo-login-logo img {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+}
+
+.isodo-login-logo strong {
+  font-size: 18px;
+  letter-spacing: -0.55px;
+}
+
+.isodo-login-layout {
+  display: grid;
+  flex: 1;
+  grid-template-columns: 1.15fr 1fr;
+  grid-template-areas: "copy card";
+  align-items: center;
+  gap: 8%;
+  padding: 55px 9% 90px;
+}
+
+.isodo-login-copy {
+  grid-area: copy;
+  min-width: 0;
+}
+
+.isodo-login-eyebrow {
+  color: #72766e;
+  font-size: 9px;
+  letter-spacing: 2px;
+}
+
+.isodo-login-copy h1 {
+  margin-top: 20px;
+  font-size: 38px;
+  font-weight: 550;
+  letter-spacing: -1.5px;
+  line-height: 1.35;
+}
+
+.isodo-login-copy > p {
+  margin-top: 18px;
+  color: #72766e;
+  font-size: 13px;
+  line-height: 1.9;
+  white-space: pre-line;
+}
+
+.isodo-login-illustration {
+  display: flex;
+  align-items: center;
+  margin-top: 45px;
+}
+
+.isodo-login-space {
+  position: relative;
+  display: flex;
+  min-width: 100px;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid #dee9d1;
+  border-radius: 12px;
+  background: #fff;
+  padding: 24px 16px;
+  color: #72766e;
+  font-size: 10px;
+}
+
+.isodo-login-space > svg {
+  width: 27px;
+  height: 27px;
+}
+
+.isodo-login-space > i {
+  position: absolute;
+  top: 9px;
+  right: 9px;
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+  background: #70a667;
+}
+
+.isodo-login-transfer {
+  display: flex;
+  min-width: 40px;
+  max-width: 80px;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  color: #72766e;
+}
+
+.isodo-login-transfer svg {
+  width: 14px;
+  height: 14px;
+}
+
+.isodo-login-features {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 18px;
+  margin-top: 27px;
+  color: #72766e;
+  font-size: 9px;
+}
+
+.isodo-login-features span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+
+.isodo-login-features svg {
+  width: 12px;
+  height: 12px;
+}
+
+.isodo-login-card {
+  grid-area: card;
+  width: 100%;
+  max-width: 360px;
+  margin: auto;
+  border-color: #e3ecda;
+  border-radius: 14px;
+  background: #fff;
+  padding: 35px 30px;
+}
+
+.isodo-login-github-button {
+  border-color: #4285f4;
+  background: #4285f4;
+  color: #fff;
+}
+
+.isodo-login-github-button:hover:not(:disabled) {
+  border-color: #3779e7;
+  background: #3779e7;
+}
+
+.isodo-login-mark {
+  display: grid;
+  width: 46px;
+  height: 46px;
+  margin-bottom: 16px;
+  place-items: center;
+  border-radius: 11px;
+  background: #f0f6e7;
+}
+
+.isodo-login-mark img {
+  width: 38px;
+  height: 38px;
+  border-radius: 9px;
+}
+
+.isodo-login-demo-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  margin-top: 8px;
+  margin-bottom: 4px;
+  border-bottom: 1px solid #e6e9e7;
+  padding: 15px 0;
+  color: #72766e;
+  font-size: 9px;
+  line-height: 1.7;
+}
+
+.isodo-login-demo-note svg {
+  width: 11px;
+  height: 11px;
+  margin-top: 2px;
+  flex: 0 0 auto;
+}
+
+.isodo-login-plan-note {
+  display: block;
+  color: #72766e;
+  font-size: 9px;
+  line-height: 1.8;
+}
+
+.isodo-login-footer {
+  color: #72766e;
+  font-size: 9px;
+}
+
+@media (max-width: 760px) {
+  .isodo-login-header {
+    padding: 22px 24px;
+  }
+
+  .isodo-login-layout {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-areas: "card";
+    gap: 0;
+    padding: 42px 24px 56px;
+  }
+
+  .isodo-login-copy {
+    display: none;
+  }
+
+  .isodo-login-copy h1 {
+    font-size: 32px;
+  }
+
+  .isodo-login-illustration {
+    margin-top: 28px;
+  }
+
+  .isodo-login-footer {
+    padding: 20px 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .isodo-login-header {
+    padding: 18px 18px;
+  }
+
+  .isodo-login-layout {
+    gap: 30px;
+    padding: 32px 18px 40px;
+  }
+
+  .isodo-login-copy h1 {
+    margin-top: 14px;
+    font-size: 29px;
+  }
+
+  .isodo-login-copy > p {
+    margin-top: 12px;
+    font-size: 12px;
+  }
+
+  .isodo-login-space {
+    min-width: 88px;
+    padding: 20px 12px;
+  }
+
+  .isodo-login-features {
+    gap: 12px;
+  }
+
+  .isodo-login-card {
+    padding: 28px 22px;
+  }
+
+  .isodo-login-footer {
+    align-items: flex-start;
+    flex-direction: column;
+    padding: 18px;
+  }
+}
+
+/* Platform sandboxes resolve from the API rather than the mock cloud store. */
+.isodo-workspace-empty {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.75rem;
+  padding: 3rem 1.5rem;
+  text-align: center;
+}
+
+.isodo-workspace-empty h1 {
+  font-size: 1.375rem;
+  font-weight: 600;
+}
+
+.isodo-workspace-mark {
+  display: grid;
+  place-items: center;
+  width: 6rem;
+  height: 6rem;
+  border-radius: 1.5rem;
+  background: color-mix(in srgb, var(--color-blue-500) 10%, transparent);
+}
+
+.isodo-workspace-mark img {
+  width: 4.5rem;
+  height: auto;
+}
+
+.isodo-overview-card-header[role="link"] {
+  cursor: pointer;
+}
+
+/* The desktop window draws its own header, so the top bars double as the
+   window drag handle while their controls stay clickable. */
+.workspace-topbar {
+  -webkit-app-region: drag;
+}
+
+.workspace-topbar button,
+.workspace-topbar a,
+.workspace-topbar input,
+.workspace-topbar select,
+.workspace-topbar [role="button"] {
+  -webkit-app-region: no-drag;
+}
+
+/* macOS desktop windows hide the title bar, so the traffic lights float over
+   the page. Every top-anchored surface reserves that strip instead of sliding
+   underneath the buttons. */
+html.electron:not(.electron-windows) {
+  --isodo-titlebar-safe-top: 30px;
+}
+
+html.electron:not(.electron-windows) .isodo-login-header {
+  padding-top: calc(30px + var(--isodo-titlebar-safe-top));
+}
+
+html.electron:not(.electron-windows) .isodo-cloud-page .workspace-topbar,
+html.electron:not(.electron-windows) .isodo-workspace .workspace-topbar {
+  height: auto;
+  min-height: calc(60px + var(--isodo-titlebar-safe-top));
+  padding-top: var(--isodo-titlebar-safe-top);
+}
+
+/* The desktop title bar is hidden, so the sidebar keeps a clear strip for the
+   traffic lights. Declared here as well as inline: the utility padding is
+   merged away by the sidebar's own base spacing. */
+html.electron:not(.electron-windows) .isodo-sidebar-header {
+  padding-top: 46px !important;
+}

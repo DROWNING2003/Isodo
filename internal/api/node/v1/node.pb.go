@@ -1253,6 +1253,172 @@ func (x *WatchOperationRequest) GetAfterSequence() uint64 {
 	return 0
 }
 
+type RelayOpen struct {
+	state               protoimpl.MessageState `protogen:"open.v1"`
+	SandboxId           string                 `protobuf:"bytes,1,opt,name=sandbox_id,json=sandboxId,proto3" json:"sandbox_id,omitempty"`
+	OwnershipGeneration uint64                 `protobuf:"varint,2,opt,name=ownership_generation,json=ownershipGeneration,proto3" json:"ownership_generation,omitempty"`
+	Port                uint32                 `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
+	Service             string                 `protobuf:"bytes,4,opt,name=service,proto3" json:"service,omitempty"`
+	unknownFields       protoimpl.UnknownFields
+	sizeCache           protoimpl.SizeCache
+}
+
+func (x *RelayOpen) Reset() {
+	*x = RelayOpen{}
+	mi := &file_isodo_node_v1_node_proto_msgTypes[13]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RelayOpen) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RelayOpen) ProtoMessage() {}
+
+func (x *RelayOpen) ProtoReflect() protoreflect.Message {
+	mi := &file_isodo_node_v1_node_proto_msgTypes[13]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RelayOpen.ProtoReflect.Descriptor instead.
+func (*RelayOpen) Descriptor() ([]byte, []int) {
+	return file_isodo_node_v1_node_proto_rawDescGZIP(), []int{13}
+}
+
+func (x *RelayOpen) GetSandboxId() string {
+	if x != nil {
+		return x.SandboxId
+	}
+	return ""
+}
+
+func (x *RelayOpen) GetOwnershipGeneration() uint64 {
+	if x != nil {
+		return x.OwnershipGeneration
+	}
+	return 0
+}
+
+func (x *RelayOpen) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *RelayOpen) GetService() string {
+	if x != nil {
+		return x.Service
+	}
+	return ""
+}
+
+type RelayFrame struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Frame:
+	//
+	//	*RelayFrame_Open
+	//	*RelayFrame_Data
+	//	*RelayFrame_CloseWrite
+	Frame         isRelayFrame_Frame `protobuf_oneof:"frame"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RelayFrame) Reset() {
+	*x = RelayFrame{}
+	mi := &file_isodo_node_v1_node_proto_msgTypes[14]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RelayFrame) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RelayFrame) ProtoMessage() {}
+
+func (x *RelayFrame) ProtoReflect() protoreflect.Message {
+	mi := &file_isodo_node_v1_node_proto_msgTypes[14]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RelayFrame.ProtoReflect.Descriptor instead.
+func (*RelayFrame) Descriptor() ([]byte, []int) {
+	return file_isodo_node_v1_node_proto_rawDescGZIP(), []int{14}
+}
+
+func (x *RelayFrame) GetFrame() isRelayFrame_Frame {
+	if x != nil {
+		return x.Frame
+	}
+	return nil
+}
+
+func (x *RelayFrame) GetOpen() *RelayOpen {
+	if x != nil {
+		if x, ok := x.Frame.(*RelayFrame_Open); ok {
+			return x.Open
+		}
+	}
+	return nil
+}
+
+func (x *RelayFrame) GetData() []byte {
+	if x != nil {
+		if x, ok := x.Frame.(*RelayFrame_Data); ok {
+			return x.Data
+		}
+	}
+	return nil
+}
+
+func (x *RelayFrame) GetCloseWrite() bool {
+	if x != nil {
+		if x, ok := x.Frame.(*RelayFrame_CloseWrite); ok {
+			return x.CloseWrite
+		}
+	}
+	return false
+}
+
+type isRelayFrame_Frame interface {
+	isRelayFrame_Frame()
+}
+
+type RelayFrame_Open struct {
+	Open *RelayOpen `protobuf:"bytes,1,opt,name=open,proto3,oneof"`
+}
+
+type RelayFrame_Data struct {
+	Data []byte `protobuf:"bytes,2,opt,name=data,proto3,oneof"`
+}
+
+type RelayFrame_CloseWrite struct {
+	CloseWrite bool `protobuf:"varint,3,opt,name=close_write,json=closeWrite,proto3,oneof"`
+}
+
+func (*RelayFrame_Open) isRelayFrame_Frame() {}
+
+func (*RelayFrame_Data) isRelayFrame_Frame() {}
+
+func (*RelayFrame_CloseWrite) isRelayFrame_Frame() {}
+
 type NodeEvent struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Sequence      uint64                 `protobuf:"varint,1,opt,name=sequence,proto3" json:"sequence,omitempty"`
@@ -1264,7 +1430,7 @@ type NodeEvent struct {
 
 func (x *NodeEvent) Reset() {
 	*x = NodeEvent{}
-	mi := &file_isodo_node_v1_node_proto_msgTypes[13]
+	mi := &file_isodo_node_v1_node_proto_msgTypes[15]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -1276,7 +1442,7 @@ func (x *NodeEvent) String() string {
 func (*NodeEvent) ProtoMessage() {}
 
 func (x *NodeEvent) ProtoReflect() protoreflect.Message {
-	mi := &file_isodo_node_v1_node_proto_msgTypes[13]
+	mi := &file_isodo_node_v1_node_proto_msgTypes[15]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -1289,7 +1455,7 @@ func (x *NodeEvent) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use NodeEvent.ProtoReflect.Descriptor instead.
 func (*NodeEvent) Descriptor() ([]byte, []int) {
-	return file_isodo_node_v1_node_proto_rawDescGZIP(), []int{13}
+	return file_isodo_node_v1_node_proto_rawDescGZIP(), []int{15}
 }
 
 func (x *NodeEvent) GetSequence() uint64 {
@@ -1417,7 +1583,20 @@ const file_isodo_node_v1_node_proto_rawDesc = "" +
 	"observedAt\"a\n" +
 	"\x15WatchOperationRequest\x12!\n" +
 	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12%\n" +
-	"\x0eafter_sequence\x18\x02 \x01(\x04R\rafterSequence\"x\n" +
+	"\x0eafter_sequence\x18\x02 \x01(\x04R\rafterSequence\"\x8b\x01\n" +
+	"\tRelayOpen\x12\x1d\n" +
+	"\n" +
+	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\x121\n" +
+	"\x14ownership_generation\x18\x02 \x01(\x04R\x13ownershipGeneration\x12\x12\n" +
+	"\x04port\x18\x03 \x01(\rR\x04port\x12\x18\n" +
+	"\aservice\x18\x04 \x01(\tR\aservice\"~\n" +
+	"\n" +
+	"RelayFrame\x12.\n" +
+	"\x04open\x18\x01 \x01(\v2\x18.isodo.node.v1.RelayOpenH\x00R\x04open\x12\x14\n" +
+	"\x04data\x18\x02 \x01(\fH\x00R\x04data\x12!\n" +
+	"\vclose_write\x18\x03 \x01(\bH\x00R\n" +
+	"closeWriteB\a\n" +
+	"\x05frame\"x\n" +
 	"\tNodeEvent\x12\x1a\n" +
 	"\bsequence\x18\x01 \x01(\x04R\bsequence\x12\x17\n" +
 	"\anode_id\x18\x02 \x01(\tR\x06nodeId\x126\n" +
@@ -1451,12 +1630,13 @@ const file_isodo_node_v1_node_proto_rawDesc = "" +
 	"EgressMode\x12\x1b\n" +
 	"\x17EGRESS_MODE_UNSPECIFIED\x10\x00\x12\x14\n" +
 	"\x10EGRESS_MODE_DENY\x10\x01\x12\x15\n" +
-	"\x11EGRESS_MODE_ALLOW\x10\x022\x94\x04\n" +
+	"\x11EGRESS_MODE_ALLOW\x10\x022\xdb\x04\n" +
 	"\x10NodeOrchestrator\x12]\n" +
 	"\x0eApplyOperation\x12$.isodo.node.v1.ApplyOperationRequest\x1a%.isodo.node.v1.ApplyOperationResponse\x12L\n" +
 	"\fGetOperation\x12\".isodo.node.v1.GetOperationRequest\x1a\x18.isodo.node.v1.Operation\x12X\n" +
 	"\x0eInspectSandbox\x12$.isodo.node.v1.InspectSandboxRequest\x1a .isodo.node.v1.SandboxInspection\x12a\n" +
-	"\x14CreateSandboxAppLink\x12*.isodo.node.v1.CreateSandboxAppLinkRequest\x1a\x1d.isodo.node.v1.SandboxAppLink\x12B\n" +
+	"\x14CreateSandboxAppLink\x12*.isodo.node.v1.CreateSandboxAppLinkRequest\x1a\x1d.isodo.node.v1.SandboxAppLink\x12E\n" +
+	"\tRelayPort\x12\x19.isodo.node.v1.RelayFrame\x1a\x19.isodo.node.v1.RelayFrame(\x010\x01\x12B\n" +
 	"\rGetNodeStatus\x12\x16.google.protobuf.Empty\x1a\x19.isodo.node.v1.NodeStatus\x12R\n" +
 	"\x0eWatchOperation\x12$.isodo.node.v1.WatchOperationRequest\x1a\x18.isodo.node.v1.NodeEvent0\x01B;Z9github.com/DROWNING2003/Isodo/internal/api/node/v1;nodev1b\x06proto3"
 
@@ -1473,7 +1653,7 @@ func file_isodo_node_v1_node_proto_rawDescGZIP() []byte {
 }
 
 var file_isodo_node_v1_node_proto_enumTypes = make([]protoimpl.EnumInfo, 4)
-var file_isodo_node_v1_node_proto_msgTypes = make([]protoimpl.MessageInfo, 14)
+var file_isodo_node_v1_node_proto_msgTypes = make([]protoimpl.MessageInfo, 16)
 var file_isodo_node_v1_node_proto_goTypes = []any{
 	(OperationAction)(0),                // 0: isodo.node.v1.OperationAction
 	(OperationState)(0),                 // 1: isodo.node.v1.OperationState
@@ -1492,9 +1672,11 @@ var file_isodo_node_v1_node_proto_goTypes = []any{
 	(*SandboxAppLink)(nil),              // 14: isodo.node.v1.SandboxAppLink
 	(*NodeStatus)(nil),                  // 15: isodo.node.v1.NodeStatus
 	(*WatchOperationRequest)(nil),       // 16: isodo.node.v1.WatchOperationRequest
-	(*NodeEvent)(nil),                   // 17: isodo.node.v1.NodeEvent
-	(*timestamppb.Timestamp)(nil),       // 18: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),               // 19: google.protobuf.Empty
+	(*RelayOpen)(nil),                   // 17: isodo.node.v1.RelayOpen
+	(*RelayFrame)(nil),                  // 18: isodo.node.v1.RelayFrame
+	(*NodeEvent)(nil),                   // 19: isodo.node.v1.NodeEvent
+	(*timestamppb.Timestamp)(nil),       // 20: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),               // 21: google.protobuf.Empty
 }
 var file_isodo_node_v1_node_proto_depIdxs = []int32{
 	3,  // 0: isodo.node.v1.NetworkSpec.egress_mode:type_name -> isodo.node.v1.EgressMode
@@ -1506,29 +1688,32 @@ var file_isodo_node_v1_node_proto_depIdxs = []int32{
 	0,  // 6: isodo.node.v1.Operation.action:type_name -> isodo.node.v1.OperationAction
 	1,  // 7: isodo.node.v1.Operation.state:type_name -> isodo.node.v1.OperationState
 	2,  // 8: isodo.node.v1.Operation.stage:type_name -> isodo.node.v1.OperationStage
-	18, // 9: isodo.node.v1.Operation.created_at:type_name -> google.protobuf.Timestamp
-	18, // 10: isodo.node.v1.Operation.updated_at:type_name -> google.protobuf.Timestamp
-	18, // 11: isodo.node.v1.SandboxInspection.observed_at:type_name -> google.protobuf.Timestamp
-	18, // 12: isodo.node.v1.SandboxAppLink.expires_at:type_name -> google.protobuf.Timestamp
-	18, // 13: isodo.node.v1.NodeStatus.observed_at:type_name -> google.protobuf.Timestamp
-	10, // 14: isodo.node.v1.NodeEvent.operation:type_name -> isodo.node.v1.Operation
-	6,  // 15: isodo.node.v1.NodeOrchestrator.ApplyOperation:input_type -> isodo.node.v1.ApplyOperationRequest
-	9,  // 16: isodo.node.v1.NodeOrchestrator.GetOperation:input_type -> isodo.node.v1.GetOperationRequest
-	11, // 17: isodo.node.v1.NodeOrchestrator.InspectSandbox:input_type -> isodo.node.v1.InspectSandboxRequest
-	13, // 18: isodo.node.v1.NodeOrchestrator.CreateSandboxAppLink:input_type -> isodo.node.v1.CreateSandboxAppLinkRequest
-	19, // 19: isodo.node.v1.NodeOrchestrator.GetNodeStatus:input_type -> google.protobuf.Empty
-	16, // 20: isodo.node.v1.NodeOrchestrator.WatchOperation:input_type -> isodo.node.v1.WatchOperationRequest
-	8,  // 21: isodo.node.v1.NodeOrchestrator.ApplyOperation:output_type -> isodo.node.v1.ApplyOperationResponse
-	10, // 22: isodo.node.v1.NodeOrchestrator.GetOperation:output_type -> isodo.node.v1.Operation
-	12, // 23: isodo.node.v1.NodeOrchestrator.InspectSandbox:output_type -> isodo.node.v1.SandboxInspection
-	14, // 24: isodo.node.v1.NodeOrchestrator.CreateSandboxAppLink:output_type -> isodo.node.v1.SandboxAppLink
-	15, // 25: isodo.node.v1.NodeOrchestrator.GetNodeStatus:output_type -> isodo.node.v1.NodeStatus
-	17, // 26: isodo.node.v1.NodeOrchestrator.WatchOperation:output_type -> isodo.node.v1.NodeEvent
-	21, // [21:27] is the sub-list for method output_type
-	15, // [15:21] is the sub-list for method input_type
-	15, // [15:15] is the sub-list for extension type_name
-	15, // [15:15] is the sub-list for extension extendee
-	0,  // [0:15] is the sub-list for field type_name
+	20, // 9: isodo.node.v1.Operation.created_at:type_name -> google.protobuf.Timestamp
+	20, // 10: isodo.node.v1.Operation.updated_at:type_name -> google.protobuf.Timestamp
+	20, // 11: isodo.node.v1.SandboxInspection.observed_at:type_name -> google.protobuf.Timestamp
+	20, // 12: isodo.node.v1.SandboxAppLink.expires_at:type_name -> google.protobuf.Timestamp
+	20, // 13: isodo.node.v1.NodeStatus.observed_at:type_name -> google.protobuf.Timestamp
+	17, // 14: isodo.node.v1.RelayFrame.open:type_name -> isodo.node.v1.RelayOpen
+	10, // 15: isodo.node.v1.NodeEvent.operation:type_name -> isodo.node.v1.Operation
+	6,  // 16: isodo.node.v1.NodeOrchestrator.ApplyOperation:input_type -> isodo.node.v1.ApplyOperationRequest
+	9,  // 17: isodo.node.v1.NodeOrchestrator.GetOperation:input_type -> isodo.node.v1.GetOperationRequest
+	11, // 18: isodo.node.v1.NodeOrchestrator.InspectSandbox:input_type -> isodo.node.v1.InspectSandboxRequest
+	13, // 19: isodo.node.v1.NodeOrchestrator.CreateSandboxAppLink:input_type -> isodo.node.v1.CreateSandboxAppLinkRequest
+	18, // 20: isodo.node.v1.NodeOrchestrator.RelayPort:input_type -> isodo.node.v1.RelayFrame
+	21, // 21: isodo.node.v1.NodeOrchestrator.GetNodeStatus:input_type -> google.protobuf.Empty
+	16, // 22: isodo.node.v1.NodeOrchestrator.WatchOperation:input_type -> isodo.node.v1.WatchOperationRequest
+	8,  // 23: isodo.node.v1.NodeOrchestrator.ApplyOperation:output_type -> isodo.node.v1.ApplyOperationResponse
+	10, // 24: isodo.node.v1.NodeOrchestrator.GetOperation:output_type -> isodo.node.v1.Operation
+	12, // 25: isodo.node.v1.NodeOrchestrator.InspectSandbox:output_type -> isodo.node.v1.SandboxInspection
+	14, // 26: isodo.node.v1.NodeOrchestrator.CreateSandboxAppLink:output_type -> isodo.node.v1.SandboxAppLink
+	18, // 27: isodo.node.v1.NodeOrchestrator.RelayPort:output_type -> isodo.node.v1.RelayFrame
+	15, // 28: isodo.node.v1.NodeOrchestrator.GetNodeStatus:output_type -> isodo.node.v1.NodeStatus
+	19, // 29: isodo.node.v1.NodeOrchestrator.WatchOperation:output_type -> isodo.node.v1.NodeEvent
+	23, // [23:30] is the sub-list for method output_type
+	16, // [16:23] is the sub-list for method input_type
+	16, // [16:16] is the sub-list for extension type_name
+	16, // [16:16] is the sub-list for extension extendee
+	0,  // [0:16] is the sub-list for field type_name
 }
 
 func init() { file_isodo_node_v1_node_proto_init() }
@@ -1536,13 +1721,18 @@ func file_isodo_node_v1_node_proto_init() {
 	if File_isodo_node_v1_node_proto != nil {
 		return
 	}
+	file_isodo_node_v1_node_proto_msgTypes[14].OneofWrappers = []any{
+		(*RelayFrame_Open)(nil),
+		(*RelayFrame_Data)(nil),
+		(*RelayFrame_CloseWrite)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_isodo_node_v1_node_proto_rawDesc), len(file_isodo_node_v1_node_proto_rawDesc)),
 			NumEnums:      4,
-			NumMessages:   14,
+			NumMessages:   16,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

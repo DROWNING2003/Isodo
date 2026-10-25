@@ -122,8 +122,13 @@ func (c *Client) CreateSandboxAppLink(ctx context.Context, sandboxID string) (st
 	if _, err := c.GetNodeStatus(ctx); err != nil {
 		return "", time.Time{}, err
 	}
-	ctx, cancel := withDefaultTimeout(ctx)
-	defer cancel()
+	// T3 may still be finishing its boot-time start, so this call is allowed
+	// more time than ordinary control RPCs.
+	if _, ok := ctx.Deadline(); !ok {
+		var cancel context.CancelFunc
+		ctx, cancel = context.WithTimeout(ctx, 90*time.Second)
+		defer cancel()
+	}
 	link, err := c.service.CreateSandboxAppLink(ctx, &nodev1.CreateSandboxAppLinkRequest{SandboxId: sandboxID})
 	if err != nil {
 		return "", time.Time{}, fmt.Errorf("create T3 pairing link: %w", err)

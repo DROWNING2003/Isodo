@@ -6,7 +6,10 @@ COMPOSE := docker compose -f compose.yaml
 IOS_SIMULATOR ?= iPhone 17
 NODE_BACKEND ?= chv
 API_NODE_BACKEND ?= lima
-API_CASDOOR_ISSUER ?= http://localhost:8000
+# Casdoor is reached through whatever origin .env declares (an ngrok tunnel in
+# shared setups). Falling back to localhost silently made the container and the
+# API disagree about the issuer, which breaks the OAuth callback handshake.
+API_CASDOOR_ISSUER ?= $(shell . ./.env 2>/dev/null; printf '%s' "$${CASDOOR_ORIGIN:-http://localhost:8000}")
 ISODO_CONTROL_CLIENT_URI ?= spiffe://isodo/control-worker
 GOARCH ?= $(shell go env GOARCH)
 ISODO_GUEST_AGENT_BINARY ?= $(CURDIR)/.tools/isodo-guest-linux-$(GOARCH)
@@ -93,6 +96,8 @@ api: db-migrate casdoor-ready dev-certs
 	ISODO_CASDOOR_CLIENT_ID="$$ISODO_CASDOOR_CLIENT_ID" \
 	ISODO_CASDOOR_CLIENT_SECRET="$$ISODO_CASDOOR_CLIENT_SECRET" \
 	ISODO_WEB_ORIGIN="$$ISODO_WEB_ORIGIN" ISODO_LISTEN_ADDR="$$ISODO_LISTEN_ADDR" \
+	ISODO_INJECTION_KEY="$${ISODO_INJECTION_KEY:-}" \
+	ISODO_INJECTION_KEY_FILE="$${ISODO_INJECTION_KEY_FILE:-./certs/injection.key}" \
 	ISODO_NODE_BACKEND="$(API_NODE_BACKEND)" \
 	ISODO_NODE_RPC_TARGET="$${ISODO_NODE_RPC_TARGET:-127.0.0.1:9090}" \
 	ISODO_NODE_ID="$${ISODO_NODE_ID:-isodo-local-node}" \
@@ -145,7 +150,7 @@ test:
 	go test ./...
 
 web:
-	cd app && HOST=127.0.0.1 PORT=5734 pnpm --filter @t3tools/web dev
+	cd app && HOST=127.0.0.1 PORT=5734 VITE_BOUNDLY_WEB_SURFACE=full pnpm --filter @t3tools/web dev
 
 electron:
 	cd app && pnpm build:desktop && pnpm --filter @t3tools/desktop start

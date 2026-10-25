@@ -149,3 +149,13 @@ Gateway 缓存/多副本通知不能作为新调用授权的唯一依据。首�
 | 日志、镜像、Guest env/文件 | 无第三方 token 或主密钥 |
 
 范围含 Linux 网络、API 身份和最小密钥使用链路。未完成测试前只报告设计，不称为生产级多租户安全认证。
+
+## 8. 当前本地实现：账号规则与沙箱注入代理
+
+2026-10-25 的本地 Lima 路径先落了一条可演示的真实注入链路，作为未来 Connection Gateway 的本地对照实现，不改变上文云端 Gateway 的授权边界：
+
+- 账号级持久规则保存在控制面 `injection_rules`，密钥 AES-256-GCM 加密；`GET /v1/injection-rules` 只返回脱敏提示，material 接口仅接受交互式会话。
+- 本地 Node 为每个沙箱维护独立规则集：可引用账号规则，也可拥有只属于该沙箱的单次规则。单次规则整体加密保存在 Node 状态目录。
+- Node 在宿主启动 per-sandbox HTTP CONNECT 代理，Guest 通过 `HTTPS_PROXY` 使用；只有命中 `base_url` host 的请求终止 TLS，其余请求原样隧道转发。
+- CA 私钥只保存在宿主，Guest 只拿到 CA 证书和代理地址；真实第三方密钥不写入沙箱文件。T3、终端和 Agent 子进程继承代理与 CA 环境变量。
+- 已用真实 Lima Guest 的 curl 验证 Header 注入；云端 CHV 的注入代理、WebSocket/HTTP2、非 HTTP 协议和所有 Agent CLI 的兼容性仍未验证。

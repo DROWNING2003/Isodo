@@ -16,7 +16,7 @@ var templateTag = regexp.MustCompile(`^[a-zA-Z0-9][a-zA-Z0-9._-]{0,63}$`)
 
 func ParseTemplateReference(reference string) (identifier, tag string, err error) {
 	if reference == "" {
-		reference = "linux-base"
+		reference = "base"
 	}
 	identifier, tag, found := strings.Cut(reference, ":")
 	if !found {

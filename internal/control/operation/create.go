@@ -28,7 +28,7 @@ type Resources struct {
 
 const (
 	DefaultVCPU        = 2
-	DefaultMemoryBytes = 512 << 20
+	DefaultMemoryBytes = 2 << 30
 )
 
 func DefaultResources() Resources {

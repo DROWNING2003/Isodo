@@ -24,6 +24,10 @@ type Queue interface {
 	ExtendSandboxCreateLease(context.Context, string, string) error
 	CompleteSandboxCreate(context.Context, operation.CreateJob, string) error
 	RetrySandboxCreate(context.Context, operation.CreateJob) error
+	ClaimSandboxLifecycle(context.Context, string, string) (operation.LifecycleJob, error)
+	ExtendSandboxLifecycleLease(context.Context, string, string) error
+	CompleteSandboxLifecycle(context.Context, operation.LifecycleJob, string) error
+	RetrySandboxLifecycle(context.Context, operation.LifecycleJob) error
 }
 
 type Worker struct {
@@ -67,8 +71,27 @@ func (w *Worker) Run(ctx context.Context) {
 		}
 		job, err := w.queue.ClaimSandboxCreate(ctx, w.workerID, w.nodeID)
 		if errors.Is(err, ErrNoCreateOperation) {
-			if !wait(ctx, time.Second) {
-				return
+			lifecycle, lifecycleErr := w.queue.ClaimSandboxLifecycle(ctx, w.workerID, w.nodeID)
+			if errors.Is(lifecycleErr, operation.ErrNoLifecycleOperation) {
+				if !wait(ctx, time.Second) {
+					return
+				}
+				continue
+			}
+			if lifecycleErr != nil {
+				if ctx.Err() == nil {
+					w.logger.Error("claim sandbox lifecycle operation", "error", lifecycleErr)
+					if !wait(ctx, time.Second) {
+						return
+					}
+				}
+				continue
+			}
+			if err := w.runLifecycle(ctx, lifecycle); err != nil && ctx.Err() == nil {
+				w.logger.Error("sandbox lifecycle operation deferred", "operation_id", lifecycle.OperationID, "sandbox_id", lifecycle.SandboxID, "action", lifecycle.Action, "error", err)
+				if retryErr := w.queue.RetrySandboxLifecycle(ctx, lifecycle); retryErr != nil {
+					w.logger.Error("release sandbox lifecycle operation", "operation_id", lifecycle.OperationID, "error", retryErr)
+				}
 			}
 			continue
 		}
@@ -160,9 +183,55 @@ func createRequest(job operation.CreateJob, backend string) *nodev1.ApplyOperati
 	}
 	if backend != "lima" {
 		request.Resources = &nodev1.ResourceSpec{Vcpu: job.Resources.VCPU, MemoryBytes: job.Resources.MemoryBytes}
-		request.Network = &nodev1.NetworkSpec{EgressMode: nodev1.EgressMode_EGRESS_MODE_DENY}
+		request.Network = &nodev1.NetworkSpec{EgressMode: nodev1.EgressMode_EGRESS_MODE_ALLOW}
 	}
 	return request
+}
+
+func (w *Worker) runLifecycle(ctx context.Context, job operation.LifecycleJob) error {
+	action := nodev1.OperationAction_OPERATION_ACTION_STOP
+	if job.Action == "start" {
+		action = nodev1.OperationAction_OPERATION_ACTION_START
+	}
+	request := &nodev1.ApplyOperationRequest{
+		OperationId: job.OperationID, RequestHash: job.RequestHash, SandboxId: job.SandboxID,
+		OwnershipGeneration: job.OwnershipGeneration, Revision: job.Revision, Action: action,
+	}
+	if _, err := w.client.GetOperation(ctx, &nodev1.GetOperationRequest{OperationId: job.OperationID, RequestHash: job.RequestHash}); err != nil {
+		if status.Code(err) != codes.NotFound {
+			return err
+		}
+		if _, err := w.client.ApplyOperation(ctx, request); err != nil {
+			switch status.Code(err) {
+			case codes.InvalidArgument, codes.FailedPrecondition, codes.PermissionDenied, codes.ResourceExhausted, codes.NotFound:
+				return w.queue.CompleteSandboxLifecycle(ctx, job, "NODE_OPERATION_REJECTED")
+			default:
+				return err
+			}
+		}
+	}
+	for {
+		if err := w.queue.ExtendSandboxLifecycleLease(ctx, job.OperationID, w.workerID); err != nil {
+			return err
+		}
+		current, err := w.client.GetOperation(ctx, &nodev1.GetOperationRequest{OperationId: job.OperationID, RequestHash: job.RequestHash})
+		if err != nil {
+			return err
+		}
+		switch current.GetState() {
+		case nodev1.OperationState_OPERATION_STATE_SUCCEEDED:
+			return w.queue.CompleteSandboxLifecycle(ctx, job, "")
+		case nodev1.OperationState_OPERATION_STATE_FAILED:
+			code := current.GetErrorCode()
+			if code == "" {
+				code = "NODE_OPERATION_FAILED"
+			}
+			return w.queue.CompleteSandboxLifecycle(ctx, job, code)
+		}
+		if !wait(ctx, 250*time.Millisecond) {
+			return ctx.Err()
+		}
+	}
 }
 
 func wait(ctx context.Context, duration time.Duration) bool {

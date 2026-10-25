@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"net"
+	"net/http"
 	"os"
 	"os/exec"
 	"os/signal"
@@ -16,13 +17,17 @@ import (
 	"strconv"
 	"strings"
 	"syscall"
+	"time"
 
 	nodev1 "github.com/DROWNING2003/Isodo/internal/api/node/v1"
+	"github.com/DROWNING2003/Isodo/internal/node/injection"
 	"github.com/DROWNING2003/Isodo/internal/node/lima"
+	"github.com/DROWNING2003/Isodo/internal/node/localapi"
 	"github.com/DROWNING2003/Isodo/internal/node/orchestrator"
 	"github.com/DROWNING2003/Isodo/internal/rpcsecurity"
 	"github.com/DROWNING2003/Isodo/internal/templateartifact"
 	"google.golang.org/grpc"
+	grpccredentials "google.golang.org/grpc/credentials"
 )
 
 func main() {
@@ -38,41 +43,117 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
-	credentials, err := rpcsecurity.ServerCredentials(
-		os.Getenv("ISODO_NODE_TLS_CERT"),
-		os.Getenv("ISODO_NODE_TLS_KEY"),
-		os.Getenv("ISODO_NODE_CLIENT_CA"),
-		os.Getenv("ISODO_CONTROL_CLIENT_URI"),
-	)
-	if err != nil {
-		return err
+	var credentials grpccredentials.TransportCredentials
+	localOnly := os.Getenv("ISODO_LOCAL_ONLY") == "true"
+	if !localOnly {
+		credentials, err = rpcsecurity.ServerCredentials(
+			os.Getenv("ISODO_NODE_TLS_CERT"),
+			os.Getenv("ISODO_NODE_TLS_KEY"),
+			os.Getenv("ISODO_NODE_CLIENT_CA"),
+			os.Getenv("ISODO_CONTROL_CLIENT_URI"),
+		)
+		if err != nil {
+			return err
+		}
 	}
-	service, err := newNodeService(nodeStatus)
+	service, templateBuilder, err := newNodeService(nodeStatus)
 	if err != nil {
 		return err
 	}
 	if closer, ok := service.(interface{ Close() }); ok {
 		defer closer.Close()
 	}
-	listenAddress := os.Getenv("ISODO_NODE_LISTEN_ADDR")
-	if listenAddress == "" {
-		listenAddress = "0.0.0.0:9090"
+	var injectionBackend localapi.InjectionBackend
+	if limaServer, ok := service.(*orchestrator.LimaServer); ok {
+		stateDir := os.Getenv("ISODO_NODE_STATE_DIR")
+		if stateDir == "" {
+			configDir, err := os.UserConfigDir()
+			if err != nil {
+				return fmt.Errorf("resolve local Node state directory: %w", err)
+			}
+			stateDir = filepath.Join(configDir, "Isodo", "node")
+		}
+		manager, err := injection.NewManager(injection.ManagerConfig{
+			StateDir:    filepath.Join(stateDir, "injections"),
+			HostGateway: envOr("ISODO_INJECTION_HOST_GATEWAY", "192.168.5.2"),
+			Logger:      logger,
+		})
+		if err != nil {
+			return fmt.Errorf("configure secure-connection injection: %w", err)
+		}
+		limaServer.EnableInjections(manager)
+		defer manager.Close()
+		injectionBackend = limaServer
 	}
-	listener, err := net.Listen("tcp", listenAddress)
+	var listener net.Listener
+	if !localOnly {
+		listenAddress := os.Getenv("ISODO_NODE_LISTEN_ADDR")
+		if listenAddress == "" {
+			listenAddress = "0.0.0.0:9090"
+		}
+		listener, err = net.Listen("tcp", listenAddress)
+		if err != nil {
+			return fmt.Errorf("listen for Control RPC: %w", err)
+		}
+		defer listener.Close()
+	}
+	var server *grpc.Server
+	if !localOnly {
+		server = grpc.NewServer(
+			grpc.Creds(credentials),
+			grpc.MaxRecvMsgSize(1<<20),
+			grpc.MaxSendMsgSize(1<<20),
+		)
+		nodev1.RegisterNodeOrchestratorServer(server, service)
+	}
+	localToken, err := localapi.NewToken()
 	if err != nil {
-		return fmt.Errorf("listen for Control RPC: %w", err)
+		return err
 	}
-	server := grpc.NewServer(
-		grpc.Creds(credentials),
-		grpc.MaxRecvMsgSize(1<<20),
-		grpc.MaxSendMsgSize(1<<20),
-	)
-	nodev1.RegisterNodeOrchestratorServer(server, service)
+	catalog, err := localapi.NewTemplateCatalog(os.Getenv("ISODO_LOCAL_TEMPLATES_FILE"))
+	if err != nil {
+		return err
+	}
+	sandboxIndex, err := localapi.NewSandboxIndex(os.Getenv("ISODO_LOCAL_SANDBOXES_FILE"))
+	if err != nil {
+		return err
+	}
+	localService, err := localapi.New(service, localToken, catalog, templateBuilder, sandboxIndex)
+	if err != nil {
+		return err
+	}
+	if injectionBackend != nil {
+		localService.SetInjections(injectionBackend)
+	}
+	if limaServer, ok := service.(*orchestrator.LimaServer); ok {
+		localService.SetAgentConfigWriter(limaServer)
+	}
+	localAddress := os.Getenv("ISODO_LOCAL_API_LISTEN_ADDR")
+	if localAddress == "" {
+		localAddress = "127.0.0.1:0"
+	}
+	localListener, err := net.Listen("tcp", localAddress)
+	if err != nil {
+		return fmt.Errorf("listen for local API: %w", err)
+	}
+	defer localListener.Close()
+	localServer := &http.Server{Handler: localService.Handler()}
+	localInfoPath := os.Getenv("ISODO_LOCAL_API_INFO_FILE")
+	if localInfoPath != "" {
+		info := fmt.Sprintf("{\"address\":%q,\"token\":%q}\n", "http://"+localListener.Addr().String(), localToken)
+		if err := os.WriteFile(localInfoPath, []byte(info), 0o600); err != nil {
+			return fmt.Errorf("write local API bootstrap file: %w", err)
+		}
+		defer os.Remove(localInfoPath)
+	}
+	localErrors := make(chan error, 1)
+	go func() { localErrors <- localServer.Serve(localListener) }()
+	logger.Info("isodo-node local API listening", "address", localListener.Addr().String(), "token", localToken)
 	serveErrors := make(chan error, 1)
-	go func() {
-		serveErrors <- server.Serve(listener)
-	}()
-	logger.Info("isodo-node listening", "node_id", nodeStatus.NodeID, "address", listenAddress)
+	if !localOnly {
+		go func() { serveErrors <- server.Serve(listener) }()
+		logger.Info("isodo-node listening", "node_id", nodeStatus.NodeID, "address", listener.Addr().String())
+	}
 
 	shutdownCtx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
@@ -82,9 +163,18 @@ func run(logger *slog.Logger) error {
 			return nil
 		}
 		return err
+	case err := <-localErrors:
+		if errors.Is(err, http.ErrServerClosed) {
+			return nil
+		}
+		return err
 	case <-shutdownCtx.Done():
-		server.GracefulStop()
-		return nil
+		if server != nil {
+			server.GracefulStop()
+		}
+		shutdownLocalCtx, cancelLocal := context.WithTimeout(context.Background(), 5*time.Second)
+		defer cancelLocal()
+		return localServer.Shutdown(shutdownLocalCtx)
 	}
 }
 
@@ -138,35 +228,39 @@ func loadNodeStatus() (orchestrator.NodeStatus, error) {
 	}, nil
 }
 
-func newNodeService(nodeStatus orchestrator.NodeStatus) (nodev1.NodeOrchestratorServer, error) {
+func newNodeService(nodeStatus orchestrator.NodeStatus) (nodev1.NodeOrchestratorServer, localapi.TemplateBuilder, error) {
 	switch backend := nodeBackend(); backend {
 	case "chv":
 		if runtime.GOOS != "linux" {
-			return nil, errors.New("CHV Node requires Linux/KVM")
+			return nil, nil, errors.New("CHV Node requires Linux/KVM")
 		}
 		storage, err := templateartifact.NewS3Store(templateartifact.S3Config{
 			Endpoint: os.Getenv("ISODO_TEMPLATE_S3_ENDPOINT"), Region: os.Getenv("ISODO_TEMPLATE_S3_REGION"), Bucket: os.Getenv("ISODO_TEMPLATE_S3_BUCKET"),
 			AccessKey: os.Getenv("SEAWEEDFS_READ_ACCESS_KEY"), SecretKey: os.Getenv("SEAWEEDFS_READ_SECRET_KEY"),
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		return orchestrator.NewCHVServer(nodeStatus, orchestrator.CHVConfig{
+		server, err := orchestrator.NewCHVServer(nodeStatus, orchestrator.CHVConfig{
 			Directory: envOr("ISODO_NODE_STATE_DIR", "/var/lib/isodo/node"), Binary: envOr("ISODO_CH_BINARY", "cloud-hypervisor"),
 			Bucket: os.Getenv("ISODO_TEMPLATE_S3_BUCKET"), Fetcher: storage,
+			NetworkBridge: os.Getenv("ISODO_CHV_NETWORK_BRIDGE"),
 		})
+		// CHV materializes object-store template builds; it exposes no local
+		// template builder, so the desktop client sees only the base template.
+		return server, nil, err
 	case "lima":
 		cpus, err := intEnv("ISODO_LIMA_CPUS", 2)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		memoryGiB, err := intEnv("ISODO_LIMA_MEMORY_GIB", 4)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		diskGiB, err := intEnv("ISODO_LIMA_DISK_GIB", 20)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		t3Bundle := os.Getenv("ISODO_T3_SERVER_BUNDLE")
 		manager, err := lima.NewManager(lima.Config{
@@ -181,25 +275,45 @@ func newNodeService(nodeStatus orchestrator.NodeStatus) (nodev1.NodeOrchestrator
 			DiskGiB:          diskGiB,
 		})
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		stateDir := os.Getenv("ISODO_NODE_STATE_DIR")
 		if stateDir == "" {
 			configDir, err := os.UserConfigDir()
 			if err != nil {
-				return nil, fmt.Errorf("resolve local Node state directory: %w", err)
+				return nil, nil, fmt.Errorf("resolve local Node state directory: %w", err)
 			}
 			stateDir = filepath.Join(configDir, "Isodo", "node")
 		}
-		return orchestrator.NewLimaServer(
+		server, err := orchestrator.NewLimaServer(
 			nodeStatus,
 			manager,
 			filepath.Join(stateDir, "journal.json"),
 			t3Bundle,
 		)
+		if err != nil {
+			return nil, nil, err
+		}
+		return server, limaTemplateBuilder{manager: manager}, nil
 	default:
-		return nil, fmt.Errorf("unsupported ISODO_NODE_BACKEND %q (expected chv or lima)", backend)
+		return nil, nil, fmt.Errorf("unsupported ISODO_NODE_BACKEND %q (expected chv or lima)", backend)
 	}
+}
+
+// limaTemplateBuilder adapts the Lima manager to the local API's backend-neutral
+// template contract. Template commands never cross the HTTP boundary.
+type limaTemplateBuilder struct{ manager *lima.Manager }
+
+func (b limaTemplateBuilder) TemplateBuilt(ctx context.Context, templateID, buildID string) (bool, error) {
+	return b.manager.TemplateBuilt(ctx, templateID, buildID)
+}
+
+func (b limaTemplateBuilder) BuildTemplate(ctx context.Context, templateID, buildID string, commands [][]string) (string, error) {
+	instance, err := b.manager.BuildTemplate(ctx, templateID, buildID, commands)
+	if err != nil {
+		return "", err
+	}
+	return instance.Name, nil
 }
 
 func nodeBackend() string {

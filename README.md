@@ -29,7 +29,27 @@ make node-local-t3
 make api
 ```
 
-`make api` 会应用数据库迁移并生成仅用于本机 Node mTLS 的证书。登录后创建沙箱会写入 Control 数据库，再由 worker 调度到 Lima，Guest Ready 后启动 T3，并从沙箱卡片进入配对登录。此路径使用 Lima 自带 Linux 基础环境，不会伪造 CHV/S3 模板记录；云端 CHV 创建仍要求 Registry 已发布 `linux-base` Ready build。首次运行还需要按 `.env.example` 配置本地 Casdoor 的 GitHub OAuth 应用。
+`make api` 会应用数据库迁移并生成仅用于本机 Node mTLS 的证书。登录后创建沙箱会写入 Control 数据库，再由 worker 调度到 Lima，Guest Ready 后启动 T3，并从沙箱卡片进入配对登录。本地沙箱支持 Stop（保盘）和 Start；T3 由 Guest 内 supervisor 托管。此路径使用 Lima 自带 Linux 基础环境，不会伪造 CHV/S3 模板记录；云端 CHV 创建仍要求 Registry 已发布 `linux-base` Ready build。首次运行还需要按 `.env.example` 配置本地 Casdoor 的 GitHub OAuth 应用。
+
+## 云端 T3 沙箱
+
+云端 CHV 使用内置 Node 24、T3 Server 和 Codex/Claude CLI 的 `base` 模板；构建与发布步骤见 [images/base/README.md](images/base/README.md)。发布后，用户可在创建沙箱时选择本地或云端、选择 `base`，打开沙箱即进入 T3；T3 自带终端、文件浏览/上传和 Agent 会话；沙箱支持 Stop 保盘与 Start 冷启动。
+
+要由 Isodo API 签发公共应用/预览链接，在 `.env` 中启用 Preview Gateway：
+
+```sh
+# 本地单机（浏览器解析 *.localhost）
+ISODO_PREVIEW_DOMAIN=localhost
+ISODO_PREVIEW_SECRET=$(openssl rand -hex 32)
+ISODO_PREVIEW_SCHEME=http
+
+# 云端：wildcard DNS/TLS 指向 API
+# ISODO_PREVIEW_DOMAIN=sandbox.example.com
+# ISODO_PREVIEW_SECRET=<shared-random-secret>
+# ISODO_PREVIEW_SCHEME=https
+```
+
+CHV 使用 Node `RelayPort`（API/Node 可分机），Lima 仍走同宿主 direct target。云端 Node 还需在宿主执行一次 `scripts/setup-chv-network.sh` 并设置 `ISODO_CHV_NETWORK_BRIDGE=isodo0`，否则 CHV 出网与云端创建会被拒绝。模块边界、真实 CHV 验证和未实现项见 [T3 云端运行时](docs/t3-cloud-runtime.md)，构建/发布/启动步骤见 [cloud-t3 runbook](docs/runbooks/cloud-t3.md)。契约与未实现边界见 [specs/sandbox-endpoints.md](specs/sandbox-endpoints.md)。
 
 ## 架构方向
 
@@ -59,6 +79,7 @@ Control API 在 PostgreSQL 事务中写入 Sandbox 与 outbox；Control Worker �
 ## 文档
 
 - [产品概念与术语](docs/product-context.md)
+- [安全连接：持久规则与单次注入](docs/secure-connections.md)
 - [产品决策](docs/product-decisions.md)
 - [产品架构规格](specs/product-architecture.md)
 - [Control API、Node gRPC 与 Redis 接入契约](specs/control-node-contract.md)

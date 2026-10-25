@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net"
 	"net/http"
 	"os"
 	"os/signal"
@@ -12,8 +13,10 @@ import (
 	"time"
 
 	"github.com/DROWNING2003/Isodo/internal/control/auth"
+	"github.com/DROWNING2003/Isodo/internal/control/injection"
 	"github.com/DROWNING2003/Isodo/internal/control/orchestrator"
 	"github.com/DROWNING2003/Isodo/internal/control/postgres"
+	"github.com/DROWNING2003/Isodo/internal/control/preview"
 	"github.com/DROWNING2003/Isodo/internal/control/sandbox"
 	"github.com/DROWNING2003/Isodo/internal/control/sandboxworker"
 	"github.com/DROWNING2003/Isodo/internal/control/template"
@@ -71,12 +74,44 @@ func run(logger *slog.Logger) error {
 		defer nodeClient.Close()
 	}
 	access := &auth.Access{Bearer: casdoor, Keys: store, Web: web}
+	sandboxHandler := sandbox.NewHandlerForBackendWithWebOrigin(store, os.Getenv("ISODO_NODE_BACKEND"), os.Getenv("ISODO_WEB_ORIGIN"), nodeClient)
+	var relay preview.RelayDialer
+	if nodeClient != nil && os.Getenv("ISODO_NODE_BACKEND") != "lima" {
+		relay = nodeClient
+	}
+	publisher, err := preview.New(preview.Config{
+		Secret:  os.Getenv("ISODO_PREVIEW_SECRET"),
+		Domain:  os.Getenv("ISODO_PREVIEW_DOMAIN"),
+		Scheme:  os.Getenv("ISODO_PREVIEW_SCHEME"),
+		APIPort: listenPort(listenAddr),
+		Relay:   relay,
+	})
+	if err != nil {
+		return fmt.Errorf("configure sandbox preview gateway: %w", err)
+	}
+	if publisher != nil {
+		sandboxHandler.SetAppLinkPublisher(publisher)
+	}
+	injectionKey, err := injection.LoadKey(os.Getenv("ISODO_INJECTION_KEY"), envOr("ISODO_INJECTION_KEY_FILE", "./certs/injection.key"))
+	if err != nil {
+		return err
+	}
+	sealer, err := injection.NewSealer(injectionKey)
+	if err != nil {
+		return err
+	}
+	injectionHandler := injection.NewHandler(injection.NewPostgresStore(store.Pool()), sealer)
+	publicHandler := httpapi.NewHandlerWithInjections(web, auth.NewAPIKeyHandler(store), sandboxHandler, access, injectionHandler, template.NewHandler(store))
+	if publisher != nil {
+		publicHandler = publisher.Wrap(publicHandler)
+	}
+	// No server-wide read/write deadline: the preview gateway carries
+	// long-lived HTTP streams and WebSockets (T3 /ws, terminal, file transfer).
+	// Per-request handlers keep their own bounded timeouts.
 	server := &http.Server{
 		Addr:              listenAddr,
-		Handler:           securityHeaders(httpapi.NewHandler(web, auth.NewAPIKeyHandler(store), sandbox.NewHandlerForBackendWithWebOrigin(store, os.Getenv("ISODO_NODE_BACKEND"), os.Getenv("ISODO_WEB_ORIGIN"), nodeClient), access, template.NewHandler(store))),
+		Handler:           securityHeaders(publicHandler),
 		ReadHeaderTimeout: 5 * time.Second,
-		ReadTimeout:       15 * time.Second,
-		WriteTimeout:      30 * time.Second,
 		IdleTimeout:       60 * time.Second,
 		MaxHeaderBytes:    16 << 10,
 	}
@@ -111,6 +146,21 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	return nil
+}
+
+func envOr(name, fallback string) string {
+	if value := os.Getenv(name); value != "" {
+		return value
+	}
+	return fallback
+}
+
+func listenPort(address string) string {
+	_, port, err := net.SplitHostPort(address)
+	if err != nil {
+		return ""
+	}
+	return port
 }
 
 func securityHeaders(next http.Handler) http.Handler {

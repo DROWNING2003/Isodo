@@ -22,6 +22,22 @@ func (m *Manager) TemplateInstanceName(templateID, buildID string) (string, erro
 	return m.config.InstancePrefix + "tpl-" + hex.EncodeToString(digest[:16]), nil
 }
 
+// TemplateBuilt reports whether this Node already holds the immutable build.
+func (m *Manager) TemplateBuilt(ctx context.Context, templateID, buildID string) (bool, error) {
+	name, err := m.TemplateInstanceName(templateID, buildID)
+	if err != nil {
+		return false, err
+	}
+	instance, err := m.inspectName(ctx, name)
+	if errors.Is(err, ErrInstanceNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return strings.EqualFold(instance.Status, "stopped"), nil
+}
+
 // BuildTemplate creates one immutable Lima template VM directly from the
 // Guest-Agent-enabled Base. Commands are argv arrays and execute only in that
 // temporary Guest; no host shell is involved.

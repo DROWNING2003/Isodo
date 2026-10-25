@@ -164,6 +164,96 @@ func (s *Store) CreateSandbox(ctx context.Context, tenantID, name string, metada
 	return item, tx.Commit(ctx)
 }
 
+func (s *Store) StartSandbox(ctx context.Context, tenantID, sandboxID string) (sandbox.Sandbox, error) {
+	return s.requestLifecycle(ctx, tenantID, sandboxID, "start")
+}
+
+func (s *Store) StopSandbox(ctx context.Context, tenantID, sandboxID string) (sandbox.Sandbox, error) {
+	return s.requestLifecycle(ctx, tenantID, sandboxID, "stop")
+}
+
+func (s *Store) requestLifecycle(ctx context.Context, tenantID, sandboxID, action string) (sandbox.Sandbox, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return sandbox.Sandbox{}, err
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+	var item sandbox.Sandbox
+	var metadata []byte
+	var templateID, buildID, digest *string
+	var nodeID string
+	var generation, revision int64
+	err = tx.QueryRow(ctx,
+		`SELECT id::text, tenant_id::text, name, metadata, desired_state, observed_state, created_at, updated_at,
+		        template_id::text, template_build_id::text, template_digest, COALESCE(node_id, ''), ownership_generation, revision
+		   FROM sandboxes WHERE tenant_id = $1::uuid AND id = $2::uuid AND deleted_at IS NULL
+		   FOR UPDATE`,
+		tenantID, sandboxID,
+	).Scan(&item.ID, &item.TenantID, &item.Name, &metadata, &item.DesiredState, &item.ObservedState,
+		&item.CreatedAt, &item.UpdatedAt, &templateID, &buildID, &digest, &nodeID, &generation, &revision)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return sandbox.Sandbox{}, sandbox.ErrNotFound
+	}
+	if err != nil {
+		return sandbox.Sandbox{}, err
+	}
+	item.Metadata = json.RawMessage(metadata)
+	item.TemplateID = templateID
+	item.TemplateBuildID = buildID
+	item.TemplateDigest = digest
+	if nodeID == "" || digest == nil || *digest == "" {
+		return sandbox.Sandbox{}, sandbox.ErrLifecycleUnsupported
+	}
+	var existing string
+	err = tx.QueryRow(ctx,
+		`SELECT status FROM sandbox_operations
+		  WHERE sandbox_id = $1::uuid AND action = $2 AND status IN ('queued', 'running') LIMIT 1`,
+		sandboxID, action,
+	).Scan(&existing)
+	if err == nil {
+		return sandbox.Sandbox{}, sandbox.ErrConflict
+	}
+	if !errors.Is(err, pgx.ErrNoRows) {
+		return sandbox.Sandbox{}, err
+	}
+	if action == "start" {
+		if item.DesiredState != "stopped" || (item.ObservedState != "stopped" && item.ObservedState != "error") {
+			return sandbox.Sandbox{}, sandbox.ErrConflict
+		}
+	} else if item.DesiredState != "running" || item.ObservedState != "running" {
+		return sandbox.Sandbox{}, sandbox.ErrConflict
+	}
+	nextRevision := revision + 1
+	desired := "stopped"
+	if action == "start" {
+		desired = "running"
+	}
+	payload, err := json.Marshal(operation.LifecyclePayload{Revision: uint64(nextRevision), OwnershipGeneration: uint64(generation)})
+	if err != nil {
+		return sandbox.Sandbox{}, err
+	}
+	requestHash := sha256.Sum256([]byte(strings.Join([]string{sandboxID, action, fmt.Sprint(nextRevision), fmt.Sprint(generation)}, "\x00")))
+	if _, err = tx.Exec(ctx,
+		`UPDATE sandboxes SET desired_state = $2, observed_state = 'requested', revision = $3, updated_at = now()
+		  WHERE id = $1::uuid`, sandboxID, desired, nextRevision,
+	); err != nil {
+		return sandbox.Sandbox{}, err
+	}
+	if _, err = tx.Exec(ctx,
+		`INSERT INTO sandbox_operations (id, tenant_id, sandbox_id, node_id, action, request_hash, payload)
+		 VALUES ($1::uuid, $2::uuid, $3::uuid, $4, $5, $6, $7::jsonb)`,
+		uuid.NewString(), tenantID, sandboxID, nodeID, action, fmt.Sprintf("%x", requestHash), payload,
+	); err != nil {
+		return sandbox.Sandbox{}, err
+	}
+	item.DesiredState = desired
+	item.ObservedState = "requested"
+	if err := tx.Commit(ctx); err != nil {
+		return sandbox.Sandbox{}, err
+	}
+	return item, nil
+}
+
 func (s *Store) ClaimSandboxCreate(ctx context.Context, workerID, nodeID string) (operation.CreateJob, error) {
 	tx, err := s.pool.Begin(ctx)
 	if err != nil {
@@ -217,6 +307,119 @@ func (s *Store) ClaimSandboxCreate(ctx context.Context, workerID, nodeID string)
 		return operation.CreateJob{}, err
 	}
 	return job, nil
+}
+
+func (s *Store) ClaimSandboxLifecycle(ctx context.Context, workerID, nodeID string) (operation.LifecycleJob, error) {
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return operation.LifecycleJob{}, err
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+	var job operation.LifecycleJob
+	var payloadJSON []byte
+	err = tx.QueryRow(ctx,
+		`WITH candidate AS (
+			SELECT id FROM sandbox_operations
+			WHERE action IN ('start', 'stop') AND status IN ('queued', 'running')
+			  AND (lease_expires_at IS NULL OR lease_expires_at < now())
+			ORDER BY created_at, id
+			FOR UPDATE SKIP LOCKED LIMIT 1
+		)
+		UPDATE sandbox_operations op
+		SET status = 'running', stage = 'starting', attempt = attempt + 1,
+		    node_id = $2, lease_owner = $1, lease_expires_at = now() + interval '30 seconds', updated_at = now()
+		FROM candidate
+		WHERE op.id = candidate.id
+		RETURNING op.id::text, op.sandbox_id::text, op.tenant_id::text, op.action, op.request_hash, op.payload`,
+		workerID, nodeID,
+	).Scan(&job.OperationID, &job.SandboxID, &job.TenantID, &job.Action, &job.RequestHash, &payloadJSON)
+	if errors.Is(err, pgx.ErrNoRows) {
+		return operation.LifecycleJob{}, operation.ErrNoLifecycleOperation
+	}
+	if err != nil {
+		return operation.LifecycleJob{}, err
+	}
+	var payload operation.LifecyclePayload
+	if err := json.Unmarshal(payloadJSON, &payload); err != nil {
+		return operation.LifecycleJob{}, err
+	}
+	job.WorkerID = workerID
+	job.Revision = payload.Revision
+	job.OwnershipGeneration = payload.OwnershipGeneration
+	if _, err := tx.Exec(ctx, `UPDATE sandboxes SET node_id = $2, updated_at = now() WHERE id = $1::uuid`, job.SandboxID, nodeID); err != nil {
+		return operation.LifecycleJob{}, err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return operation.LifecycleJob{}, err
+	}
+	return job, nil
+}
+
+func (s *Store) ExtendSandboxLifecycleLease(ctx context.Context, operationID, workerID string) error {
+	command, err := s.pool.Exec(ctx,
+		`UPDATE sandbox_operations SET lease_expires_at = now() + interval '30 seconds', updated_at = now()
+		 WHERE id = $1::uuid AND lease_owner = $2 AND status = 'running'`, operationID, workerID,
+	)
+	if err != nil {
+		return err
+	}
+	if command.RowsAffected() != 1 {
+		return errors.New("sandbox lifecycle operation lease was lost")
+	}
+	return nil
+}
+
+func (s *Store) RetrySandboxLifecycle(ctx context.Context, job operation.LifecycleJob) error {
+	command, err := s.pool.Exec(ctx,
+		`UPDATE sandbox_operations SET status = 'queued', stage = 'reserve', lease_owner = NULL, lease_expires_at = NULL, updated_at = now()
+		 WHERE id = $1::uuid AND lease_owner = $2`, job.OperationID, job.WorkerID,
+	)
+	if err != nil {
+		return err
+	}
+	if command.RowsAffected() != 1 {
+		return errors.New("sandbox lifecycle operation lease was lost")
+	}
+	return nil
+}
+
+func (s *Store) CompleteSandboxLifecycle(ctx context.Context, job operation.LifecycleJob, errorCode string) error {
+	status, observed, desired := "succeeded", "running", "running"
+	if job.Action == "stop" {
+		observed, desired = "stopped", "stopped"
+	}
+	if errorCode != "" {
+		status, observed = "failed", "error"
+		if job.Action == "start" {
+			desired = "stopped"
+		} else {
+			desired = "running"
+		}
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback(context.WithoutCancel(ctx)) }()
+	command, err := tx.Exec(ctx,
+		`UPDATE sandbox_operations SET status = $2, stage = CASE WHEN $2 = 'succeeded' THEN 'guest_ready' ELSE 'failed' END,
+		        error_code = $3, lease_owner = NULL, lease_expires_at = NULL, updated_at = now()
+		 WHERE id = $1::uuid AND lease_owner = $4`,
+		job.OperationID, status, errorCode, job.WorkerID,
+	)
+	if err != nil {
+		return err
+	}
+	if command.RowsAffected() != 1 {
+		return errors.New("sandbox lifecycle operation lease was lost")
+	}
+	if _, err := tx.Exec(ctx,
+		`UPDATE sandboxes SET desired_state = $2, observed_state = $3, updated_at = now() WHERE id = $1::uuid`,
+		job.SandboxID, desired, observed,
+	); err != nil {
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 func (s *Store) ExtendSandboxCreateLease(ctx context.Context, operationID, workerID string) error {
@@ -385,3 +588,7 @@ func scanSandbox(row rowScanner) (sandbox.Sandbox, error) {
 	item.Metadata = json.RawMessage(metadata)
 	return item, nil
 }
+
+// Pool exposes the control-plane connection pool to sibling stores that keep
+// their SQL in their own package (for example injection rules).
+func (s *Store) Pool() *pgxpool.Pool { return s.pool }

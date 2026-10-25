@@ -24,6 +24,7 @@ const (
 	NodeOrchestrator_GetOperation_FullMethodName         = "/isodo.node.v1.NodeOrchestrator/GetOperation"
 	NodeOrchestrator_InspectSandbox_FullMethodName       = "/isodo.node.v1.NodeOrchestrator/InspectSandbox"
 	NodeOrchestrator_CreateSandboxAppLink_FullMethodName = "/isodo.node.v1.NodeOrchestrator/CreateSandboxAppLink"
+	NodeOrchestrator_RelayPort_FullMethodName            = "/isodo.node.v1.NodeOrchestrator/RelayPort"
 	NodeOrchestrator_GetNodeStatus_FullMethodName        = "/isodo.node.v1.NodeOrchestrator/GetNodeStatus"
 	NodeOrchestrator_WatchOperation_FullMethodName       = "/isodo.node.v1.NodeOrchestrator/WatchOperation"
 )
@@ -40,6 +41,9 @@ type NodeOrchestratorClient interface {
 	GetOperation(ctx context.Context, in *GetOperationRequest, opts ...grpc.CallOption) (*Operation, error)
 	InspectSandbox(ctx context.Context, in *InspectSandboxRequest, opts ...grpc.CallOption) (*SandboxInspection, error)
 	CreateSandboxAppLink(ctx context.Context, in *CreateSandboxAppLinkRequest, opts ...grpc.CallOption) (*SandboxAppLink, error)
+	// RelayPort bridges one API-side TCP connection to a Guest port without
+	// exposing a Node-local listener. The first frame must be RelayOpen.
+	RelayPort(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[RelayFrame, RelayFrame], error)
 	GetNodeStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*NodeStatus, error)
 	WatchOperation(ctx context.Context, in *WatchOperationRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[NodeEvent], error)
 }
@@ -92,6 +96,19 @@ func (c *nodeOrchestratorClient) CreateSandboxAppLink(ctx context.Context, in *C
 	return out, nil
 }
 
+func (c *nodeOrchestratorClient) RelayPort(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[RelayFrame, RelayFrame], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &NodeOrchestrator_ServiceDesc.Streams[0], NodeOrchestrator_RelayPort_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[RelayFrame, RelayFrame]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type NodeOrchestrator_RelayPortClient = grpc.BidiStreamingClient[RelayFrame, RelayFrame]
+
 func (c *nodeOrchestratorClient) GetNodeStatus(ctx context.Context, in *emptypb.Empty, opts ...grpc.CallOption) (*NodeStatus, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(NodeStatus)
@@ -104,7 +121,7 @@ func (c *nodeOrchestratorClient) GetNodeStatus(ctx context.Context, in *emptypb.
 
 func (c *nodeOrchestratorClient) WatchOperation(ctx context.Context, in *WatchOperationRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[NodeEvent], error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
-	stream, err := c.cc.NewStream(ctx, &NodeOrchestrator_ServiceDesc.Streams[0], NodeOrchestrator_WatchOperation_FullMethodName, cOpts...)
+	stream, err := c.cc.NewStream(ctx, &NodeOrchestrator_ServiceDesc.Streams[1], NodeOrchestrator_WatchOperation_FullMethodName, cOpts...)
 	if err != nil {
 		return nil, err
 	}
@@ -133,6 +150,9 @@ type NodeOrchestratorServer interface {
 	GetOperation(context.Context, *GetOperationRequest) (*Operation, error)
 	InspectSandbox(context.Context, *InspectSandboxRequest) (*SandboxInspection, error)
 	CreateSandboxAppLink(context.Context, *CreateSandboxAppLinkRequest) (*SandboxAppLink, error)
+	// RelayPort bridges one API-side TCP connection to a Guest port without
+	// exposing a Node-local listener. The first frame must be RelayOpen.
+	RelayPort(grpc.BidiStreamingServer[RelayFrame, RelayFrame]) error
 	GetNodeStatus(context.Context, *emptypb.Empty) (*NodeStatus, error)
 	WatchOperation(*WatchOperationRequest, grpc.ServerStreamingServer[NodeEvent]) error
 	mustEmbedUnimplementedNodeOrchestratorServer()
@@ -156,6 +176,9 @@ func (UnimplementedNodeOrchestratorServer) InspectSandbox(context.Context, *Insp
 }
 func (UnimplementedNodeOrchestratorServer) CreateSandboxAppLink(context.Context, *CreateSandboxAppLinkRequest) (*SandboxAppLink, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateSandboxAppLink not implemented")
+}
+func (UnimplementedNodeOrchestratorServer) RelayPort(grpc.BidiStreamingServer[RelayFrame, RelayFrame]) error {
+	return status.Errorf(codes.Unimplemented, "method RelayPort not implemented")
 }
 func (UnimplementedNodeOrchestratorServer) GetNodeStatus(context.Context, *emptypb.Empty) (*NodeStatus, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method GetNodeStatus not implemented")
@@ -256,6 +279,13 @@ func _NodeOrchestrator_CreateSandboxAppLink_Handler(srv interface{}, ctx context
 	return interceptor(ctx, in, info, handler)
 }
 
+func _NodeOrchestrator_RelayPort_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(NodeOrchestratorServer).RelayPort(&grpc.GenericServerStream[RelayFrame, RelayFrame]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type NodeOrchestrator_RelayPortServer = grpc.BidiStreamingServer[RelayFrame, RelayFrame]
+
 func _NodeOrchestrator_GetNodeStatus_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(emptypb.Empty)
 	if err := dec(in); err != nil {
@@ -314,6 +344,12 @@ var NodeOrchestrator_ServiceDesc = grpc.ServiceDesc{
 		},
 	},
 	Streams: []grpc.StreamDesc{
+		{
+			StreamName:    "RelayPort",
+			Handler:       _NodeOrchestrator_RelayPort_Handler,
+			ServerStreams: true,
+			ClientStreams: true,
+		},
 		{
 			StreamName:    "WatchOperation",
 			Handler:       _NodeOrchestrator_WatchOperation_Handler,

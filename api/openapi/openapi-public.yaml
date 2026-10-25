@@ -4,6 +4,80 @@ info:
   version: 0.1.0
   description: Public sandbox API. Every operation requires a valid session, Casdoor bearer token, or scoped API key.
 paths:
+  /v1/credential-documents/{kind}:
+    parameters:
+      - {name: kind, in: path, required: true, schema: {type: string}}
+    get:
+      operationId: ListCredentialDocuments
+      summary: List encrypted account credential configurations
+      description: Interactive login required. Kind is agents or sandboxes. Values are decrypted only for the owning account.
+      tags: [Credentials]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      responses:
+        "200":
+          description: Configurations owned by the current account
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [items]
+                properties:
+                  items:
+                    type: array
+                    items:
+                      type: object
+                      required: [id, value]
+                      properties:
+                        id: {type: string}
+                        value: {type: object, additionalProperties: true}
+        default:
+          description: Authentication, validation or storage error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/credential-documents/{kind}/{id}:
+    parameters:
+      - {name: kind, in: path, required: true, schema: {type: string}}
+      - {name: id, in: path, required: true, schema: {type: string, maxLength: 160}}
+    put:
+      operationId: PutCredentialDocument
+      summary: Save an account Agent configuration or sandbox credential selection
+      description: Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+      tags: [Credentials]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {type: object, additionalProperties: true}
+      responses:
+        "200":
+          description: Configuration persisted with encryption at rest
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [id, value]
+                properties:
+                  id: {type: string}
+                  value: {type: object, additionalProperties: true}
+        default:
+          description: Authentication, validation or storage error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+    delete:
+      operationId: DeleteCredentialDocument
+      summary: Delete one configuration owned by the current account
+      tags: [Credentials]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      responses:
+        "204": {description: Configuration deleted; referenced API credential is retained}
+        default:
+          description: Authentication, validation or storage error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
   /v1/sandboxes:
     get:
       operationId: ListSandboxes
@@ -164,6 +238,66 @@ paths:
           required: true
           schema:
             type: string
+  /v1/sandboxes/{sandboxID}/start:
+    post:
+      operationId: StartSandbox
+      summary: Start a stopped sandbox
+      description: Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
+      tags:
+        - Sandboxes
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+        - APIKeyAuth: []
+      responses:
+        "202":
+          description: Start accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sandbox"
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      parameters:
+        - name: sandboxID
+          in: path
+          required: true
+          schema:
+            type: string
+  /v1/sandboxes/{sandboxID}/stop:
+    post:
+      operationId: StopSandbox
+      summary: Stop a running sandbox
+      description: Requests a graceful stop for a cloud sandbox owned by the authenticated user while preserving its instance disks. The operation is asynchronous; poll the sandbox until observed_state becomes stopped.
+      tags:
+        - Sandboxes
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+        - APIKeyAuth: []
+      responses:
+        "202":
+          description: Stop accepted
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Sandbox"
+        default:
+          description: Error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      parameters:
+        - name: sandboxID
+          in: path
+          required: true
+          schema:
+            type: string
   /v1/sandboxes/{sandboxID}/app:
     get:
       operationId: GetSandboxApp
@@ -189,6 +323,10 @@ paths:
           description: Sandbox not found
         "409":
           description: Sandbox is not running
+        "501":
+          description: The configured sandbox backend does not support application links
+        "502":
+          description: The Node returned an invalid or unreachable application link
         "503":
           description: Sandbox application service is unavailable
       parameters:
@@ -197,6 +335,196 @@ paths:
           required: true
           schema:
             type: string
+  /v1/sandboxes/{sandboxID}/app-link:
+    post:
+      operationId: CreateSandboxAppLink
+      summary: Create a sandbox application link
+      description: Creates a short-lived T3 pairing link for an authenticated sandbox owner and returns it as JSON. Desktop clients and SDKs use this endpoint; browsers can use `GET /v1/sandboxes/{sandboxID}/app` instead. The pairing credential is carried in the `pairing_url` fragment and is never sent to the Isodo API.
+      tags:
+        - Sandboxes
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: The sandbox application link.
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/SandboxAppLink"
+        "401":
+          description: Authentication is required
+        "403":
+          description: An interactive Isodo session is required
+        "404":
+          description: Sandbox not found
+        "409":
+          description: Sandbox is not running
+        "501":
+          description: The configured sandbox backend does not support application links
+        "502":
+          description: The Node returned an invalid or unreachable application link
+        "503":
+          description: Sandbox application service is unavailable
+      parameters:
+        - name: sandboxID
+          in: path
+          required: true
+          schema:
+            type: string
+  /v1/injection-rules:
+    get:
+      operationId: ListInjectionRules
+      summary: List account injection rules
+      description: Returns the authenticated account's persistent injection rules. Secrets are never returned; only a short masked hint is exposed.
+      tags:
+        - Secure Connections
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InjectionRuleList"
+        default:
+          description: Request, authentication or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    post:
+      operationId: CreateInjectionRule
+      summary: Create an account injection rule
+      description: Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+      tags:
+        - Secure Connections
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "201":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InjectionRule"
+        default:
+          description: Request, authentication or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/CreateInjectionRule"
+  /v1/injection-rules/{ruleID}:
+    parameters:
+      - name: ruleID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: GetInjectionRule
+      summary: Get an account injection rule
+      tags:
+        - Secure Connections
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InjectionRule"
+        default:
+          description: Request, authentication or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+    patch:
+      operationId: UpdateInjectionRule
+      summary: Update an account injection rule
+      description: Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+      tags:
+        - Secure Connections
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InjectionRule"
+        default:
+          description: Request, authentication or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/PatchInjectionRule"
+    delete:
+      operationId: DeleteInjectionRule
+      summary: Delete an account injection rule
+      tags:
+        - Secure Connections
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "204":
+          description: Success
+        default:
+          description: Request, authentication or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
+  /v1/injection-rules/{ruleID}/material:
+    parameters:
+      - name: ruleID
+        in: path
+        required: true
+        schema:
+          type: string
+    get:
+      operationId: GetInjectionRuleMaterial
+      summary: Read injection material
+      description: Returns the plaintext header/key for the authenticated owner so a trusted local runtime can apply it. The response is never cached; secrets are never logged.
+      tags:
+        - Secure Connections
+      security:
+        - SessionCookie: []
+        - BearerAuth: []
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/InjectionRuleMaterial"
+        default:
+          description: Request, authentication or server error
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Error"
   /v1/system-templates:
     get:
       operationId: ListSystemTemplates
@@ -498,6 +826,12 @@ components:
               type: string
             message:
               type: string
+            request_id:
+              type: string
+            retryable:
+              type: boolean
+            field:
+              type: string
           required:
             - code
             - message
@@ -554,8 +888,8 @@ components:
           maxLength: 128
         template:
           type: string
-          description: System catalog name or template UUID, optionally followed by :tag. Defaults to linux-base:default. Resolved to an immutable build at creation.
-          example: linux-base
+          description: System catalog name or template UUID, optionally followed by :tag. Defaults to base:default. Resolved to an immutable build at creation.
+          example: base
         metadata:
           $ref: "#/components/schemas/Metadata"
           x-go-type-skip-optional-pointer: true
@@ -591,6 +925,203 @@ components:
         - total
         - limit
         - offset
+    SandboxAppLink:
+      type: object
+      additionalProperties: false
+      properties:
+        sandbox_id:
+          type: string
+        service:
+          type: string
+          enum:
+            - t3
+          description: The named Guest service this link targets.
+        url:
+          type: string
+          format: uri
+          description: The application base URL. Clients must treat this value as opaque and must not construct or rewrite it.
+        pairing_url:
+          type: string
+          format: uri
+          description: A ready-to-open URL whose fragment carries the short-lived T3 pairing credential.
+        status:
+          type: string
+          enum:
+            - ready
+            - pending
+            - stopped
+            - failed
+            - unsupported
+        expires_at:
+          type: string
+          format: date-time
+        generation:
+          type: string
+          description: Opaque runtime generation. When present, the link is valid only for this generation; a Stop/Start/Restore changes it. Clients must not parse it.
+        capabilities:
+          type: array
+          items:
+            type: string
+          description: Named capabilities available through this application link, for example `terminal` and `files`. Clients must treat unknown values as optional.
+      required:
+        - sandbox_id
+        - service
+        - url
+        - pairing_url
+        - status
+        - expires_at
+    InjectionRuleType:
+      type: string
+      enum:
+        - http
+        - mcp
+        - openai
+        - anthropic
+        - gemini
+        - qiniu
+        - github
+    InjectionRule:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        name:
+          type: string
+        type:
+          $ref: "#/components/schemas/InjectionRuleType"
+        base_url:
+          type: string
+        header_name:
+          type: string
+        if_headers:
+          type: object
+          additionalProperties:
+            type: string
+        if_queries:
+          type: object
+          additionalProperties:
+            type: string
+        secret_set:
+          type: boolean
+        secret_hint:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+      required:
+        - id
+        - name
+        - type
+        - secret_set
+        - secret_hint
+        - created_at
+        - updated_at
+    CreateInjectionRule:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        type:
+          $ref: "#/components/schemas/InjectionRuleType"
+        base_url:
+          type: string
+          maxLength: 2048
+        header_name:
+          type: string
+          maxLength: 128
+        if_headers:
+          type: object
+          additionalProperties:
+            type: string
+        if_queries:
+          type: object
+          additionalProperties:
+            type: string
+        secret:
+          type: string
+          minLength: 1
+          maxLength: 8192
+      required:
+        - name
+        - type
+        - secret
+    PatchInjectionRule:
+      type: object
+      additionalProperties: false
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+        base_url:
+          type: string
+          maxLength: 2048
+        header_name:
+          type: string
+          maxLength: 128
+        if_headers:
+          type: object
+          additionalProperties:
+            type: string
+        if_queries:
+          type: object
+          additionalProperties:
+            type: string
+        secret:
+          type: string
+          maxLength: 8192
+    InjectionRuleList:
+      type: object
+      additionalProperties: false
+      properties:
+        items:
+          type: array
+          items:
+            $ref: "#/components/schemas/InjectionRule"
+        total:
+          type: integer
+          format: int64
+      required:
+        - items
+        - total
+    InjectionRuleMaterial:
+      type: object
+      additionalProperties: false
+      properties:
+        id:
+          type: string
+        type:
+          $ref: "#/components/schemas/InjectionRuleType"
+        base_url:
+          type: string
+        header_name:
+          type: string
+        if_headers:
+          type: object
+          additionalProperties:
+            type: string
+        if_queries:
+          type: object
+          additionalProperties:
+            type: string
+        api_key:
+          type: string
+        token:
+          type: string
+        headers:
+          type: object
+          additionalProperties:
+            type: string
+      required:
+        - id
+        - type
     Template:
       type: object
       additionalProperties: false
