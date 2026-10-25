@@ -17,7 +17,9 @@
 - 修复 devpts 挂载后，真实 App 终端可用，UID/GID 1000；保盘重启后任务和文件保留。
 - 同一 App 创建新的 Lima 沙箱、应用 Agent 配置并连接工作台通过。本轮未据此声明完整本地模型回归已完成。
 
-录屏主线和交付核对见 [Demo 录制指南](docs/runbooks/demo-recording.md)。本次演示视频：[Isodo Demo 视频](assets/Isodo.mp4)，预览图：[Demo 预览](assets/isodo-demo-preview.jpg)。架构、模块规格与分工见 [MVP 架构文档](docs-site/content/docs/concepts/architecture.mdx)。
+<video src="https://github.com/user-attachments/assets/ed5cb878-9206-4775-a566-a4d9311ca7e7" controls width="960"></video>
+
+[点击打开 Isodo Demo 视频](https://github.com/user-attachments/assets/ed5cb878-9206-4775-a566-a4d9311ca7e7) · [Demo 预览图](assets/isodo-demo-preview.jpg)。架构、模块规格与分工见 [MVP 架构文档](docs-site/content/docs/concepts/architecture.mdx)。
 
 ## 运行
 
