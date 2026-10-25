@@ -6,7 +6,7 @@
 
 新构建的 runtime snapshot 已通过真实 CHV 双克隆及 Node 工作台探针。恢复过程中直接链接原始 `vm-state.json`，没有时钟状态兼容改写。探针完成后该文件 SHA-256 仍与 manifest 一致，保存的 KVM clock flags 为 14。
 
-这验证了快照构建与 Node runtime 路径；**尚未向 S3 发布这个新 digest，未切换 Control 的默认 catalog，未在演示 Node 部署本轮预热代码，也未完成真实浏览器配对。** 不应据此宣称 App 默认创建已达到这些耗时。
+上述探针完成时，尚未发布新 digest、切换默认 catalog、部署 Node 预热或验证真实浏览器配对。下述探针耗时应与后续 App 部署验收区分；部署后的证据见文末补充。
 
 ## 两个独立的时钟问题
 
@@ -43,10 +43,43 @@
 | 重启后 boot ID / Guest epoch | 均更新 |
 | 停止和删除 | 通过 |
 
-首个用户请求若仍执行全量校验，仍会额外等待约 42 秒。此次代码增加 `ISODO_TEMPLATE_PRELOAD_DIGESTS`，在 Node 监听前下载/校验工件，并复用进程内验证凭据；这个部署步骤尚未执行。
+首个用户请求若仍执行全量校验，仍会额外等待约 42 秒。此次代码增加 `ISODO_TEMPLATE_PRELOAD_DIGESTS`，在 Node 监听前下载/校验工件，并复用进程内验证凭据；后续部署记录见文末。
 
 ## 证据与本地检查
 
 原始探针输出位于远端 `/root/zkp/isodo-api-unify/warm-20261026/`：`build-native-kvmclock.json`、`probe-artifact-native-kvmclock.{json,log}`、`probe-node-native-kvmclock.{json,log}`。Node 探针 JSON 含临时 app URL/token，保留在服务器，不复制进仓库。
 
 本地 `go test ./...`、Linux amd64 CLI 构建、`git diff --check` 通过。宿主版本门禁在本地单测和 Linux 编译中验证；此次远端探针二进制在加入版本门禁前编译，其余恢复及 Guest 时钟逻辑与本次源码一致。
+
+## 后续部署与桌面验收（北京时间 02:06–02:11）
+
+新 digest 已上传至隔离 SeaweedFS 桶 `isodo-unify-demo`。Node 使用只读凭证下载/校验，首次耗时 143303 ms；同进程二次读取为 0 ms，复用验证凭据。演示 Node 升级前检查 journal：活动沙箱和未完成操作均为 0。旧测试沙箱已被用户删除，没有恢复这些已删除记录。
+
+新版演示 Node 保持 `isodo-jfcs1024-unify-demo`、端口 19191 和原 state 目录。启动预热耗时 41825 ms，完成后 mTLS `GetNodeStatus` 通过。另一个端口 9190 的 Node 未变更。
+
+系统 catalog 新增 `base`，build ID 为 `a7a07645-ccc4-4811-aef3-be0704332d46`，对应本文新 digest；旧 `base-unify-demo-20261025` 保留。旧模板不含 runtime snapshot，用户此前创建的 `fenno` 在 Node 阶段耗时 41.745 秒。
+
+用户随后从真实 Electron App 创建 `fenno`（`1202a915-523a-4d2a-83d4-e5f3c1e54850`），数据库确认已固定到新 build/digest，状态 running。Node 日志：
+
+| 阶段 | 耗时 |
+| --- | --- |
+| Node 排队 | 3 ms |
+| 工件获取 / 验证凭据检查 | 0 / 0 ms |
+| 私有磁盘 CoW 准备 | 23 ms |
+| CHV restore 调用 | 125 ms |
+| Guest template Ready 等待 | 22 ms |
+| Node CREATE 总耗时 | 243 ms |
+| 工作台 HTTP Ready 等待 | 5455 ms |
+| pairing credential 签发 | 2444 ms |
+
+243 ms 是 Node CREATE 耗时，**不包含** Control 轮询、工作台 HTTP、pairing 和前端模块加载，不能描述为用户进入工作台的总耗时。没有采集此次点击到工作台的精确前端计时。
+
+真实桌面观察已从“正在连接沙箱”进入任务编辑器，显示 `fenno` 云端运行中及 `gpt-6.1-sol` 模型选择器；配对与工作台进入通过。未发送 Agent 推理请求，因此尚未验证模型服务调用或生成结果。
+
+此次同时修复了验收环境的三处启动不一致：
+
+- 旧 main 的 Electron preload 没有 `sandboxRequest`，与新前端混用会导致列表失败；现已从同一 worktree 构建前端、Electron 和本地 Node。
+- App 原先打开 `http://127.0.0.1:5734`，API 只接受 `http://app.isodo.localhost:5734`，写请求触发 INVALID_CSRF；现统一到后者，保留 CSRF 校验。
+- 前端缺少 `VITE_ISODO_PREVIEW_DOMAIN`，拒绝合法预览链接；两个 checkout 的忽略文件 `app/apps/web/.env.local` 已设置为 `isodo.localhost`。
+
+启动入口：本 worktree 的 `.tools/start-acceptance-web.sh`、`.tools/start-acceptance-desktop.sh`；远端 `/root/zkp/isodo-api-unify/warm-20261026/start-warm-node.py` 保留预热设置。启动脚本和私有环境留在各主机，凭证未入库。远端 `node-warm.log`、`publish-native.json`、`fetch-native.json` 保留部署与实测证据。

@@ -17,6 +17,7 @@ import (
 	"github.com/DROWNING2003/Isodo/internal/node/templatebuilder"
 	"github.com/DROWNING2003/Isodo/internal/templateartifact"
 	"github.com/google/uuid"
+	"golang.org/x/sync/singleflight"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -49,9 +50,10 @@ type CHVConfig struct {
 	NetworkBridge             string
 }
 type CHVServer struct {
-	injections *injection.Manager
-	egress     map[string]*egressBinding
-	stateLock  *os.File
+	injections  *injection.Manager
+	egress      map[string]*egressBinding
+	egressSetup singleflight.Group
+	stateLock   *os.File
 	nodev1.UnimplementedNodeOrchestratorServer
 	nodev1.UnimplementedSandboxRuntimeServer
 	status     *StatusServer

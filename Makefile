@@ -10,6 +10,8 @@ API_NODE_BACKEND ?= lima
 # shared setups). Falling back to localhost silently made the container and the
 # API disagree about the issuer, which breaks the OAuth callback handshake.
 API_CASDOOR_ISSUER ?= $(shell . ./.env 2>/dev/null; printf '%s' "$${CASDOOR_ORIGIN:-http://localhost:8000}")
+APP_WEB_ORIGIN ?= $(shell . ./.env 2>/dev/null; printf '%s' "$${ISODO_WEB_URL:-$${ISODO_WEB_ORIGIN:-http://127.0.0.1:5734}}")
+APP_PREVIEW_DOMAIN ?= $(shell . ./.env 2>/dev/null; printf '%s' "$${VITE_ISODO_PREVIEW_DOMAIN:-$${ISODO_PREVIEW_DOMAIN:-}}")
 ISODO_CONTROL_CLIENT_URI ?= spiffe://isodo/control-worker
 GOARCH ?= $(shell go env GOARCH)
 ISODO_GUEST_AGENT_BINARY ?= $(CURDIR)/.tools/isodo-guest-linux-$(GOARCH)
@@ -96,6 +98,9 @@ api: db-migrate casdoor-ready dev-certs
 	ISODO_CASDOOR_CLIENT_ID="$$ISODO_CASDOOR_CLIENT_ID" \
 	ISODO_CASDOOR_CLIENT_SECRET="$$ISODO_CASDOOR_CLIENT_SECRET" \
 	ISODO_WEB_ORIGIN="$$ISODO_WEB_ORIGIN" ISODO_LISTEN_ADDR="$$ISODO_LISTEN_ADDR" \
+	ISODO_PREVIEW_DOMAIN="$${ISODO_PREVIEW_DOMAIN:-}" \
+	ISODO_PREVIEW_SECRET="$${ISODO_PREVIEW_SECRET:-}" \
+	ISODO_PREVIEW_SCHEME="$${ISODO_PREVIEW_SCHEME:-http}" \
 	ISODO_INJECTION_KEY="$${ISODO_INJECTION_KEY:-}" \
 	ISODO_INJECTION_KEY_FILE="$${ISODO_INJECTION_KEY_FILE:-./certs/injection.key}" \
 	ISODO_NODE_BACKEND="$(API_NODE_BACKEND)" \
@@ -151,10 +156,10 @@ test:
 	go test ./...
 
 web:
-	cd app && HOST=127.0.0.1 PORT=5734 VITE_BOUNDLY_WEB_SURFACE=full pnpm --filter @t3tools/web dev
+	cd app && HOST=127.0.0.1 PORT=5734 VITE_BOUNDLY_WEB_SURFACE=full VITE_ISODO_PREVIEW_DOMAIN="$(APP_PREVIEW_DOMAIN)" pnpm --filter @t3tools/web dev
 
 electron:
-	cd app && pnpm build:desktop && pnpm --filter @t3tools/desktop start
+	cd app && pnpm build:desktop && ISODO_WEB_URL="$(APP_WEB_ORIGIN)" pnpm --filter @t3tools/desktop start
 
 mobile:
 	cd app && $(MOBILE_DEV_ENV) pnpm --filter @t3tools/mobile exec expo run:ios --device "$(IOS_SIMULATOR)"

@@ -10,11 +10,13 @@ import (
 	"os"
 	"sort"
 	"strings"
+	"time"
 
 	guestv1 "github.com/DROWNING2003/Isodo/internal/api/guest/v1"
 	"github.com/DROWNING2003/Isodo/internal/egressproxy"
 	"github.com/DROWNING2003/Isodo/internal/node/guesttransport"
 	"github.com/DROWNING2003/Isodo/internal/node/injection"
+	"golang.org/x/sync/singleflight"
 	"google.golang.org/protobuf/proto"
 )
 
@@ -75,6 +77,32 @@ func (s *CHVServer) prepareCHVEgress(ctx context.Context, record sandboxRecord, 
 	if s.injections == nil {
 		return errors.New("CHV egress proxy is not configured")
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	done := s.startEgressSetup(instance.Identity(), func(setupCtx context.Context) error {
+		return s.configureCHVEgress(setupCtx, record, instance)
+	})
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	case result := <-done:
+		return result.Err
+	}
+}
+
+// Concurrent app-link requests share one boot's socket and Guest initialization.
+// A caller leaving the page must not cancel setup for another waiting caller.
+func (s *CHVServer) startEgressSetup(identity *guestv1.RuntimeIdentity, setup func(context.Context) error) <-chan singleflight.Result {
+	key := fmt.Sprintf("%s/%d/%s/%s", identity.GetSandboxId(), identity.GetOwnershipGeneration(), identity.GetBootId(), identity.GetGuestEpoch())
+	return s.egressSetup.DoChan(key, func() (any, error) {
+		ctx, cancel := context.WithTimeout(s.ctx, 90*time.Second)
+		defer cancel()
+		return nil, setup(ctx)
+	})
+}
+
+func (s *CHVServer) configureCHVEgress(ctx context.Context, record sandboxRecord, instance CHVRuntime) error {
 	identity := instance.Identity()
 	s.mu.Lock()
 	existing := s.egress[record.SandboxID]
