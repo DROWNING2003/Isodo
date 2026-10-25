@@ -23,6 +23,17 @@ fi
 set -a
 . "$env_file"
 set +a
+# The system base uses runtime restore by default. A cold publication must be
+# an explicit operator choice, never an unnoticed fallback from a failed build.
+python3 - "$candidate/manifest.json" <<'PY'
+import json
+import os
+import sys
+
+manifest = json.load(open(sys.argv[1]))
+if not manifest.get("runtime_snapshot") and os.environ.get("ISODO_ALLOW_COLD_TEMPLATE") != "true":
+    raise SystemExit("System base requires a runtime snapshot; run build-warm first, or explicitly set ISODO_ALLOW_COLD_TEMPLATE=true.")
+PY
 if [ -z "${ISODO_DATABASE_URL:-}" ]; then
     ISODO_DATABASE_URL=$(python3 - <<'PY'
 import os, urllib.parse

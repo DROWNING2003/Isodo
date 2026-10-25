@@ -4,7 +4,7 @@
 
 ## 1. 前置
 
-- Linux x86_64，`/dev/kvm` 可用，Cloud Hypervisor v54（或与模板 manifest 匹配的版本）
+- Linux x86_64，`/dev/kvm` 可用，Cloud Hypervisor v54（或与模板 manifest 匹配的版本）；runtime snapshot 要求**宿主内核 ≥ 6.8**
 - Docker（构建 `t3-base` 镜像）
 - PostgreSQL 与 SeaweedFS S3（模板 catalog / artifact）
 - Casdoor（真实浏览器登录）
@@ -25,6 +25,28 @@ sh scripts/build-base-template.sh /root/zkp/template-candidates/t3-base-003
 ```
 
 产物包含 `manifest.json`、`vmlinux`、`initramfs.cpio`、`rootfs.raw`；digest 是 manifest 的 SHA-256。
+
+## 2.0 生成可恢复的系统模板
+
+冷模板只是构建输入。发布 `base` 前，使用启用 VMGENID 的 Guest 内核，生成 runtime snapshot：
+
+```sh
+.tools/isodo-template build-warm \
+  --dir "$COLD_DIR" --digest "$COLD_DIGEST" \
+  --out-dir "$WARM_DIR" --vmm-binary "$CHV" \
+  --vcpus 2 --memory-mib 2048
+```
+
+返回的 manifest digest 用于后续验证、发布和 Node 预热。快照固定 CPU/内存，恢复请求必须匹配；VMM 二进制摘要、宿主 CPU 签名也必须匹配。宿主内核升级可能改变 CPU 特征，需要重建快照。
+
+CHV v53/v54 在旧宿主上可能因 `KVM_SET_CLOCK` flags 恢复失败；上游把最低内核要求提高到 6.8，见 [#9101](https://github.com/cloud-hypervisor/cloud-hypervisor/issues/9101)。升级 Guest 内核不能替代升级宿主。构建器为 amd64 Guest 选择 `kvm-clock`，使用上游原生实时钟补偿；恢复过程保留原始时钟状态。`probe-artifact` 同时检查恢复后 Guest 与宿主的时间差不超过 5 秒，避免过期 pairing token 被误判为工作台启动失败。
+
+```sh
+.tools/isodo-template probe-artifact --dir "$WARM_DIR" --digest "$WARM_DIGEST" --vmm-binary "$CHV"
+.tools/isodo-template probe-node-t3 --dir "$WARM_DIR" --digest "$WARM_DIGEST" --vmm-binary "$CHV"
+```
+
+`probe-artifact` 检查双克隆、随机数/身份和磁盘隔离；`probe-node-t3` 检查创建、工作台 HTTP、pairing token 签发、停止/重启和删除。两者不代替真实浏览器配对验收。
 
 ## 2.1 CHV 出网
 
@@ -70,7 +92,7 @@ sh scripts/publish-t3-template.sh "$DIR" "$DIGEST" "$CHV"
 - `ISODO_TEMPLATE_S3_REGION=us-east-1`
 - `ISODO_TEMPLATE_S3_BUCKET=isodo-templates`
 
-发布成功后，`system_template_catalog` 出现 `t3-base`，API 创建沙箱时可解析。
+发布成功后，`system_template_catalog` 出现 `base`，API 创建沙箱时可解析。脚本默认要求 runtime snapshot；仅诊断冷模板时才显式设置 `ISODO_ALLOW_COLD_TEMPLATE=true`。
 
 > 8 GiB rootfs 的发布曾把测试机 I/O 打满；优先使用 4 GiB，并先确认主机磁盘/SeaweedFS 健康。
 
@@ -89,11 +111,12 @@ Node 需要：
 - `ISODO_NODE_BACKEND=chv`
 - `ISODO_NODE_STATE_DIR`、`ISODO_CH_BINARY`
 - `ISODO_TEMPLATE_S3_ENDPOINT`、`ISODO_TEMPLATE_S3_BUCKET`、`SEAWEEDFS_READ_*`
+- `ISODO_TEMPLATE_PRELOAD_DIGESTS`：逗号分隔的 manifest digest；Node 在开始监听前下载/校验这些工件，失败则启动失败。将首次下载和全量校验移出用户创建请求；不要把预热耗时算作恢复耗时。
 - mTLS server 证书/CA、Node ID
 
 启动后：
 
-1. 浏览器登录，创建沙箱选择“云端”和 `t3-base`。
+1. 浏览器登录，创建沙箱选择“云端”和 `base`。
 2. 打开沙箱；API 调用 `POST /app-link`，Gateway 设置 cookie 并 302 到 `/pair`。
 3. T3 进入工作台；终端/文件在 T3 内使用。
 4. 停止/启动使用 `POST /v1/sandboxes/{sandboxID}/stop` 和 `/start`；两者返回 202，客户端轮询 `observed_state`。Stop 保盘，Start 产生新 boot ID/guest epoch。
@@ -119,5 +142,5 @@ Node 需要：
 - 真实 API/Node 两个独立进程的 mTLS E2E
 - Connection Gateway 的凭证注入（CHV 网络/出网已实现）
 - 真实 Casdoor + 真实 PostgreSQL 的浏览器 E2E
-- warm snapshot（需 VMGENID 内核）
+- warm snapshot 在正式演示链路的发布、预热与真实浏览器配对验收（本地/Node 探针不能替代）
 - 生产 isodo-test 的 4G Registry 重发

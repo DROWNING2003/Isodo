@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -33,6 +34,7 @@ type RuntimeConfig struct {
 type Runtime struct {
 	session           *vmSession
 	directory, vsock  string
+	socketDirectory   string
 	identity          *guestv1.RuntimeIdentity
 	readyMilliseconds int64
 }
@@ -58,6 +60,7 @@ func StartRuntime(ctx, lifetime context.Context, config RuntimeConfig) (_ *Runti
 	if err != nil {
 		return nil, err
 	}
+	finish := runtimePhase(config, "artifact_verify")
 	var m templateartifact.Manifest
 	if config.Verified != nil {
 		if config.Verified.Digest() != config.ManifestDigest || config.Verified.Directory() != artifact {
@@ -70,17 +73,13 @@ func StartRuntime(ctx, lifetime context.Context, config RuntimeConfig) (_ *Runti
 	} else {
 		m, err = templateartifact.Verify(artifact, config.ManifestDigest)
 	}
+	finish(err)
 	if err != nil {
 		return nil, err
 	}
-	if config.CPUs == 0 {
-		config.CPUs = 2
-	}
-	if config.MemoryBytes == 0 {
-		config.MemoryBytes = uint64(m.MinimumMemoryMiB) << 20
-	}
-	if config.CPUs > 64 || config.MemoryBytes < uint64(m.MinimumMemoryMiB)<<20 || config.MemoryBytes > 4<<30 {
-		return nil, errors.New("runtime resources are outside supported limits")
+	config.CPUs, config.MemoryBytes, err = runtimeResources(m, config.CPUs, config.MemoryBytes)
+	if err != nil {
+		return nil, err
 	}
 	// Reuse is forbidden: a second operation must never format another VM's disk.
 	if config.DiskBytes != 0 && config.DiskBytes != uint64(m.Workspace.MinimumSizeBytes) {
@@ -100,7 +99,13 @@ func StartRuntime(ctx, lifetime context.Context, config RuntimeConfig) (_ *Runti
 			_ = os.RemoveAll(directory)
 		}
 	}()
+	finish = runtimePhase(config, "disk_prepare")
+	result.socketDirectory, err = os.MkdirTemp("", "isodo-vm-")
+	if err != nil {
+		return nil, err
+	}
 	vmConfig, err := prepareVM(ctx, artifact, directory, m)
+	finish(err)
 	if err != nil {
 		return nil, err
 	}
@@ -108,16 +113,21 @@ func StartRuntime(ctx, lifetime context.Context, config RuntimeConfig) (_ *Runti
 	vmConfig.CPUs.MaxVCPUs = config.CPUs
 	vmConfig.Memory.Size = config.MemoryBytes
 	attachNetwork(&vmConfig, config)
-	// No network device is attached: egress is denied until network isolation is wired.
+
+	vmConfig.Vsock.Socket = filepath.Join(result.socketDirectory, "vsock")
 	result.vsock = vmConfig.Vsock.Socket
-	result.session, err = bootWithLifetime(ctx, lifetime, config.VMMBinary, directory, vmConfig)
+	finish = runtimePhase(config, "vmm_boot")
+	result.session, err = bootWithSockets(ctx, lifetime, config.VMMBinary, directory, result.socketDirectory, vmConfig)
+	finish(err)
 	if err != nil {
 		return nil, err
 	}
 	started := time.Now()
 	readyCtx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
+	finish = runtimePhase(config, "guest_ready")
 	ready, err := guesttransport.WaitTemplateReady(readyCtx, result.vsock)
+	finish(err)
 	if err != nil {
 		return nil, withLogTail(err, vmConfig.Serial.File)
 	}
@@ -188,29 +198,20 @@ func RestartRuntime(ctx, lifetime context.Context, config RuntimeConfig) (_ *Run
 			return nil, err
 		}
 	}
-	if config.CPUs == 0 {
-		config.CPUs = 2
+	config.CPUs, config.MemoryBytes, err = runtimeResources(m, config.CPUs, config.MemoryBytes)
+	if err != nil {
+		return nil, err
 	}
-	if config.MemoryBytes == 0 {
-		config.MemoryBytes = uint64(m.MinimumMemoryMiB) << 20
+	disks, err := persistedDisks(directory, m)
+	if err != nil {
+		return nil, err
 	}
-	if config.CPUs > 64 || config.MemoryBytes < uint64(m.MinimumMemoryMiB)<<20 || config.MemoryBytes > 4<<30 {
-		return nil, errors.New("runtime resources are outside supported limits")
-	}
-	for _, disk := range []string{filepath.Join(directory, "rootfs.raw"), filepath.Join(directory, "workspace.raw")} {
-		info, statErr := os.Stat(disk)
-		if statErr != nil {
-			return nil, fmt.Errorf("persisted sandbox disk %s: %w", filepath.Base(disk), statErr)
-		}
-		if !info.Mode().IsRegular() {
-			return nil, fmt.Errorf("persisted sandbox disk %s is not a regular file", filepath.Base(disk))
-		}
-	}
+
 	vmConfig := vmm.VMConfig{
 		CPUs:    vmm.CPUConfig{BootVCPUs: config.CPUs, MaxVCPUs: config.CPUs},
 		Memory:  vmm.MemoryConfig{Size: config.MemoryBytes},
 		Payload: vmm.PayloadConfig{Kernel: filepath.Join(artifact, m.Kernel.Name), Cmdline: "console=ttyS0 root=/dev/vda rw rdinit=/init panic=-1 random.trust_cpu=on"},
-		Disks:   []vmm.DiskConfig{{Path: filepath.Join(directory, "rootfs.raw"), ImageType: "Raw"}, {Path: filepath.Join(directory, "workspace.raw"), ImageType: "Raw"}},
+		Disks:   disks,
 		Vsock:   vmm.VsockConfig{CID: 3, Socket: filepath.Join(directory, "vsock")},
 		Serial:  vmm.ConsoleConfig{Mode: "File", File: filepath.Join(directory, "serial.log")},
 		Console: vmm.ConsoleConfig{Mode: "Off"},
@@ -231,7 +232,13 @@ func RestartRuntime(ctx, lifetime context.Context, config RuntimeConfig) (_ *Run
 			result.Close()
 		}
 	}()
-	result.session, err = bootWithLifetime(ctx, lifetime, config.VMMBinary, directory, vmConfig)
+	result.socketDirectory, err = os.MkdirTemp("", "isodo-vm-")
+	if err != nil {
+		return nil, err
+	}
+	vmConfig.Vsock.Socket = filepath.Join(result.socketDirectory, "vsock")
+	result.vsock = vmConfig.Vsock.Socket
+	result.session, err = bootWithSockets(ctx, lifetime, config.VMMBinary, directory, result.socketDirectory, vmConfig)
 	if err != nil {
 		return nil, err
 	}
@@ -266,15 +273,25 @@ func (r *Runtime) Identity() *guestv1.RuntimeIdentity {
 func (r *Runtime) VsockSocket() string            { return r.vsock }
 func (r *Runtime) BootToReadyMilliseconds() int64 { return r.readyMilliseconds }
 func (r *Runtime) Close() {
-	if r != nil && r.session != nil {
+	if r == nil {
+		return
+	}
+	if r.session != nil {
 		r.session.kill()
+	}
+	if r.socketDirectory != "" {
+		_ = os.RemoveAll(r.socketDirectory)
 	}
 }
 func (r *Runtime) Stop(ctx context.Context) error {
 	if r == nil || r.session == nil {
 		return errors.New("runtime is not initialized")
 	}
-	return r.session.stop(ctx)
+	err := r.session.stop(ctx)
+	if err == nil && r.socketDirectory != "" {
+		err = os.RemoveAll(r.socketDirectory)
+	}
+	return err
 }
 
 // Delete removes only this Runtime's reserved directory after reaping its VMM.
@@ -288,4 +305,13 @@ func (r *Runtime) Running(ctx context.Context) (bool, error) {
 	}
 	info, err := r.session.client.Info(ctx)
 	return err == nil && info.State == "Running", err
+}
+
+// runtimePhase exposes slow runtime boundaries without recording credentials.
+func runtimePhase(config RuntimeConfig, stage string) func(error) {
+	started := time.Now()
+	slog.Info("sandbox runtime phase started", "sandbox_id", config.Identity.GetSandboxId(), "boot_id", config.Identity.GetBootId(), "stage", stage)
+	return func(err error) {
+		slog.Info("sandbox runtime phase completed", "sandbox_id", config.Identity.GetSandboxId(), "boot_id", config.Identity.GetBootId(), "stage", stage, "duration_ms", time.Since(started).Milliseconds(), "succeeded", err == nil)
+	}
 }

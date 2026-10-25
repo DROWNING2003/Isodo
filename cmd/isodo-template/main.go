@@ -31,6 +31,8 @@ func run() error {
 	directory := flags.String("dir", "", "candidate artifact directory")
 	digest := flags.String("digest", "", "expected manifest SHA-256")
 	binary := flags.String("vmm-binary", "cloud-hypervisor", "Cloud Hypervisor executable")
+	snapshotCPUs := flags.Uint("vcpus", 2, "CPU count captured by build-warm")
+	snapshotMemory := flags.Uint64("memory-mib", 2048, "memory captured by build-warm, in MiB")
 	outputDirectory := flags.String("out-dir", "", "new immutable warm artifact directory")
 	cache := flags.String("cache-dir", "", "download artifact with Node read-only S3 credentials before probe-bound")
 	name := flags.String("name", "base", "system catalog name")
@@ -143,7 +145,10 @@ func run() error {
 		}
 		buildCtx, stop := context.WithTimeout(ctx, 15*time.Minute)
 		defer stop()
-		digest, err := templatebuilder.BuildWarmArtifact(buildCtx, *binary, *directory, *digest, *outputDirectory)
+		if *snapshotCPUs == 0 || *snapshotCPUs > 64 || *snapshotMemory == 0 || *snapshotMemory > 4096 {
+			return errors.New("snapshot resources are outside supported limits")
+		}
+		digest, err := templatebuilder.BuildWarmArtifactWithResources(buildCtx, *binary, *directory, *digest, *outputDirectory, templatebuilder.SnapshotResources{CPUs: uint32(*snapshotCPUs), MemoryBytes: *snapshotMemory << 20})
 		if err != nil {
 			return err
 		}

@@ -20,7 +20,10 @@ type frozenTemplate struct {
 }
 
 func (f *frozenTemplate) close() { _ = os.RemoveAll(f.work) }
-func freezeTemplate(ctx context.Context, binary, directory, digest, parent string) (_ *frozenTemplate, err error) {
+func freezeTemplate(ctx context.Context, binary, directory, digest, parent string, resources SnapshotResources) (_ *frozenTemplate, err error) {
+	if err := requireSnapshotHost(); err != nil {
+		return nil, err
+	}
 	directory, err = filepath.Abs(directory)
 	if err != nil {
 		return nil, err
@@ -42,6 +45,10 @@ func freezeTemplate(ctx context.Context, binary, directory, digest, parent strin
 	if !strings.Contains(string(configuration), "CONFIG_VMGENID=y\n") && !strings.Contains(string(configuration), "CONFIG_VMGENID=m\n") {
 		return nil, errors.New("Guest kernel does not enable VMGENID")
 	}
+	cpus, memory, err := snapshotResources(m, resources)
+	if err != nil {
+		return nil, err
+	}
 	work, err := os.MkdirTemp(parent, "isodo-warm-")
 	if err != nil {
 		return nil, err
@@ -59,6 +66,12 @@ func freezeTemplate(ctx context.Context, binary, directory, digest, parent strin
 	config, err := prepareVM(ctx, directory, sourceWork, m)
 	if err != nil {
 		return nil, err
+	}
+	config.CPUs.BootVCPUs, config.CPUs.MaxVCPUs, config.Memory.Size = cpus, cpus, memory
+	// KVM realtime compensation updates the paravirtual clock. A Guest using
+	// native TSC as its clocksource can retain stale wall time after restore.
+	if m.Arch == "amd64" {
+		config.Payload.Cmdline += " clocksource=kvm-clock"
 	}
 	source, err := boot(ctx, binary, sourceWork, config)
 	if err != nil {

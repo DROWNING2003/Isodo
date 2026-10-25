@@ -248,7 +248,8 @@ func newNodeService(nodeStatus orchestrator.NodeStatus) (nodev1.NodeOrchestrator
 		server, err := orchestrator.NewCHVServer(nodeStatus, orchestrator.CHVConfig{
 			Directory: envOr("ISODO_NODE_STATE_DIR", "/var/lib/isodo/node"), Binary: envOr("ISODO_CH_BINARY", "cloud-hypervisor"),
 			Bucket: os.Getenv("ISODO_TEMPLATE_S3_BUCKET"), Fetcher: storage,
-			NetworkBridge: os.Getenv("ISODO_CHV_NETWORK_BRIDGE"),
+			NetworkBridge:  os.Getenv("ISODO_CHV_NETWORK_BRIDGE"),
+			PreloadDigests: strings.FieldsFunc(os.Getenv("ISODO_TEMPLATE_PRELOAD_DIGESTS"), func(r rune) bool { return r == ',' || r == ' ' || r == '\n' }),
 		})
 		// CHV materializes object-store template builds; it exposes no local
 		// template builder, so the desktop client sees only the base template.
