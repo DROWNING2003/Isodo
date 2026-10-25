@@ -312,7 +312,7 @@ func snapshotMappingBytes(maps string) uint64 {
 // warmExec executes only a fixed private validation script. It does not advertise
 // the incomplete public exec/files/PTY capability or accept user commands.
 func warmExec(ctx context.Context, socket string, identity *guestv1.RuntimeIdentity, create bool) (string, error) {
-	script := `import json,os,pathlib,sys
+	script := `import json,os,pathlib,sys,time
 paths=[pathlib.Path('/workspace/isodo-clone-marker'),pathlib.Path('/home/isodo/isodo-clone-marker')]
 if sys.argv[2]=='create':
  for p in paths:
@@ -320,7 +320,7 @@ if sys.argv[2]=='create':
   p.write_text(sys.argv[1])
 else:
  for p in paths: assert p.read_text()==sys.argv[1], 'cross-clone write'
-print(json.dumps({'id':sys.argv[1],'random':os.urandom(32).hex()}))`
+print(json.dumps({'id':sys.argv[1],'random':os.urandom(32).hex(),'realtime_ns':time.time_ns(),'clocksource':pathlib.Path('/sys/devices/system/clocksource/clocksource0/current_clocksource').read_text().strip()}))`
 	action := "check"
 	if create {
 		action = "create"
@@ -363,12 +363,20 @@ print(json.dumps({'id':sys.argv[1],'random':os.urandom(32).hex()}))`
 			if exit.ExitCode == nil || *exit.ExitCode != 0 || exit.OutputIncomplete {
 				return "", fmt.Errorf("validation command failed: %s", output.String())
 			}
-			var value struct{ ID, Random string }
+			var value struct {
+				ID, Random  string
+				RealtimeNS  int64  `json:"realtime_ns"`
+				Clocksource string `json:"clocksource"`
+			}
 			if err = json.Unmarshal([]byte(output.String()), &value); err != nil {
 				return "", err
 			}
 			if value.ID != identity.SandboxId || len(value.Random) != 64 {
 				return "", errors.New("validation output did not match assigned Sandbox")
+			}
+			drift := time.Now().UnixNano() - value.RealtimeNS
+			if drift > int64(5*time.Second) || drift < -int64(5*time.Second) {
+				return "", fmt.Errorf("restored Guest clock drift %d ms (clocksource=%s)", drift/int64(time.Millisecond), value.Clocksource)
 			}
 			return value.Random, nil
 		}

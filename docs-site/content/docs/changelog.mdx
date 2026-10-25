@@ -5,4 +5,14 @@ description: Isodo 文档和接口变更记录。
 
 # 更新日志
 
+## 2026-10-26 · 黑客松 MVP 联调
+
+- 同一 App 的 SandboxClient 接入本地 IPC 与云端 HTTP，使用 revision 与动作结果等待生命周期完成。
+- 实机打通 Control → SSH/mTLS → CHV → Agent 工作台 → Codex 模型任务，生成文件并运行测试。
+- 通用 Files 接入配置写入；CHV Vsock 出站与宿主凭证注入完成实际模型调用验证。
+- 修复 Preview Cookie bootstrap、指定 App origin 的 CORS 和 Guest devpts 终端挂载。
+- 更新运行说明、模块规格与分工、演示指南，以及从最新 OpenAPI 生成的 Files / Agent 配置接口参考。
+
+本轮修改的发布状态以 GitHub PR 为准；本地联调通过不等于代码和视频已经上传。
+
 该页面记录发布后的产品与 API 变化。当前接口契约版本为 `0.1.0`；开发中的变更以仓库中的 OpenAPI 契约和代码为准。

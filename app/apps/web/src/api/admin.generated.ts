@@ -5,7 +5,7 @@
  * Control-plane API for browser login, sessions, API-key management, and health checks.
  * OpenAPI spec version: 0.1.0
  */
-import { isodoFetch } from "./transport";
+import { isodoFetch } from './transport';
 export type ErrorError = {
   code: string;
   message: string;
@@ -26,13 +26,14 @@ export interface Session {
   expires_at: string;
 }
 
-export type APIKeyScope = (typeof APIKeyScope)[keyof typeof APIKeyScope];
+export type APIKeyScope = typeof APIKeyScope[keyof typeof APIKeyScope];
+
 
 export const APIKeyScope = {
-  "sandboxes:read": "sandboxes:read",
-  "sandboxes:write": "sandboxes:write",
-  "templates:read": "templates:read",
-  "templates:write": "templates:write",
+  'sandboxes:read': 'sandboxes:read',
+  'sandboxes:write': 'sandboxes:write',
+  'templates:read': 'templates:read',
+  'templates:write': 'templates:write',
 } as const;
 
 export interface APIKey {
@@ -51,14 +52,14 @@ export interface APIKey {
 
 export interface CreateAPIKey {
   /**
-   * @minLength 1
-   * @maxLength 64
-   */
+     * @minLength 1
+     * @maxLength 64
+     */
   name: string;
   /**
-   * @minItems 1
-   * @maxItems 2
-   */
+     * @minItems 1
+     * @maxItems 2
+     */
   scopes: APIKeyScope[];
   /** @nullable */
   expires_at?: string | null;
@@ -84,81 +85,126 @@ export interface APIKeyList {
 }
 
 export const getLoginUrl = () => {
-  return `/auth/login`;
-};
 
-export const login = async (options?: Parameters<typeof isodoFetch>[1]): Promise<Error> => {
-  return isodoFetch<Error>(getLoginUrl(), {
+
+
+
+  return `/auth/login`
+}
+
+export const login = async ( options?: Parameters<typeof isodoFetch>[1]): Promise<Error> => {
+
+  return isodoFetch<Error>(getLoginUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
 
 export const getCallbackUrl = () => {
-  return `/auth/callback`;
-};
 
-export const callback = async (options?: Parameters<typeof isodoFetch>[1]): Promise<Error> => {
-  return isodoFetch<Error>(getCallbackUrl(), {
+
+
+
+  return `/auth/callback`
+}
+
+export const callback = async ( options?: Parameters<typeof isodoFetch>[1]): Promise<Error> => {
+
+  return isodoFetch<Error>(getCallbackUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
 
 export const getGetSessionUrl = () => {
-  return `/auth/me`;
-};
 
-export const getSession = async (options?: Parameters<typeof isodoFetch>[1]): Promise<Session> => {
-  return isodoFetch<Session>(getGetSessionUrl(), {
+
+
+
+  return `/auth/me`
+}
+
+export const getSession = async ( options?: Parameters<typeof isodoFetch>[1]): Promise<Session> => {
+
+  return isodoFetch<Session>(getGetSessionUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
 
 export const getLogoutUrl = () => {
-  return `/auth/logout`;
-};
 
-export const logout = async (options?: Parameters<typeof isodoFetch>[1]): Promise<void> => {
-  return isodoFetch<void>(getLogoutUrl(), {
+
+
+
+  return `/auth/logout`
+}
+
+export const logout = async ( options?: Parameters<typeof isodoFetch>[1]): Promise<void> => {
+
+  return isodoFetch<void>(getLogoutUrl(),
+  {
     ...options,
-    method: "POST",
-  });
-};
+    method: 'POST'
+
+
+  }
+);}
+
+
 
 export const getListAPIKeysUrl = () => {
-  return `/v1/api-keys`;
-};
 
-export const listAPIKeys = async (
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<APIKeyList> => {
-  return isodoFetch<APIKeyList>(getListAPIKeysUrl(), {
+
+
+
+  return `/v1/api-keys`
+}
+
+export const listAPIKeys = async ( options?: Parameters<typeof isodoFetch>[1]): Promise<APIKeyList> => {
+
+  return isodoFetch<APIKeyList>(getListAPIKeysUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}
+
+
 
 export const getCreateAPIKeyUrl = () => {
-  return `/v1/api-keys`;
-};
 
-export const createAPIKey = async (
-  createAPIKeyBody: CreateAPIKey,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<CreatedAPIKey> => {
-  const getHeaders = (
-    h?: NonNullable<RequestInit["headers"]>,
-  ): Record<string, string | readonly string[]> => {
+
+
+
+  return `/v1/api-keys`
+}
+
+export const createAPIKey = async (createAPIKeyBody: CreateAPIKey, options?: Parameters<typeof isodoFetch>[1]): Promise<CreatedAPIKey> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
     if (!h) return {};
     if (h instanceof Headers) return Object.fromEntries(h.entries());
     if (Symbol.iterator in h) {
       return Object.fromEntries(
-        Array.from(
-          h as Iterable<Iterable<string>>,
-          (entry) => Array.from(entry) as [string, string],
-        ),
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
       );
     }
     const headers: Record<string, string | readonly string[]> = {};
@@ -167,35 +213,53 @@ export const createAPIKey = async (
     }
     return headers;
   };
-  return isodoFetch<CreatedAPIKey>(getCreateAPIKeyUrl(), {
+return isodoFetch<CreatedAPIKey>(getCreateAPIKeyUrl(),
+  {
     ...options,
-    method: "POST",
-    headers: { "Content-Type": "application/json", ...getHeaders(options?.headers) },
-    body: JSON.stringify(createAPIKeyBody),
-  });
-};
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createAPIKeyBody)
+  }
+);}
 
-export const getRevokeAPIKeyUrl = (keyID: string) => {
-  return `/v1/api-keys/${keyID}`;
-};
 
-export const revokeAPIKey = async (
-  keyID: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<void> => {
-  return isodoFetch<void>(getRevokeAPIKeyUrl(keyID), {
+
+export const getRevokeAPIKeyUrl = (keyID: string,) => {
+
+
+
+
+  return `/v1/api-keys/${keyID}`
+}
+
+export const revokeAPIKey = async (keyID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<void> => {
+
+  return isodoFetch<void>(getRevokeAPIKeyUrl(keyID),
+  {
     ...options,
-    method: "DELETE",
-  });
-};
+    method: 'DELETE'
+
+
+  }
+);}
+
+
 
 export const getHealthUrl = () => {
-  return `/healthz`;
-};
 
-export const health = async (options?: Parameters<typeof isodoFetch>[1]): Promise<string> => {
-  return isodoFetch<string>(getHealthUrl(), {
+
+
+
+  return `/healthz`
+}
+
+export const health = async ( options?: Parameters<typeof isodoFetch>[1]): Promise<string> => {
+
+  return isodoFetch<string>(getHealthUrl(),
+  {
     ...options,
-    method: "GET",
-  });
-};
+    method: 'GET'
+
+
+  }
+);}

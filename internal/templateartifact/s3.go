@@ -235,8 +235,16 @@ func (s *S3Store) FetchVerified(ctx context.Context, cacheRoot, digest string) (
 		if cached != nil && cached.Directory() == key && cached.Digest() == digest && cached.Check() == nil {
 			return cached, nil
 		}
-		directory, err := s.Fetch(ctx, absolute, digest)
-		if err != nil {
+		// An existing disk cache needs one full verification to establish a
+		// process-local receipt. Fetch also hashes existing files, so calling it
+		// here would read every rootfs and snapshot memory file twice.
+		directory := key
+		if _, err := os.Lstat(key); errors.Is(err, os.ErrNotExist) {
+			directory, err = s.Fetch(ctx, absolute, digest)
+			if err != nil {
+				return nil, err
+			}
+		} else if err != nil {
 			return nil, err
 		}
 		artifact, err := VerifyArtifact(directory, digest)

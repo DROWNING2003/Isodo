@@ -190,8 +190,11 @@ func createRequest(job operation.CreateJob, backend string) *nodev1.ApplyOperati
 
 func (w *Worker) runLifecycle(ctx context.Context, job operation.LifecycleJob) error {
 	action := nodev1.OperationAction_OPERATION_ACTION_STOP
-	if job.Action == "start" {
+	switch job.Action {
+	case "start":
 		action = nodev1.OperationAction_OPERATION_ACTION_START
+	case "delete":
+		action = nodev1.OperationAction_OPERATION_ACTION_DELETE
 	}
 	request := &nodev1.ApplyOperationRequest{
 		OperationId: job.OperationID, RequestHash: job.RequestHash, SandboxId: job.SandboxID,

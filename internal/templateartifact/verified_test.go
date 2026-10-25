@@ -120,3 +120,34 @@ func TestRuntimeSnapshotRequiresCompatibilityAndFixedPayloads(t *testing.T) {
 		t.Fatal("snapshot lacks CPU compatibility signature")
 	}
 }
+
+func TestFetchVerifiedRechecksDiskCacheAndDetectsCorruption(t *testing.T) {
+	directory, digest := readonlyFixture(t)
+	cache := t.TempDir()
+	path := filepath.Join(cache, digest)
+	if err := os.Rename(directory, path); err != nil {
+		t.Fatal(err)
+	}
+	store := &S3Store{}
+	first, err := store.FetchVerified(t.Context(), cache, digest)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := store.FetchVerified(t.Context(), cache, digest)
+	if err != nil || first != second {
+		t.Fatalf("receipt was not reused: %v", err)
+	}
+	rootfs := filepath.Join(path, first.Manifest().RootFS.Name)
+	if err := os.Chmod(rootfs, 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(rootfs, []byte("corrupted"), 0400); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(rootfs, 0400); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := store.FetchVerified(t.Context(), cache, digest); err == nil {
+		t.Fatal("cached receipt hid corrupted artifact")
+	}
+}

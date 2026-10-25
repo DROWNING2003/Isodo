@@ -1,3 +1,6 @@
+import { localSandboxClient } from "./sandboxTransports";
+import { waitForSandboxAction } from "./sandboxClient";
+import { toLocalSandboxItem } from "./sandboxQueries";
 import { updateLocalSandboxCache } from "./sandboxQueries";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { CloudIcon, LaptopIcon, LoaderIcon, ShieldCheckIcon } from "lucide-react";
@@ -213,30 +216,15 @@ export function CloudWorkspace({ sandboxId }: { sandboxId: string }) {
                 <Button
                   disabled={starting}
                   onClick={() => {
-                    const bridge = window.isodoDesktop;
-                    if (!bridge) return;
                     setStarting(true);
-                    void bridge
-                      .startLocalSandbox(localRecord.id)
-                      .then(async () => {
-                        // Start is asynchronous: wait for the runtime to report
-                        // the sandbox running before pairing.
-                        const deadline = Date.now() + 120_000;
-                        for (;;) {
-                          const listed = (await bridge.listLocalSandboxes()) as {
-                            items?: { id: string; state?: string }[];
-                          };
-                          const current = listed.items?.find((item) => item.id === localRecord.id);
-                          if (current?.state === "running") {
-                            autoConnectFor.current = sandboxId;
-                            updateLocalSandboxCache(() => listed.items ?? []);
-                            break;
-                          }
-                          if (current?.state === "failed" || Date.now() > deadline) {
-                            throw new Error("沙箱没有启动成功");
-                          }
-                          await new Promise((resolve) => setTimeout(resolve, 1000));
-                        }
+                    void localSandboxClient.start(localRecord.id)
+                      .then((accepted) => waitForSandboxAction(localSandboxClient, accepted, { timeoutMs: 120_000 }))
+                      .then(async (running) => {
+                        autoConnectFor.current = sandboxId;
+                        updateLocalSandboxCache((items) => [
+                          ...(items ?? []).filter((item) => item.id !== running.id),
+                          toLocalSandboxItem(running),
+                        ]);
                         await connect();
                       })
                       .catch((reason: unknown) => {

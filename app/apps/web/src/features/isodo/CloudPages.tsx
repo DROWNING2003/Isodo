@@ -1,3 +1,6 @@
+import { sandboxClientFor } from "./sandboxTransports";
+import { waitForSandboxAction } from "./sandboxClient";
+import { toLocalSandboxItem } from "./sandboxQueries";
 import { useServerAgentConfigs, useAgentConfigMutations } from "./credentialDocuments";
 import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, type ReactNode } from "react";
@@ -19,13 +22,7 @@ import {
   SquareIcon,
   Trash2Icon,
 } from "lucide-react";
-import {
-  deleteSandbox,
-  startSandbox,
-  stopSandbox,
-  type InjectionRule,
-  type Sandbox as PlatformSandbox,
-} from "../../api/public.generated";
+import { type InjectionRule, type Sandbox as PlatformSandbox } from "../../api/public.generated";
 import { Button } from "../../components/ui/button";
 import { Card, CardHeader, CardTitle, CardPanel, CardFooter } from "../../components/ui/card";
 import { Input } from "../../components/ui/input";
@@ -135,8 +132,8 @@ export function CloudOverview() {
         id: sandbox.id,
         name: sandbox.name,
         template: "blank" as const,
-        description: sandbox.template_id ? "模板沙箱" : "T3 沙箱应用",
-        agent: "T3 应用",
+        description: sandbox.template_id ? "模板沙箱" : "Agent 工作台",
+        agent: "Agent 工作台",
         status:
           sandbox.observed_state === "running"
             ? ("running" as const)
@@ -254,70 +251,29 @@ export function CloudOverview() {
             };
             const requestLifecycle = (action: "start" | "stop") => {
               setLifecyclePending(sandbox.id);
-              if (isLocalSandbox) {
-                const bridge = window.isodoDesktop;
-                if (!bridge) {
-                  setPlatformError("本地运行时不可用");
-                  setLifecyclePending(null);
-                  return;
-                }
-                const request =
-                  action === "start"
-                    ? bridge.startLocalSandbox(sandbox.id)
-                    : bridge.stopLocalSandbox(sandbox.id);
-                void request
-                  .then(async () => {
-                    const target = action === "start" ? "running" : "stopped";
-                    const deadline = Date.now() + 60_000;
-                    let latest: { items?: LocalSandboxItem[] } | undefined;
-                    for (;;) {
-                      latest = (await bridge.listLocalSandboxes()) as {
-                        items?: LocalSandboxItem[];
-                      };
-                      const current = latest.items?.find((item) => item.id === sandbox.id);
-                      if (current?.state === target) break;
-                      if (current?.state === "failed" || Date.now() > deadline) {
-                        throw new Error("沙箱状态没有按预期变化");
-                      }
-                      await new Promise((resolve) => setTimeout(resolve, 1000));
-                    }
-                    if (action === "stop") await connections.disconnect(sandbox.id);
-                    setLocalSandboxes(() => latest?.items ?? []);
-                    setPlatformError(null);
-                  })
-                  .catch(() =>
-                    setPlatformError(
-                      action === "start"
-                        ? "启动本地沙箱失败，请稍后重试"
-                        : "停止本地沙箱失败，请稍后重试",
-                    ),
-                  )
-                  .finally(() => setLifecyclePending(null));
-                return;
-              }
+              const client = sandboxClientFor(isLocalSandbox ? "local" : "cloud");
               const request =
-                action === "start" ? startSandbox(sandbox.id) : stopSandbox(sandbox.id);
+                action === "start" ? client.start(sandbox.id) : client.stop(sandbox.id);
               void request
+                .then((accepted) => waitForSandboxAction(client, accepted, { timeoutMs: 120_000 }))
                 .then(async (updated) => {
                   if (action === "stop") await connections.disconnect(sandbox.id);
-                  setPlatformSandboxes((current) =>
-                    current
-                      ? current.map((item) =>
-                          item.id === sandbox.id
-                            ? {
-                                ...item,
-                                desired_state: updated.desired_state,
-                                observed_state: updated.observed_state,
-                              }
-                            : item,
-                        )
-                      : current,
-                  );
+                  if (isLocalSandbox) {
+                    setLocalSandboxes((items) => [
+                      ...(items ?? []).filter((item) => item.id !== updated.id),
+                      toLocalSandboxItem(updated),
+                    ]);
+                  } else {
+                    setPlatformSandboxes(
+                      (items) =>
+                        items?.map((item) => (item.id === updated.id ? updated : item)) ?? items,
+                    );
+                  }
                   setPlatformError(null);
                 })
-                .catch(() =>
+                .catch((reason: unknown) =>
                   setPlatformError(
-                    action === "start" ? "启动沙箱失败，请稍后重试" : "停止沙箱失败，请稍后重试",
+                    reason instanceof Error ? reason.message : "沙箱状态变更失败，请稍后重试",
                   ),
                 )
                 .finally(() => setLifecyclePending(null));
@@ -398,7 +354,8 @@ export function CloudOverview() {
                   )}
                 </CardPanel>
                 <CardFooter className="isodo-overview-card-footer">
-                  {(isPlatformSandbox || isLocalSandbox) && sandbox.status === "stopped" ? (
+                  {(isPlatformSandbox || isLocalSandbox) &&
+                  (sandbox.status === "stopped" || sandbox.status === "failed") ? (
                     <Button
                       size="sm"
                       variant="ghost"
@@ -435,12 +392,16 @@ export function CloudOverview() {
                           return;
                         }
                         setDeleting(sandbox.id);
-                        const removal =
-                          sandbox.runtime === "local-runtime"
-                            ? (window.isodoDesktop?.deleteLocalSandbox(sandbox.id) ??
-                              Promise.reject(new Error("no bridge")))
-                            : deleteSandbox(sandbox.id);
-                        void removal
+                        const client = sandboxClientFor(
+                          sandbox.runtime === "local-runtime" ? "local" : "cloud",
+                        );
+                        void client
+                          .delete(sandbox.id)
+                          .then((accepted) =>
+                            accepted
+                              ? waitForSandboxAction(client, accepted, { timeoutMs: 120_000 })
+                              : undefined,
+                          )
                           .then(async () => {
                             await connections.disconnect(sandbox.id);
                             if (sandbox.runtime === "local-runtime") {

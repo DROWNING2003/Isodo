@@ -13,6 +13,7 @@ import (
 	"time"
 
 	"github.com/oapi-codegen/runtime"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
 // Defines values for CreateTemplateVisibility.
@@ -102,6 +103,57 @@ func (e PatchTemplateVisibility) Valid() bool {
 	}
 }
 
+// Defines values for SandboxActionStatus.
+const (
+	SandboxActionStatusAccepted   SandboxActionStatus = "accepted"
+	SandboxActionStatusFailed     SandboxActionStatus = "failed"
+	SandboxActionStatusRunning    SandboxActionStatus = "running"
+	SandboxActionStatusSucceeded  SandboxActionStatus = "succeeded"
+	SandboxActionStatusSuperseded SandboxActionStatus = "superseded"
+)
+
+// Valid indicates whether the value is a known member of the SandboxActionStatus enum.
+func (e SandboxActionStatus) Valid() bool {
+	switch e {
+	case SandboxActionStatusAccepted:
+		return true
+	case SandboxActionStatusFailed:
+		return true
+	case SandboxActionStatusRunning:
+		return true
+	case SandboxActionStatusSucceeded:
+		return true
+	case SandboxActionStatusSuperseded:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SandboxActionType.
+const (
+	Create SandboxActionType = "create"
+	Delete SandboxActionType = "delete"
+	Start  SandboxActionType = "start"
+	Stop   SandboxActionType = "stop"
+)
+
+// Valid indicates whether the value is a known member of the SandboxActionType enum.
+func (e SandboxActionType) Valid() bool {
+	switch e {
+	case Create:
+		return true
+	case Delete:
+		return true
+	case Start:
+		return true
+	case Stop:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for SandboxAppLinkService.
 const (
 	T3 SandboxAppLinkService = "t3"
@@ -138,6 +190,78 @@ func (e SandboxAppLinkStatus) Valid() bool {
 	case SandboxAppLinkStatusStopped:
 		return true
 	case SandboxAppLinkStatusUnsupported:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SandboxDesiredState.
+const (
+	SandboxDesiredStateRunning SandboxDesiredState = "running"
+	SandboxDesiredStateStopped SandboxDesiredState = "stopped"
+)
+
+// Valid indicates whether the value is a known member of the SandboxDesiredState enum.
+func (e SandboxDesiredState) Valid() bool {
+	switch e {
+	case SandboxDesiredStateRunning:
+		return true
+	case SandboxDesiredStateStopped:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SandboxInjectionKind.
+const (
+	OneOff     SandboxInjectionKind = "one-off"
+	Persistent SandboxInjectionKind = "persistent"
+)
+
+// Valid indicates whether the value is a known member of the SandboxInjectionKind enum.
+func (e SandboxInjectionKind) Valid() bool {
+	switch e {
+	case OneOff:
+		return true
+	case Persistent:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SandboxObservedState.
+const (
+	SandboxObservedStateError     SandboxObservedState = "error"
+	SandboxObservedStatePreparing SandboxObservedState = "preparing"
+	SandboxObservedStateRequested SandboxObservedState = "requested"
+	SandboxObservedStateRunning   SandboxObservedState = "running"
+	SandboxObservedStateStarting  SandboxObservedState = "starting"
+	SandboxObservedStateStopped   SandboxObservedState = "stopped"
+	SandboxObservedStateStopping  SandboxObservedState = "stopping"
+	SandboxObservedStateUnknown   SandboxObservedState = "unknown"
+)
+
+// Valid indicates whether the value is a known member of the SandboxObservedState enum.
+func (e SandboxObservedState) Valid() bool {
+	switch e {
+	case SandboxObservedStateError:
+		return true
+	case SandboxObservedStatePreparing:
+		return true
+	case SandboxObservedStateRequested:
+		return true
+	case SandboxObservedStateRunning:
+		return true
+	case SandboxObservedStateStarting:
+		return true
+	case SandboxObservedStateStopped:
+		return true
+	case SandboxObservedStateStopping:
+		return true
+	case SandboxObservedStateUnknown:
 		return true
 	default:
 		return false
@@ -231,6 +355,14 @@ func (e ListTemplatesParamsScope) Valid() bool {
 	}
 }
 
+// ActionError defines model for ActionError.
+type ActionError struct {
+	Code      string  `json:"code"`
+	Message   string  `json:"message"`
+	RequestId *string `json:"request_id,omitempty"`
+	Retryable bool    `json:"retryable"`
+}
+
 // BuildRecipe defines model for BuildRecipe.
 type BuildRecipe struct {
 	Commands      *[][]string `json:"commands,omitempty"`
@@ -252,7 +384,7 @@ type CreateInjectionRule struct {
 // CreateSandbox defines model for CreateSandbox.
 type CreateSandbox struct {
 	Metadata Metadata `json:"metadata,omitempty"`
-	Name     string   `json:"name"`
+	Name     *string  `json:"name,omitempty"`
 
 	// Template System catalog name or template UUID, optionally followed by :tag. Defaults to base:default. Resolved to an immutable build at creation.
 	//
@@ -279,6 +411,13 @@ type Error struct {
 		RequestId *string `json:"request_id,omitempty"`
 		Retryable *bool   `json:"retryable,omitempty"`
 	} `json:"error"`
+}
+
+// FileWriteResult defines model for FileWriteResult.
+type FileWriteResult struct {
+	Bytes  int64  `json:"bytes"`
+	Path   string `json:"path"`
+	Sha256 string `json:"sha256"`
 }
 
 // ForkTemplate defines model for ForkTemplate.
@@ -359,17 +498,43 @@ type PatchTemplateVisibility string
 
 // Sandbox defines model for Sandbox.
 type Sandbox struct {
-	CreatedAt       time.Time `json:"created_at"`
-	DesiredState    string    `json:"desired_state"`
-	ID              string    `json:"id"`
-	Metadata        Metadata  `json:"metadata"`
-	Name            string    `json:"name"`
-	ObservedState   string    `json:"observed_state"`
+	CreatedAt     time.Time            `json:"created_at"`
+	Deletion      *SandboxDeletion     `json:"deletion,omitempty"`
+	DesiredState  SandboxDesiredState  `json:"desired_state"`
+	ID            string               `json:"id"`
+	LastAction    *SandboxAction       `json:"last_action,omitempty"`
+	Metadata      Metadata             `json:"metadata"`
+	Name          string               `json:"name"`
+	ObservedAt    *time.Time           `json:"observed_at,omitempty"`
+	ObservedState SandboxObservedState `json:"observed_state"`
+	Resources     *SandboxResources    `json:"resources,omitempty"`
+
+	// Revision Lifecycle intent revision. PATCH name or metadata does not change it.
+	Revision *string `json:"revision,omitempty"`
+
+	// RuntimeId Opaque handle for the current running instance, never caller-selected.
+	RuntimeId       *string   `json:"runtime_id,omitempty"`
 	TemplateBuildID *string   `json:"template_build_id,omitempty"`
 	TemplateDigest  *string   `json:"template_digest,omitempty"`
 	TemplateID      *string   `json:"template_id,omitempty"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
+
+// SandboxAction defines model for SandboxAction.
+type SandboxAction struct {
+	Error     *ActionError        `json:"error,omitempty"`
+	Revision  string              `json:"revision"`
+	Stage     *string             `json:"stage,omitempty"`
+	Status    SandboxActionStatus `json:"status"`
+	Type      SandboxActionType   `json:"type"`
+	UpdatedAt time.Time           `json:"updated_at"`
+}
+
+// SandboxActionStatus defines model for SandboxAction.Status.
+type SandboxActionStatus string
+
+// SandboxActionType defines model for SandboxAction.Type.
+type SandboxActionType string
 
 // SandboxAppLink defines model for SandboxAppLink.
 type SandboxAppLink struct {
@@ -380,7 +545,7 @@ type SandboxAppLink struct {
 	// Generation Opaque runtime generation. When present, the link is valid only for this generation; a Stop/Start/Restore changes it. Clients must not parse it.
 	Generation *string `json:"generation,omitempty"`
 
-	// PairingUrl A ready-to-open URL whose fragment carries the short-lived T3 pairing credential.
+	// PairingUrl A ready-to-open URL whose fragment carries the short-lived Agent workbench pairing credential.
 	PairingUrl string `json:"pairing_url"`
 	SandboxId  string `json:"sandbox_id"`
 
@@ -398,12 +563,64 @@ type SandboxAppLinkService string
 // SandboxAppLinkStatus defines model for SandboxAppLink.Status.
 type SandboxAppLinkStatus string
 
+// SandboxDeletion defines model for SandboxDeletion.
+type SandboxDeletion struct {
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+	RequestedAt time.Time  `json:"requested_at"`
+}
+
+// SandboxDesiredState defines model for SandboxDesiredState.
+type SandboxDesiredState string
+
+// SandboxInjection defines model for SandboxInjection.
+type SandboxInjection struct {
+	Key          string               `json:"key"`
+	Kind         SandboxInjectionKind `json:"kind"`
+	Name         string               `json:"name"`
+	PersistentId *string              `json:"persistent_id,omitempty"`
+	Secret       *struct {
+		ApiKey  *string            `json:"api_key,omitempty"`
+		Headers *map[string]string `json:"headers,omitempty"`
+		Token   *string            `json:"token,omitempty"`
+	} `json:"secret,omitempty"`
+	SecretHint *string `json:"secret_hint,omitempty"`
+	Spec       struct {
+		BaseUrl    *string            `json:"base_url,omitempty"`
+		HeaderName *string            `json:"header_name,omitempty"`
+		IfHeaders  *map[string]string `json:"if_headers,omitempty"`
+		IfQueries  *map[string]string `json:"if_queries,omitempty"`
+		Type       InjectionRuleType  `json:"type"`
+	} `json:"spec"`
+}
+
+// SandboxInjectionKind defines model for SandboxInjection.Kind.
+type SandboxInjectionKind string
+
+// SandboxInjectionState defines model for SandboxInjectionState.
+type SandboxInjectionState struct {
+	Enabled bool               `json:"enabled"`
+	Rules   []SandboxInjection `json:"rules"`
+	Stats   struct {
+		Injected int64 `json:"injected"`
+	} `json:"stats"`
+}
+
 // SandboxList defines model for SandboxList.
 type SandboxList struct {
 	Items  []Sandbox `json:"items"`
 	Limit  int       `json:"limit"`
 	Offset int       `json:"offset"`
 	Total  int64     `json:"total"`
+}
+
+// SandboxObservedState defines model for SandboxObservedState.
+type SandboxObservedState string
+
+// SandboxResources defines model for SandboxResources.
+type SandboxResources struct {
+	DiskBytes   *int64 `json:"disk_bytes,omitempty"`
+	MemoryBytes *int64 `json:"memory_bytes,omitempty"`
+	Vcpu        *int   `json:"vcpu,omitempty"`
 }
 
 // SetTemplateTag defines model for SetTemplateTag.
@@ -472,6 +689,36 @@ type ListSandboxesParams struct {
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
+// MakeSandboxDirectoryJSONBody defines parameters for MakeSandboxDirectory.
+type MakeSandboxDirectoryJSONBody struct {
+	Parents *bool  `json:"parents,omitempty"`
+	Path    string `json:"path"`
+}
+
+// DownloadSandboxFileParams defines parameters for DownloadSandboxFile.
+type DownloadSandboxFileParams struct {
+	// Path Canonical absolute path under /workspace
+	Path string `form:"path" json:"path"`
+}
+
+// UploadSandboxFileMultipartBody defines parameters for UploadSandboxFile.
+type UploadSandboxFileMultipartBody struct {
+	File openapi_types.File `json:"file"`
+}
+
+// UploadSandboxFileParams defines parameters for UploadSandboxFile.
+type UploadSandboxFileParams struct {
+	Overwrite *bool `form:"overwrite,omitempty" json:"overwrite,omitempty"`
+
+	// Path Canonical absolute path under /workspace
+	Path string `form:"path" json:"path"`
+}
+
+// SetSandboxInjectionsJSONBody defines parameters for SetSandboxInjections.
+type SetSandboxInjectionsJSONBody struct {
+	Rules []SandboxInjection `json:"rules"`
+}
+
 // ListSystemTemplatesParams defines parameters for ListSystemTemplates.
 type ListSystemTemplatesParams struct {
 	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
@@ -502,6 +749,15 @@ type CreateSandboxJSONRequestBody = CreateSandbox
 
 // UpdateSandboxJSONRequestBody defines body for UpdateSandbox for application/json ContentType.
 type UpdateSandboxJSONRequestBody = PatchSandbox
+
+// MakeSandboxDirectoryJSONRequestBody defines body for MakeSandboxDirectory for application/json ContentType.
+type MakeSandboxDirectoryJSONRequestBody MakeSandboxDirectoryJSONBody
+
+// UploadSandboxFileMultipartRequestBody defines body for UploadSandboxFile for multipart/form-data ContentType.
+type UploadSandboxFileMultipartRequestBody UploadSandboxFileMultipartBody
+
+// SetSandboxInjectionsJSONRequestBody defines body for SetSandboxInjections for application/json ContentType.
+type SetSandboxInjectionsJSONRequestBody SetSandboxInjectionsJSONBody
 
 // CreateTemplateJSONRequestBody defines body for CreateTemplate for application/json ContentType.
 type CreateTemplateJSONRequestBody = CreateTemplate
@@ -568,6 +824,21 @@ type ServerInterface interface {
 	// CreateSandboxAppLink Create a sandbox application link
 	// (POST /v1/sandboxes/{sandboxID}/app-link)
 	CreateSandboxAppLink(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// MakeSandboxDirectory Create a workspace directory
+	// (POST /v1/sandboxes/{sandboxID}/directories)
+	MakeSandboxDirectory(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// DownloadSandboxFile Download a verified binary file
+	// (GET /v1/sandboxes/{sandboxID}/files)
+	DownloadSandboxFile(w http.ResponseWriter, r *http.Request, sandboxID string, params DownloadSandboxFileParams)
+	// UploadSandboxFile Upload and atomically commit one file
+	// (POST /v1/sandboxes/{sandboxID}/files)
+	UploadSandboxFile(w http.ResponseWriter, r *http.Request, sandboxID string, params UploadSandboxFileParams)
+	// GetSandboxInjections Read masked host-side injection configuration
+	// (GET /v1/sandboxes/{sandboxID}/injections)
+	GetSandboxInjections(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// SetSandboxInjections Replace sandbox host-side injection rules
+	// (PUT /v1/sandboxes/{sandboxID}/injections)
+	SetSandboxInjections(w http.ResponseWriter, r *http.Request, sandboxID string)
 	// StartSandbox Start a stopped sandbox
 	// (POST /v1/sandboxes/{sandboxID}/start)
 	StartSandbox(w http.ResponseWriter, r *http.Request, sandboxID string)
@@ -1030,6 +1301,181 @@ func (siw *ServerInterfaceWrapper) CreateSandboxAppLink(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateSandboxAppLink(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MakeSandboxDirectory operation middleware
+func (siw *ServerInterfaceWrapper) MakeSandboxDirectory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MakeSandboxDirectory(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DownloadSandboxFile operation middleware
+func (siw *ServerInterfaceWrapper) DownloadSandboxFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params DownloadSandboxFileParams
+
+	// ------------- Required query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DownloadSandboxFile(w, r, sandboxID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UploadSandboxFile operation middleware
+func (siw *ServerInterfaceWrapper) UploadSandboxFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params UploadSandboxFileParams
+
+	// ------------- Optional query parameter "overwrite" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "overwrite", r.URL.Query(), &params.Overwrite, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "overwrite"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "overwrite", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UploadSandboxFile(w, r, sandboxID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetSandboxInjections operation middleware
+func (siw *ServerInterfaceWrapper) GetSandboxInjections(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSandboxInjections(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetSandboxInjections operation middleware
+func (siw *ServerInterfaceWrapper) SetSandboxInjections(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetSandboxInjections(w, r, sandboxID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1600,6 +2046,11 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/files", wrapper.DownloadSandboxFile)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/files", wrapper.UploadSandboxFile)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/directories", wrapper.MakeSandboxDirectory)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/injections", wrapper.GetSandboxInjections)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/injections", wrapper.SetSandboxInjections)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/credential-documents/{kind}", wrapper.ListCredentialDocuments)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/credential-documents/{kind}/{id}", wrapper.DeleteCredentialDocument)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/credential-documents/{kind}/{id}", wrapper.PutCredentialDocument)

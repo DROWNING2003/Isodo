@@ -50,4 +50,5 @@ destination = Path(sys.argv[2])
 destination.mkdir(parents=True, exist_ok=True)
 for path in source.glob("*.mdx"):
     shutil.copy2(path, destination / path.name)
+shutil.copy2(source / "meta.json", destination / "meta.json")
 PY

@@ -1,26 +1,32 @@
 ---
 title: Isodo 文档
-description: 为 AI Agent 提供可恢复、可隔离的工作空间。
+description: 同一个 App，在本地 Lima 和云端 Cloud Hypervisor 沙箱中使用真实 AI Agent。
 ---
 
 # 为 Agent 构建安全的工作空间
 
-Isodo 为 AI Agent 和自动化任务提供按需创建的沙箱。每个沙箱拥有独立的运行环境；控制面负责身份认证、资源归属和生命周期管理，运行时负责隔离执行。
+Isodo 是面向个人用户的 AI Agent 安全工作空间。选择本地或云端沙箱，在同一个 App 中授权模型连接、打开 Agent 工作台、让 Agent 编写代码并查看文件与测试结果。
+
+本地使用 Lima，云端使用 Cloud Hypervisor。Agent 在 Linux 虚拟机中运行，真实模型密钥由沙箱外的代理注入；沙箱中的配置文件使用占位符。
 
 ## 从这里开始
 
-- [快速开始](/docs/guides/quickstart)：配置本地服务并发起第一个 API 请求。
+- [快速开始](/docs/guides/quickstart)：启动 App 和依赖，创建第一个沙箱。
+- [演示与当前能力](/docs/guides/demo)：查看已验证的流程、录屏步骤和能力边界。
+- [本地与云端接入](/docs/guides/runtime)：了解 Lima、CHV、S3 与 Preview 的部署关系。
 - [身份认证](/docs/guides/authentication)：了解网页登录会话、Casdoor Bearer Token 和 API Key。
 - [Sandbox 概念](/docs/concepts/sandbox)：了解 Sandbox 的状态、归属和隔离边界。
 - [API Reference](/docs/api-reference)：浏览由公开 OpenAPI 契约生成的接口文档。
+- [MVP 架构与模块分工](/docs/concepts/architecture)：从 App 到 Guest，再到外部模型的实际链路。
 
 ## 产品结构
 
 | 区域 | 职责 |
 | --- | --- |
-| 控制面 | 用户认证、API Key 管理、Sandbox API 和资源归属校验 |
-| Node Runtime | 在节点上协调隔离运行时，并向控制面报告状态 |
-| Guest Agent | 在沙箱内执行命令、管理文件与终端会话 |
-| 文档与 SDK | 从公开 API 契约生成接口参考，并为 SDK 提供稳定边界 |
+| Isodo App | 统一 SandboxClient；本地 IPC、云端 HTTP 只在适配层区分 |
+| Control | OAuth 会话、资源归属、生命周期意图、数据库 outbox 与 Node mTLS |
+| Node Runtime | Lima / CHV 生命周期、Guest RPC、文件转发、Vsock 与凭证代理 |
+| Guest / Agent 工作台 | 非 root 执行、工作区文件、任务、模型调用和终端 |
+| 模板存储 | SeaweedFS S3，按 manifest digest 校验并缓存工件 |
 
-各组件按产品目标设计；具体后端、部署方式和能力以对应指南与 API 契约为准。
+2026-10-25 至 26 日的实机演示已完成云端 App 创建、配对、Codex 真实模型任务、文件产物与终端测试。公开 SDK、App 快照流转、MCP 一键接入和商业套餐仍不属于这次已验收的演示能力。

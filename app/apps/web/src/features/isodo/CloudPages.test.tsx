@@ -69,12 +69,21 @@ vi.mock("../../components/ui/dialog", () => {
   };
 });
 import { CloudOverview, CloudCredentials } from "./CloudPages";
-import { sandboxQueryClient, localSandboxesKey } from "./sandboxQueries";
+import { sandboxQueryClient, localSandboxesKey, platformSandboxesPrefix } from "./sandboxQueries";
 let renderer: ReactTestRenderer;
 afterEach(async () => {
   await act(async () => renderer?.unmount());
   sandboxQueryClient.clear();
   vi.unstubAllGlobals();
+});
+it("offers a start retry after a runtime action failed", async () => {
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  vi.stubGlobal("window", {});
+  sandboxQueryClient.setQueryData([...platformSandboxesPrefix, 0, "test", "test-user"], [
+    { id: "cloud-failed", name: "Retryable sandbox", desired_state: "running", observed_state: "error" },
+  ]);
+  await act(async () => { renderer = create(<CloudOverview />); });
+  expect(renderer.root.findAllByType("button").filter((button) => button.props["aria-label"] === "启动沙箱 Retryable sandbox")).toHaveLength(1);
 });
 it("renders cached local cards while the independent cloud request is still pending", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);

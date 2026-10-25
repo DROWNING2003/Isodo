@@ -16,7 +16,9 @@ export function configureSessionTransport(csrf: () => string | null, unauthorize
 }
 export async function isodoFetch<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
-  if (init.body) headers.set("Content-Type", "application/json");
+  if (typeof init.body === "string" && !headers.has("Content-Type"))
+    headers.set("Content-Type", "application/json");
+  if (init.body instanceof FormData) headers.delete("Content-Type");
   const csrf = getCSRF();
   if (init.method && init.method !== "GET" && csrf) headers.set("X-CSRF-Token", csrf);
   const response = await fetch(path, {
@@ -54,5 +56,7 @@ export async function isodoFetch<T>(path: string, init: RequestInit = {}): Promi
     throw new IsodoAPIError(message, response.status, code ?? "UNKNOWN");
   }
   if (response.status === 204) return undefined as T;
+  if (response.headers.get("Content-Type")?.split(";")[0] === "application/octet-stream")
+    return response.blob() as Promise<T>;
   return response.json() as Promise<T>;
 }

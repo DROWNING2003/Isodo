@@ -18,6 +18,9 @@ import (
 )
 
 func restoreArtifactRuntime(ctx, lifetime context.Context, config RuntimeConfig, artifact, directory string, m templateartifact.Manifest) (_ *Runtime, err error) {
+	if err := requireSnapshotHost(); err != nil {
+		return nil, err
+	}
 	snapshot := m.RuntimeSnapshot
 	if config.CPUs != snapshot.VCPU || config.MemoryBytes != snapshot.MemoryBytes {
 		return nil, errors.New("requested resources do not match runtime snapshot")
@@ -50,6 +53,12 @@ func restoreArtifactRuntime(ctx, lifetime context.Context, config RuntimeConfig,
 			_ = os.RemoveAll(directory)
 		}
 	}()
+	finish := runtimePhase(config, "disk_overlay")
+	instance.socketDirectory, err = os.MkdirTemp("", "isodo-vm-")
+	if err != nil {
+		return nil, err
+	}
+	instance.vsock = filepath.Join(instance.socketDirectory, "vsock")
 	privateSnapshot := filepath.Join(directory, "snapshot")
 	if err = os.Mkdir(privateSnapshot, 0700); err != nil {
 		return nil, err
@@ -57,10 +66,13 @@ func restoreArtifactRuntime(ctx, lifetime context.Context, config RuntimeConfig,
 	// All data remains pinned by private hard links. Cross-filesystem placement
 	// fails explicitly rather than introducing a hidden full-copy path or letting
 	// cache GC remove a running VM's required backing data.
-	for _, pair := range [][2]string{{m.RootFS.Name, "base-root.raw"}, {snapshot.Workspace.Name, "base-workspace.raw"}, {snapshot.Memory.Name, "snapshot/memory-ranges"}, {snapshot.State.Name, "snapshot/state.json"}} {
+	for _, pair := range [][2]string{{m.RootFS.Name, "base-root.raw"}, {snapshot.Workspace.Name, "base-workspace.raw"}, {snapshot.Memory.Name, "snapshot/memory-ranges"}} {
 		if err = os.Link(filepath.Join(artifact, pair[0]), filepath.Join(directory, pair[1])); err != nil {
 			return nil, fmt.Errorf("pin snapshot data; cache and runtime must share a filesystem: %w", err)
 		}
+	}
+	if err = os.Link(filepath.Join(artifact, snapshot.State.Name), filepath.Join(privateSnapshot, "state.json")); err != nil {
+		return nil, err
 	}
 	root, workspace := filepath.Join(directory, "root.qcow2"), filepath.Join(directory, "workspace.qcow2")
 	for i, path := range []string{root, workspace} {
@@ -78,13 +90,16 @@ func restoreArtifactRuntime(ctx, lifetime context.Context, config RuntimeConfig,
 	if err = rewriteArtifactSnapshotConfig(filepath.Join(artifact, snapshot.Config.Name), filepath.Join(privateSnapshot, "config.json"), root, workspace, instance.vsock, serial, payload); err != nil {
 		return nil, err
 	}
-	instance.session, err = startVMM(ctx, lifetime, config.VMMBinary, directory)
+	finish(nil)
+	finish = runtimePhase(config, "snapshot_restore")
+	instance.session, err = startVMMAt(ctx, lifetime, config.VMMBinary, directory, instance.socketDirectory)
 	if err != nil {
 		return nil, err
 	}
 	if err = instance.session.client.Restore(ctx, privateSnapshot, vmm.MemoryRestoreCopyOnWrite); err != nil {
 		return nil, err
 	}
+	finish(err)
 	confirmed, err := hasPrivateSnapshotMapping(instance.session.command.Process.Pid, config.MemoryBytes)
 	if err != nil {
 		return nil, err
@@ -98,7 +113,9 @@ func restoreArtifactRuntime(ctx, lifetime context.Context, config RuntimeConfig,
 	}
 	readyCtx, cancel := context.WithTimeout(ctx, 30*time.Second)
 	defer cancel()
+	finish = runtimePhase(config, "guest_ready")
 	ready, err := guesttransport.WaitTemplateReady(readyCtx, instance.vsock)
+	finish(err)
 	if err != nil {
 		return nil, withLogTail(err, serial)
 	}

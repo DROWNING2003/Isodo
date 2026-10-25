@@ -1,0 +1,64 @@
+---
+title: 本地与云端接入
+description: Electron IPC、Control mTLS、CHV Vsock、模板存储与工作台 Preview 的实际配置。
+---
+
+# 本地与云端接入
+
+## 两条执行链路
+
+```text
+Isodo App / SandboxClient
+  ├─ Electron IPC → 本机 Node → Lima → Guest / Agent 工作台
+  └─ HTTP → Control / PostgreSQL outbox
+              → SSH 转发 + mTLS → 远端 Node → CHV / Vsock → Guest
+
+App → Preview Gateway → Node Relay → Agent 工作台
+Guest → Vsock → Node 出站代理 / 凭证注入 → 模型服务
+```
+
+Control、数据库与 OAuth 入口可以运行在开发者本机，远端只运行独立 Node 和 CHV。SSH 转发只提供传输，仍必须验证 mTLS 的 CA、ServerName 和 Node 身份。
+
+## 本地 Lima
+
+Electron 启动本地 Node sidecar，通过 IPC 使用同构的 Sandbox 管理 DTO；配置文件通过通用 Files 写入，分块上传使用有界消息和 ACK。默认工作区是 `/workspace`，Agent HOME 为 `/workspace/.home`，Codex 配置位于 `/workspace/.codex`。
+
+单独的 `make node-local-t3` 是 Control 调用 Lima 的开发路径。桌面模式已有 sidecar 时，无需为同一 journal 重复启动 Node。
+
+## 云端 CHV 与 S3
+
+Node 使用固定 build 与 manifest digest，从 SeaweedFS S3 获取 kernel、initramfs 和 rootfs，校验后缓存。每个实例拥有独立工作盘，停止保盘，启动产生新的运行身份。
+
+云端镜像需包含匹配架构的 Agent 工作台 bundle、Codex/Claude CLI 和 Guest Agent。Guest init 必须挂载 `devpts`，否则工作台终端的 PTY 分配会失败。完整构建命令在仓库 `images/base/README.md`，Docker 存储部署在 `deploy/seaweedfs/remote-demo.md`。
+
+本轮无网卡 CHV 的模型出站使用 Vsock 代理，不要求新建 bridge/TAP 或修改宿主防火墙。旧的 bridge/NAT 方案是另一种可选部署方式，不能自动应用到已有服务器。
+
+存储健康接口返回 200 还不够；发布模板前应验证真实上传与下载、摘要、匿名拒绝，以及 Node 的 Read/List 凭证不能写入。
+
+## 本机 Preview 与 Cookie
+
+App 的工作台连接先访问短期认证地址，建立 HttpOnly Preview Cookie，再使用现有配对协议完成 descriptor/session/WebSocket 连接。Gateway 只允许配置的 App origin，跨域 HTTP 请求需携带 Cookie。
+
+本机双环境演示使用同站点子域名，浏览器将 `.localhost` 解析到本机，不需要新增公网 DNS：
+
+```dotenv
+# Control 的环境；Casdoor 中登记对应的精确回调。
+ISODO_WEB_ORIGIN=http://app.isodo.localhost:5734
+ISODO_PREVIEW_DOMAIN=isodo.localhost
+ISODO_PREVIEW_SCHEME=http
+# ISODO_PREVIEW_SECRET 使用本地保存的随机秘密，不提交 Git。
+
+# Web 开发进程的环境。
+VITE_ISODO_PREVIEW_DOMAIN=isodo.localhost
+
+# Electron 启动进程的环境。
+ISODO_WEB_URL=http://app.isodo.localhost:5734
+```
+
+设置相应环境后再启动 `make api`、`make web`、`make electron`。Vite 仍监听 `127.0.0.1:5734`，但 App 使用上面的 origin；Casdoor 回调为 `http://app.isodo.localhost:5734/auth/callback`。GitHub Provider 的公网回调仍指向 Casdoor，二者不要混淆。
+
+单独打开 `127.0.0.1` App，再连接另一站点的 Preview 主机，可能被 SameSite Cookie 或 CORS 阻止。不要通过关闭浏览器安全校验或向任意 origin 开放凭证来处理。
+
+## 环境保留
+
+录屏前先检查现有 PID、监听端口和容器，复用已经运行的隔离服务。不要重新运行初始化、格式化或整套部署。只操作明确属于本次测试的 VM、目录与端口。

@@ -118,13 +118,13 @@ func (s *memoryStore) StopSandbox(_ context.Context, tenantID, id string) (sandb
 	return item, nil
 }
 
-func (s *memoryStore) DeleteSandbox(_ context.Context, tenantID, id string) error {
+func (s *memoryStore) DeleteSandbox(_ context.Context, tenantID, id string) (sandbox.Sandbox, error) {
 	item, ok := s.items[id]
 	if !ok || item.TenantID != tenantID {
-		return sandbox.ErrNotFound
+		return sandbox.Sandbox{}, sandbox.ErrNotFound
 	}
 	delete(s.items, id)
-	return nil
+	return item, nil
 }
 
 type fakeAppLink struct {
@@ -282,8 +282,17 @@ func TestSandboxAppLinkAndPreviewGatewayEndToEnd(t *testing.T) {
 	redirectRequest.Header.Set("Authorization", "Bearer user-a")
 	redirectResponse := httptest.NewRecorder()
 	gateway.ServeHTTP(redirectResponse, redirectRequest)
-	if redirectResponse.Code != http.StatusSeeOther || redirectResponse.Header().Get("Location") != link.PairingUrl {
-		t.Fatalf("app redirect status=%d location=%q", redirectResponse.Code, redirectResponse.Header().Get("Location"))
+	redirect, err := url.Parse(redirectResponse.Header().Get("Location"))
+	// Each issuance has its own expiry; crossing a second may legitimately change
+	// the signed credential while keeping the same pairing destination.
+	if err != nil || redirectResponse.Code != http.StatusSeeOther || redirect.Host != parsed.Host || redirect.Scheme != parsed.Scheme || redirect.RawQuery != parsed.RawQuery || redirect.Fragment != parsed.Fragment || !strings.HasPrefix(redirect.Path, "/__isodo/auth/") {
+		t.Fatalf("app redirect did not preserve pairing destination: status=%d", redirectResponse.Code)
+	}
+	freshAuth := httptest.NewRequest(http.MethodGet, redirect.String(), nil)
+	freshResponse := httptest.NewRecorder()
+	gateway.ServeHTTP(freshResponse, freshAuth)
+	if freshResponse.Code != http.StatusFound || len(freshResponse.Result().Cookies()) == 0 {
+		t.Fatalf("redirect credential was not accepted: status=%d", freshResponse.Code)
 	}
 }
 
@@ -316,7 +325,11 @@ func TestSandboxCRUDIsTenantScoped(t *testing.T) {
 			req.Header.Set("Authorization", "Bearer user-b")
 			response := httptest.NewRecorder()
 			mux.ServeHTTP(response, req)
-			if response.Code != http.StatusNotFound || !strings.Contains(response.Body.String(), `"SANDBOX_NOT_FOUND"`) {
+			expected := http.StatusNotFound
+			if request.method == http.MethodDelete {
+				expected = http.StatusNoContent
+			}
+			if response.Code != expected || (expected == http.StatusNotFound && !strings.Contains(response.Body.String(), `"SANDBOX_NOT_FOUND"`)) {
 				t.Errorf("%s %s: status=%d body=%s", request.method, request.path, response.Code, response.Body.String())
 			}
 		}
@@ -350,7 +363,7 @@ func TestSandboxCRUDIsTenantScoped(t *testing.T) {
 		create.Header.Set("Authorization", "Bearer user-a")
 		created := httptest.NewRecorder()
 		mux.ServeHTTP(created, create)
-		if created.Code != http.StatusCreated || !strings.Contains(created.Body.String(), `"observed_state":"requested"`) {
+		if created.Code != http.StatusAccepted || !strings.Contains(created.Body.String(), `"observed_state":"requested"`) {
 			t.Fatalf("create response = %d %s", created.Code, created.Body.String())
 		}
 	})

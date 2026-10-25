@@ -1,111 +1,92 @@
-# 目录与模块职责
+# 目录职责与真实依赖（2026-10-25 Review）
 
-状态：现状与目标布局，2026-10-24。`api/` 存放机器可读接口契约；`specs/` 存放人读的架构与实施规格；原型和 T3 派生应用工作区仍按仓库约定保留在本地并由根 `.gitignore` 排除。
+状态：基于已合并 `e368919` 与当前 worktree 的源码/import/生成脚本核对。本轮只修文档；目录调整是建议，不执行源码移动。
 
-## 当前目录
+旧文档关于“app未跟踪”“仅有Guest proto”“internal尚无Runtime”的描述已过时：当前Git跟踪app约3690个文件，Node/Guest proto与Runtime均有实现。约束与最终接口建议见[统一设计](unified-sandbox-api.md)。
+
+## 1. 当前目录与职责
+
+| 目录 | 真实内容/调用证据 | 结论 |
+| --- | --- | --- |
+| `api/openapi/` | openapi.yaml（auth/session/keys）与openapi-public.yaml（sandbox/template/injection/documents）；scripts/generate-api.sh + tools/openapi配置生成Go/TS | 保留。admin命名不等于Node内部管理面，文档说明边界；无需拆更多schema目录 |
+| `api/proto/isodo/node/v1/` | Control→Node Apply/GetOperation/Inspect/AppLink/RelayPort等 | 保留；新增Files转发时更新机器契约。service边界先明确，不新建部署进程 |
+| `api/proto/isodo/guest/v1/` | Ready/BindRuntime、Files、Process、输入/PTY声明、PortForward | 保留；区分已声明与已实现，不为E2B兼容替换gRPC |
+| `specs/` | 设计、研究与历史目标混排，多个状态/分页/Operation/Redis约束冲突 | 保留路径；加状态/替代关系，统一设计指向单一契约来源，不批量搬动研究文档 |
+| `internal/api/` | OpenAPI生成的admin/public handler/types，protoc生成的node/guest binding | 保留；它是产物，不是api/协议源的重复实现；禁手改 |
+| `internal/control/` | auth、sandbox/template handler、postgres事务与sqlc、operation payload、worker、Node client、injection、preview | 保留；不直接操作VM。preview是用户入口代理，不是宿主出站injection |
+| `internal/httpapi/` | 组合admin/public handlers、认证middleware及路由 | 保留；不属于另一套Control业务，不合并到cmd/main |
+| `internal/node/` | localapi HTTP adapter、orchestrator server/journal、lima manager、guesttransport、vmm、templatebuilder、injection | 保留现有实现；只修少量边界反向依赖 |
+| `internal/guest/agent/` | Guest身份、files/process/port_forward执行与测试 | 保留，Guest不拥有账号权限或宿主VM管理 |
+| `internal/rpcsecurity/` | mTLS凭证与可信peer校验，Node/Control入口使用 | 保留共享低层模块 |
+| `internal/templateartifact/` | manifest/S3/缓存/校验；Node/templatebuilder/CLI调用 | 保留共享工件库，不挪入control或app |
+| `cmd/` | isodo-api/node/guest/template四个进程/工具 | 保留四入口；无须新建isodo-gateway/isodo-orchestrator进程 |
+| `app/apps/web` | Isodo UI、generated API、T3工作台；管理调用仍有本地/云端与mock分支 | 保留，管理收敛到feature内client；不重写T3 |
+| `app/apps/desktop` | Electron、IPC、本地Node生命周期、自动暂停 | 保留，不把Lima控制放回renderer |
+| `app/apps/server` | Guest内T3 Runtime，build:bundle打包server及web client/native依赖 | 保留，它与GoControl是不同业务，不是两个重复服务端 |
+| `app/apps/mobile` | 独立移动入口，仍消费E2B风格sandbox-client等 | 本轮保留；不能因桌面迁移就删除共享包 |
+| `app/packages/contracts` | T3环境/RPC等契约，server/web/mobile/client-runtime消费 | 保留，与Isodo管理OpenAPI不是同一个协议 |
+| `app/packages/client-runtime` | T3连接、授权与运行状态封装 | 保留，不等同于管理SandboxClient |
+| `app/packages/sandbox-client` | 现有E2B形状api/envd/file等及cloud mock，web/mobile/shared依赖 | 不能整体删除或原地假装换成Isodo SDK；按调用方迁移隔离 |
+
+## 2. 真实Go依赖图
+
+依据本轮 `go list -json ./internal/... ./cmd/...`（不是按目录名猜测）：
 
 ```text
-Isodo/
-├── api/
-│   ├── openapi/                 # 控制面与公开 HTTP 契约
-│   └── proto/isodo/guest/v1/    # Guest RPC 契约
-├── app/                         # 本地 Isodo/T3 派生多应用工作区；当前被忽略
-├── artifacts/validation/        # CHV/Vsock 探针的可核对证据
-├── assets/brand/                # 项目共用品牌素材
-├── cmd/isodo-api/               # 控制面进程入口
-├── deploy/                      # Casdoor、PostgreSQL、Redis、SeaweedFS 等本地/部署配置
-├── docs/                        # 产品上下文、产品决策、参赛交付要求
-├── docs-site/                   # Fumadocs 产品文档站；公开 API Reference 从 OpenAPI 生成
-├── internal/
-│   ├── api/{admin,public}/      # OpenAPI 生成的 Go 路由与模型
-│   ├── control/{auth,postgres,sandbox}/ # 当前控制面实现
-│   └── httpapi/                 # API 组合与 HTTP 中间件
-├── migrations/                  # PostgreSQL schema 迁移
-├── prototype/                  # 原型、mock、交互稿和设计历史；当前被忽略
-├── scripts/                     # 生成、环境配置和集成验证脚本
-├── specs/                       # 人读的产品、架构、模块和研究规格
-├── tasks/                       # 实施计划与 TODO
-├── tests/validation/            # 跨模块/环境验证工具
-└── tools/openapi/               # Go 与前端 API 生成器配置
+cmd/isodo-api
+ → control/{auth,injection,postgres,preview,sandbox,sandboxworker,template,orchestrator}
+ → httpapi
+control/orchestrator → api/node + rpcsecurity + grpc（RPC客户端）
+httpapi → generated api/admin/public + control handlers
+control/postgres → control领域接口/payload + dbsqlc + generated api/public
+
+cmd/isodo-node → node/{localapi,orchestrator,lima,injection} + rpcsecurity
+node/localapi → api/node/public + node/injection
+node/orchestrator → api/node/guest + guesttransport + lima + injection
+                  + templatebuilder + templateartifact + localapi（问题边）
+node/templatebuilder → node/{guesttransport,vmm} + api/guest + templateartifact
+
+cmd/isodo-guest → guest/agent + api/guest
+guest/agent → api/guest，不引用control/node/app
 ```
 
-`app/` 是根仓库中的本地目录，不是嵌套 Git 仓库；它包含 web、desktop、mobile、server 和共享 packages。当前根 `.gitignore` 排除了整个目录，因此这些本地工作区内容不会随根仓库提交。`prototype/` 同样是本地原型目录。修改或迁移这两个目录前应先明确是否要纳入正式源码。
+两个orchestrator包不是重复：control/orchestrator是Node RPC client；node/orchestrator是服务实现和编排。可用import alias提高可读性，不为名字相同移动整个包。
 
-## 目标布局
+`cmd/isodo-template` 实际同时包含verify/build/publish及多种T3/API/Node探针，依赖Control、Node、Guest多个层。它是确实偏厚的CLI，但当前真实验收依赖它；第一轮不搬。未来只把可复用probe主体移入既有tests/validation或单独validation包，CLI保留命令调用；发布命令不是测试，不能一并删除。
 
-随着 Runtime 实现逐步进入仓库，后端按可执行入口和业务模块扩展。目录只在对应实现开始时创建，不预建空模块：
+## 3. 职责重复、反向依赖与处理
 
-```text
-Isodo/
-├── api/
-│   ├── openapi/{openapi.yaml,openapi-public.yaml}
-│   └── proto/isodo/{node,guest}/v1/
-├── cmd/{isodo-api,isodo-orchestrator,isodo-guest,isodo-gateway}/
-├── internal/
-│   ├── control/                 # 租户、鉴权、配额、placement、operation/outbox
-│   │   ├── orchestrator/        # Control -> Node 的 gRPC client/连接池
-│   │   └── redis/               # active Sandbox Store、索引、routing catalog adapter
-│   ├── node/                    # gRPC server、宿主资源、journal、reconcile 与 Guest relay
-│   ├── vmm/cloudhypervisor/     # CHV 适配，不承载租户业务
-│   ├── guest/                  # Guest 内 exec、PTY、files
-│   ├── gateway/                # 连接授权、上游适配与秘密读取
-│   └── template/               # manifest、校验与缓存
-├── migrations/
-├── deploy/{nomad,systemd}/
-├── images/                     # Guest 镜像配方、版本和 manifest
-├── docs/                       # 产品上下文、决策和交付说明
-├── docs-site/                  # 面向用户的 Fumadocs 文档站与公开 API Reference
-├── specs/                      # 可实施规格、架构决策和参考研究
-├── tests/                      # 跨模块 contract/integration/e2e/security
-└── artifacts/                  # 可复核的验证证据
-```
+### 3.1 本轮应收敛
 
-正式 Web 目前位于本地工作区 `app/apps/web/`，由 `make web` 启动；其代码尚未纳入根仓库提交。原型统一留在 `prototype/`，正式网页逐项绑定真实能力后再调整源码归属。
+- 同一管理行为在localapi与Control handler各有DTO、错误、分页和状态映射。两adapter仍需存在，统一机器契约/fixtures和小型边界映射，不把认证、持久化或VM后端硬合并。
+- App `features/isodo/sandboxQueries/usePlatformSandbox/CreateSandboxDialog/CloudPages` 直接使用本地IPC和generated client；集中到 `features/isodo/sandboxClient.ts` 与本地/云端adapter。本轮不新建“公共SDK”package或重构所有T3共享包。
+- `node/orchestrator/agent_config.go` 返回 `localapi.AgentConfigWriteResult`，导致Runtime依赖HTTP层。通用Files迁移后消除专用返回类型和localapi import；HTTP映射放adapter，Runtime返回已有Guest FileInfo/写入结果或在既有runtime包内定义最小结果。无需先创建一层framework。
+- `specs/directory-responsibilities.md` 旧状态与源码矛盾。本次更新事实；后续修订lifecycle/guest/工程生成说明的过时条款及链接，避免新增第五份权威API描述。
 
-## 依赖方向
+### 3.2 应保留，不能误判重复
 
-- `cmd/` 只装配配置、依赖和信号处理；业务放在对应 `internal/` 模块。
-- `app/apps/web/` 消费公开 HTTP 契约；不得引用 Node/Guest 内部协议，也不持有宿主地址和权限。
-- `internal/control/` 存储租户期望状态并调用 Node 接口，不直接操作 CHV、systemd 或节点文件。
-- `internal/control/orchestrator/` 负责 Node registry/placement 结果到 gRPC target 的映射、mTLS 连接池、RPC deadline 和错误翻译；HTTP handler 不直接拨号 Node。
-- `internal/control/redis/` 维护 active Sandbox record、tenant index 和过期扫描；Redis 记录仅用于在线状态与路由发现，不作为租户授权依据。
-- `internal/node/` 管理本机资源、VMM、Guest RPC 和宿主网络；不实现全局用户和计费。
-- Node Orchestrator 实现内部 gRPC service，并在真实 Guest Ready/MarkRunning、Stop/Delete/Crash 时发布/撤销 Redis routing record；用 execution_id 做 fencing。
-- `internal/vmm/cloudhypervisor/` 只适配 VMM。进程托管、磁盘和网络事务由 Node 编排。
-- `internal/guest/` 只管理 VM 内进程和文件，不操作宿主资源。
-- `internal/gateway/` 是独立信任边界；平台 API 只处理 credential metadata/connection ID，凭证值走受限入口和 secret store。
-- 模块单元验证与代码同目录；`tests/` 只存跨模块验证，不重复搬运单元验证。
+- `api/` vs `internal/api/`：输入契约与生成产物。
+- GoControl vs T3 `app/apps/server`：用户沙箱管理与Guest内Agent工作台。
+- `control/injection` vs `node/injection`：账号加密材料管理与宿主注入执行，信任边界不同。
+- `control/preview` vs Node apprelay/Guest PortForward：外部授权/HTTP代理、Node转发、Guest loopback连接，各自必要。
+- Node lima/vmm/templatebuilder：Lima命令管理、CHV HTTP VMM适配、工件构建与启动逻辑不等价；templatebuilder/runtime.go确有运行态与构建态同包，但当前调用清晰，无需本轮搬目录。
+- T3 contracts与Isodo OpenAPI：操作协议和管理契约不同，不合并生成流程。
 
-R-01 的 Control API 入口位于 `cmd/isodo-api`；Casdoor 身份验证和本地 tenant 映射位于 `internal/control/auth`，Sandbox HTTP 处理位于 `internal/control/sandbox`，PostgreSQL adapter 位于 `internal/control/postgres`。机器可读契约位于 `api/openapi/`，生成流程见其中的 README。
+### 3.3 延后且需调用证据
 
-## 网页职责
+- mock cloud仍被CloudPages/CloudSidebar/CloudWorkspace及mobile使用；不能仅见mock字样就删包。先移除生产路径fallback和入口，再处理确无调用的mock。
+- 用户要求删除的旧文件面板，须先定位路由/组件引用，删除未使用的面板接线与E2B上传hook；保留仍被T3任务使用的预览/附件/代码编辑部件。
+- `cmd/isodo-template`探针收拢、templatebuilder/runtime包改名、apps/web server build关联整理，作为独立维护项，不阻塞管理/Files。
+- 不创建旧“目标目录”中尚无需求的internal/control/redis、internal/gateway、internal/vmm/cloudhypervisor、isodo-gateway入口，不因整理目录引入组件。
 
-正式网页沿用原型的沙箱主体与页面布局，但逐项绑定真实能力：
+## 4. 生成与App依赖证据
 
-| 页面 | v0.1 接口职责 | 未实现时的呈现 |
-| --- | --- | --- |
-| 沙箱总览/创建 | templates、sandboxes、operations | 显示真实准备/失败状态，不用定时器模拟完成 |
-| 沙箱详情 | observed state、资源、启动/停止/删除 | unknown 与 stopped 分开 |
-| 终端 | terminal 创建、WS 字节流、resize | 未实现的重连明确不可用 |
-| 文件 | 受限路径上传/下载/目录 | 展示后端错误，不假成功 |
-| 安全连接 | 授权、撤销、受控调用审计 | 仅展示已验证的服务适配 |
-| 快照/套餐/对话任务 | 后续契约确定后接入 | 保留在原型演示，不显示为已可用能力 |
+- `scripts/generate-api.sh`：oapi-codegen → internal/api/admin/public；orval → app/apps/web/src/api/admin.generated.ts/public.generated.ts。
+- `tools/openapi/orval.config.mjs`：generated fetch使用web `api/transport.ts:isodoFetch`；它当前默认JSON/same-origin，Files二进制/multipart需在transport边界支持，不能全局强制JSON header。
+- `scripts/generate-proto.sh`：api/proto → internal/api/node/guest；根Makefile聚合生成和docs-site生成。
+- `app/apps/web`依赖client-runtime/contracts/sandbox-client/shared；mobile也依赖这些。server依赖contracts/shared/ssh/tailscale/effect-agent包，build bundle时还构建web并装入Guest工件。
+- `app/apps/desktop`未通过workspace依赖复用web SandboxClient；使用preload IPC。TS DTO生成/共享须明确单一来源，不能由preload手写一套第三种状态。
 
-网页不是新的 Node 控制层；它不自行认定操作成功，operation 完成后重新读取 Sandbox 观测状态。
+## 5. 最小目录调整决定
 
-## 按模块参考上游
-
-| 本项目模块 | 第一参考 | 补充参考 |
-| --- | --- | --- |
-| control / API / 调度 | E2B Runtime API 与架构 | sandboxd 对照单节点边界 |
-| node / CHV adapter | Cocoon Engine | CHV 官方 API 为行为依据 |
-| guest exec / 协议 | Cocoon Agent、silkd 进程表 | E2B envd process proto；Isodo 落地见 [Guest 运行时规格](guest-agent-runtime.md) |
-| guest PTY / files | silkd PTY 实现 | E2B envd；Isodo PTY 实现见 [Guest 运行时规格](guest-agent-runtime.md) |
-| checkpoint / snapshot | CHV 官方文档 + Cocoon | E2B 工件管理思想，非 Firecracker 格式移植 |
-| gateway | 自身威胁模型与真实上游协议 | 不因某仓库有代理就认定其满足全部要求 |
-
-具体许可证、固定版本和源码入口见 [references.md](references.md)。这是代码职责分解，实际成员分工尚未提供。
-
-Guest 接口已定义于 [协议规格](guest-protocol.md) 与 [guest.proto](../api/proto/isodo/guest/v1/guest.proto)；当前 `api/proto/` 仅有 Guest 契约，Node gRPC 契约与 Runtime 实现仍待完成。Control/Node gRPC 与 Redis record 的规范见 [Control API 与 Node RPC 接入契约](control-node-contract.md)。
-
-模板 Registry HTTP 位于 `internal/control/template/`，查询与事务仍由 `internal/control/postgres/` 承担。`internal/templateartifact/` 校验不可变 manifest，并通过 S3 传输模板文件；不处理用户授权或 VM 调度。SeaweedFS 的 Compose 配置与本地凭证初始化见 `deploy/seaweedfs/`。
+本轮不搬顶层目录、不改包名、不新增服务。仅在现有目录中增加统一client/Files adapter及对应tests；删除专用agent-config导致的反向类型依赖；同步specs的事实和替代关系。完整逐文件最小变更清单见[设计修订清单](../docs/reviews/sandbox-api-design-revision-2026-10-25.md)。

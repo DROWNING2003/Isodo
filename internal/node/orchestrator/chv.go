@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"os"
 	"path/filepath"
@@ -12,9 +13,11 @@ import (
 
 	guestv1 "github.com/DROWNING2003/Isodo/internal/api/guest/v1"
 	nodev1 "github.com/DROWNING2003/Isodo/internal/api/node/v1"
+	"github.com/DROWNING2003/Isodo/internal/node/injection"
 	"github.com/DROWNING2003/Isodo/internal/node/templatebuilder"
 	"github.com/DROWNING2003/Isodo/internal/templateartifact"
 	"github.com/google/uuid"
+	"golang.org/x/sync/singleflight"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/proto"
@@ -40,14 +43,19 @@ type RuntimeLauncher func(context.Context, context.Context, templatebuilder.Runt
 type CHVConfig struct {
 	Directory, Binary, Bucket string
 	CacheDirectory            string
+	PreloadDigests            []string
 	Fetcher                   ArtifactFetcher
 	Launch                    RuntimeLauncher
 	Restart                   RuntimeLauncher
 	NetworkBridge             string
 }
 type CHVServer struct {
-	stateLock *os.File
+	injections  *injection.Manager
+	egress      map[string]*egressBinding
+	egressSetup singleflight.Group
+	stateLock   *os.File
 	nodev1.UnimplementedNodeOrchestratorServer
+	nodev1.UnimplementedSandboxRuntimeServer
 	status     *StatusServer
 	config     CHVConfig
 	journal    *limaJournal
@@ -130,7 +138,23 @@ func NewCHVServer(nodeStatus NodeStatus, config CHVConfig) (*CHVServer, error) {
 	ctx, cancel := context.WithCancel(context.Background())
 	life, end := context.WithCancel(context.Background())
 	retained = true
-	return &CHVServer{stateLock: stateLock, status: ss, config: config, journal: journal, busy: make(map[string]bool), live: make(map[string]CHVRuntime), appLinks: make(map[string]*appRelay), allocated: make(map[string]*nodev1.ResourceSpec), networkIPs: make(map[string]string), ctx: ctx, cancel: cancel, life: life, endLife: end}, nil
+	server := &CHVServer{stateLock: stateLock, status: ss, config: config, journal: journal, busy: make(map[string]bool), live: make(map[string]CHVRuntime), appLinks: make(map[string]*appRelay), allocated: make(map[string]*nodev1.ResourceSpec), networkIPs: make(map[string]string), ctx: ctx, cancel: cancel, life: life, endLife: end}
+	preloadCtx, preloadCancel := context.WithTimeout(ctx, 15*time.Minute)
+	defer preloadCancel()
+	for _, digest := range config.PreloadDigests {
+		if !sha256Text.MatchString(digest) {
+			server.Close()
+			return nil, errors.New("invalid template preload digest")
+		}
+		started := time.Now()
+		slog.Info("preloading sandbox template", "manifest_digest", digest)
+		if _, _, err := server.fetchArtifact(preloadCtx, digest); err != nil {
+			server.Close()
+			return nil, fmt.Errorf("preload sandbox template: %w", err)
+		}
+		slog.Info("sandbox template preloaded", "manifest_digest", digest, "duration_ms", time.Since(started).Milliseconds())
+	}
+	return server, nil
 }
 
 func (s *CHVServer) validate(request *nodev1.ApplyOperationRequest) error {
@@ -151,8 +175,8 @@ func (s *CHVServer) validate(request *nodev1.ApplyOperationRequest) error {
 			if request.Network.EgressMode != nodev1.EgressMode_EGRESS_MODE_DENY && request.Network.EgressMode != nodev1.EgressMode_EGRESS_MODE_ALLOW {
 				return status.Error(codes.FailedPrecondition, "unsupported CHV egress mode")
 			}
-			if request.Network.EgressMode == nodev1.EgressMode_EGRESS_MODE_ALLOW && s.config.NetworkBridge == "" {
-				return status.Error(codes.FailedPrecondition, "CHV egress bridge is not configured")
+			if request.Network.EgressMode == nodev1.EgressMode_EGRESS_MODE_ALLOW && s.config.NetworkBridge == "" && s.injections == nil {
+				return status.Error(codes.FailedPrecondition, "CHV egress proxy or bridge is not configured")
 			}
 			if len(request.Network.AllowedCidrs) > 0 {
 				return status.Error(codes.FailedPrecondition, "CHV per-sandbox CIDR allowlists are not implemented")
@@ -227,7 +251,7 @@ func (s *CHVServer) ApplyOperation(ctx context.Context, request *nodev1.ApplyOpe
 		record.VCPU = request.Resources.Vcpu
 		record.MemoryBytes = request.Resources.MemoryBytes
 		record.EgressAllowed = request.Network == nil || request.Network.EgressMode == nodev1.EgressMode_EGRESS_MODE_ALLOW
-		if record.EgressAllowed {
+		if record.EgressAllowed && s.config.NetworkBridge != "" {
 			if err := s.ensureSandboxNetwork(&record); err != nil {
 				return nil, status.Error(codes.Unavailable, "CHV egress network could not be prepared")
 			}
@@ -237,7 +261,7 @@ func (s *CHVServer) ApplyOperation(ctx context.Context, request *nodev1.ApplyOpe
 	}
 	if request.Action == nodev1.OperationAction_OPERATION_ACTION_START {
 		record.State = "starting"
-		if record.EgressAllowed {
+		if record.EgressAllowed && s.config.NetworkBridge != "" {
 			if err := s.ensureSandboxNetwork(&record); err != nil {
 				return nil, status.Error(codes.Unavailable, "CHV egress network could not be prepared")
 			}
@@ -292,6 +316,11 @@ func validateRuntimeIdentity(instance CHVRuntime, record sandboxRecord) error {
 }
 
 func (s *CHVServer) execute(entry journalOperation, record sandboxRecord) {
+	started := time.Now()
+	slog.Info("sandbox operation started", "operation_id", entry.Operation.OperationId, "sandbox_id", record.SandboxID, "queue_ms", time.Since(entry.Operation.CreatedAt.AsTime()).Milliseconds())
+	defer func() {
+		slog.Info("sandbox operation completed", "operation_id", entry.Operation.OperationId, "sandbox_id", record.SandboxID, "action", entry.Operation.Action.String(), "duration_ms", time.Since(started).Milliseconds())
+	}()
 	ctx, cancel := context.WithTimeout(s.ctx, 10*time.Minute)
 	defer cancel()
 	entry.Operation.State = nodev1.OperationState_OPERATION_STATE_RUNNING
@@ -309,7 +338,9 @@ func (s *CHVServer) execute(entry journalOperation, record sandboxRecord) {
 	case nodev1.OperationAction_OPERATION_ACTION_CREATE:
 		var artifact string
 		var verified *templateartifact.Artifact
+		fetchStarted := time.Now()
 		artifact, verified, err = s.fetchArtifact(ctx, entry.Request.TemplateArtifact.ManifestDigest)
+		slog.Info("sandbox artifact fetched", "operation_id", entry.Operation.OperationId, "sandbox_id", record.SandboxID, "duration_ms", time.Since(fetchStarted).Milliseconds(), "succeeded", err == nil)
 		if err == nil {
 			entry.Operation.Stage = nodev1.OperationStage_OPERATION_STAGE_LAUNCH
 			err = s.persistOperation(entry)
@@ -346,6 +377,9 @@ func (s *CHVServer) execute(entry journalOperation, record sandboxRecord) {
 			}
 		} else if entry.Operation.Action == nodev1.OperationAction_OPERATION_ACTION_DELETE {
 			err = os.RemoveAll(filepath.Join(s.config.Directory, "vms", record.SandboxID))
+		}
+		if err == nil && entry.Operation.Action == nodev1.OperationAction_OPERATION_ACTION_DELETE && s.injections != nil {
+			err = s.injections.Delete(record.SandboxID)
 		}
 	}
 	s.mu.Lock()
@@ -490,6 +524,9 @@ func (s *CHVServer) Close() {
 	}
 	for id := range s.appLinks {
 		s.closeAppLinkLocked(id)
+	}
+	for id := range s.egress {
+		s.closeEgressLocked(id)
 	}
 	s.endLife()
 	_ = s.stateLock.Close()

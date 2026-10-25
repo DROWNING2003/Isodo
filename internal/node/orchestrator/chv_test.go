@@ -355,3 +355,31 @@ func TestCHVJournalOwnsOperationAndRequestSnapshots(t *testing.T) {
 		t.Fatal("operation journal retained worker-owned mutable protobufs")
 	}
 }
+
+func TestCHVPreloadCompletesBeforeServing(t *testing.T) {
+	calls := 0
+	config := CHVConfig{Directory: t.TempDir(), Binary: "test", Bucket: "templates", PreloadDigests: []string{strings.Repeat("a", 64)}}
+	config.Fetcher = fetchFunc(func(context.Context, string, string) (string, error) { calls++; return "fixture", nil })
+	server, err := NewCHVServer(testCHVStatus(), config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer server.Close()
+	if calls != 1 {
+		t.Fatalf("Node became available before preloading: calls=%d", calls)
+	}
+}
+
+func TestCHVPreloadFailureReleasesStateLock(t *testing.T) {
+	config := CHVConfig{Directory: t.TempDir(), Binary: "test", Bucket: "templates", PreloadDigests: []string{strings.Repeat("a", 64)}}
+	config.Fetcher = fetchFunc(func(context.Context, string, string) (string, error) { return "", errors.New("unavailable") })
+	if _, err := NewCHVServer(testCHVStatus(), config); err == nil {
+		t.Fatal("served with an unverified preload")
+	}
+	config.PreloadDigests = nil
+	server, err := NewCHVServer(testCHVStatus(), config)
+	if err != nil {
+		t.Fatalf("failed preload retained Node lock: %v", err)
+	}
+	server.Close()
+}

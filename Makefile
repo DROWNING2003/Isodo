@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help init infra-up infra-down infra-ps infra-logs casdoor-ready db-migrate dev-certs api node node-local node-local-t3 web electron mobile t3-app-bundle docs docs-build test test-integration
+.PHONY: help init infra-up infra-down infra-ps infra-logs casdoor-ready db-migrate dev-certs api node node-local node-local-agent-workspace web electron mobile agent-workspace-bundle docs docs-build test test-integration
 
 COMPOSE := docker compose -f compose.yaml
 IOS_SIMULATOR ?= iPhone 17
@@ -10,6 +10,8 @@ API_NODE_BACKEND ?= lima
 # shared setups). Falling back to localhost silently made the container and the
 # API disagree about the issuer, which breaks the OAuth callback handshake.
 API_CASDOOR_ISSUER ?= $(shell . ./.env 2>/dev/null; printf '%s' "$${CASDOOR_ORIGIN:-http://localhost:8000}")
+APP_WEB_ORIGIN ?= $(shell . ./.env 2>/dev/null; printf '%s' "$${ISODO_WEB_URL:-$${ISODO_WEB_ORIGIN:-http://127.0.0.1:5734}}")
+APP_PREVIEW_DOMAIN ?= $(shell . ./.env 2>/dev/null; printf '%s' "$${VITE_ISODO_PREVIEW_DOMAIN:-$${ISODO_PREVIEW_DOMAIN:-}}")
 ISODO_CONTROL_CLIENT_URI ?= spiffe://isodo/control-worker
 GOARCH ?= $(shell go env GOARCH)
 ISODO_GUEST_AGENT_BINARY ?= $(CURDIR)/.tools/isodo-guest-linux-$(GOARCH)
@@ -29,11 +31,11 @@ help:
 	  'make api         Apply schema and run the Go API on 127.0.0.1:8080' \
 	  'make node        Run the Linux Node Orchestrator gRPC endpoint' \
 	  'make node-local  Run the Lima-backed local Node Orchestrator' \
-	  'make node-local-t3 Build T3 and run the Lima-backed Node with T3 and Agent CLIs' \
+	  'make node-local-agent-workspace Build the Agent workspace and run the Lima-backed local Node' \
 	  'make web         Run the Isodo web UI on 127.0.0.1:5733 via pnpm' \
 	  'make electron    Build and open the Isodo desktop app via pnpm' \
 	  'make mobile      Build/install the iOS development app and open Simulator' \
-	  'make t3-app-bundle Build the T3 server bundle with its web application' \
+	  'make agent-workspace-bundle Build the Agent workspace server bundle with its web application' \
 	  'make docs        Run the Fumadocs site on 127.0.0.1:3000' \
 	  'make docs-build  Build the Fumadocs site for production' \
 	  'make generate    Generate OpenAPI bindings, gRPC code and docs' \
@@ -96,6 +98,9 @@ api: db-migrate casdoor-ready dev-certs
 	ISODO_CASDOOR_CLIENT_ID="$$ISODO_CASDOOR_CLIENT_ID" \
 	ISODO_CASDOOR_CLIENT_SECRET="$$ISODO_CASDOOR_CLIENT_SECRET" \
 	ISODO_WEB_ORIGIN="$$ISODO_WEB_ORIGIN" ISODO_LISTEN_ADDR="$$ISODO_LISTEN_ADDR" \
+	ISODO_PREVIEW_DOMAIN="$${ISODO_PREVIEW_DOMAIN:-}" \
+	ISODO_PREVIEW_SECRET="$${ISODO_PREVIEW_SECRET:-}" \
+	ISODO_PREVIEW_SCHEME="$${ISODO_PREVIEW_SCHEME:-http}" \
 	ISODO_INJECTION_KEY="$${ISODO_INJECTION_KEY:-}" \
 	ISODO_INJECTION_KEY_FILE="$${ISODO_INJECTION_KEY_FILE:-./certs/injection.key}" \
 	ISODO_NODE_BACKEND="$(API_NODE_BACKEND)" \
@@ -122,6 +127,7 @@ node:
 	ISODO_CH_BINARY="$${ISODO_CH_BINARY:-cloud-hypervisor}" \
 	ISODO_NODE_STATE_DIR="$${ISODO_NODE_STATE_DIR:-}" \
 	ISODO_TEMPLATE_S3_ENDPOINT="$${ISODO_TEMPLATE_S3_ENDPOINT:-}" \
+	ISODO_TEMPLATE_PRELOAD_DIGESTS="$${ISODO_TEMPLATE_PRELOAD_DIGESTS:-}" \
 	ISODO_TEMPLATE_S3_REGION="$${ISODO_TEMPLATE_S3_REGION:-us-east-1}" \
 	ISODO_TEMPLATE_S3_BUCKET="$${ISODO_TEMPLATE_S3_BUCKET:-}" \
 	SEAWEEDFS_READ_ACCESS_KEY="$${SEAWEEDFS_READ_ACCESS_KEY:-}" \
@@ -139,8 +145,8 @@ node:
 node-local: dev-certs $(ISODO_GUEST_AGENT_BINARY)
 	$(MAKE) node NODE_BACKEND=lima
 
-node-local-t3: dev-certs $(ISODO_GUEST_AGENT_BINARY) t3-app-bundle
-	$(MAKE) node NODE_BACKEND=lima ISODO_T3_SERVER_BUNDLE="$(CURDIR)/app/artifacts/sandbox/t3-server-dist.bundle"
+node-local-agent-workspace: dev-certs $(ISODO_GUEST_AGENT_BINARY) agent-workspace-bundle
+	$(MAKE) node NODE_BACKEND=lima ISODO_T3_SERVER_BUNDLE="$(CURDIR)/app/artifacts/sandbox/agent-workspace-server-dist.bundle"
 
 $(ISODO_GUEST_AGENT_BINARY):
 	mkdir -p "$(dir $@)"
@@ -150,23 +156,23 @@ test:
 	go test ./...
 
 web:
-	cd app && HOST=127.0.0.1 PORT=5734 VITE_BOUNDLY_WEB_SURFACE=full pnpm --filter @t3tools/web dev
+	cd app && HOST=127.0.0.1 PORT=5734 VITE_BOUNDLY_WEB_SURFACE=full VITE_ISODO_PREVIEW_DOMAIN="$(APP_PREVIEW_DOMAIN)" pnpm --filter @t3tools/web dev
 
 electron:
-	cd app && pnpm build:desktop && pnpm --filter @t3tools/desktop start
+	cd app && pnpm build:desktop && ISODO_WEB_URL="$(APP_WEB_ORIGIN)" pnpm --filter @t3tools/desktop start
 
 mobile:
 	cd app && $(MOBILE_DEV_ENV) pnpm --filter @t3tools/mobile exec expo run:ios --device "$(IOS_SIMULATOR)"
 
-# T3's server bundle normally omits dist/client. The Isodo Guest runs headless,
-# so ship the built web application beside bin.mjs for ServerConfig.resolveStaticDir.
-t3-app-bundle:
+# The Agent workspace server bundle normally omits dist/client. The Isodo Guest runs headless,
+# so ship the built web application beside the server entrypoint for static file serving.
+agent-workspace-bundle:
 	cd app && corepack pnpm@11.10.0 --filter @t3tools/web build
 	cd app && corepack pnpm@11.10.0 --filter t3 build:bundle
 	mkdir -p app/apps/server/dist/client
 	cp -R app/apps/web/dist/. app/apps/server/dist/client/
 	mkdir -p app/artifacts/sandbox
-	tar -czf app/artifacts/sandbox/t3-server-dist.bundle --exclude='*.map' -C app/apps/server dist
+	tar -czf app/artifacts/sandbox/agent-workspace-server-dist.bundle --exclude='*.map' -C app/apps/server dist
 
 docs:
 	npm --prefix docs-site run dev -- --hostname 127.0.0.1
