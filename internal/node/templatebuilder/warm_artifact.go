@@ -16,7 +16,12 @@ import (
 
 // BuildWarmArtifact freezes an unbound Guest into a self-contained immutable
 // artifact. It never publishes the Registry or overwrites an existing directory.
-func BuildWarmArtifact(ctx context.Context, binary, source, digest, destination string) (_ string, err error) {
+func BuildWarmArtifact(ctx context.Context, binary, source, digest, destination string) (string, error) {
+	return BuildWarmArtifactWithResources(ctx, binary, source, digest, destination, SnapshotResources{})
+}
+
+// BuildWarmArtifactWithResources captures the hardware requested by runtime creates.
+func BuildWarmArtifactWithResources(ctx context.Context, binary, source, digest, destination string, resources SnapshotResources) (_ string, err error) {
 	source, err = filepath.Abs(source)
 	if err != nil {
 		return "", err
@@ -38,7 +43,7 @@ func BuildWarmArtifact(ctx context.Context, binary, source, digest, destination 
 			_ = os.RemoveAll(destination)
 		}
 	}()
-	frozen, err := freezeTemplate(ctx, binary, source, digest, filepath.Dir(destination))
+	frozen, err := freezeTemplate(ctx, binary, source, digest, filepath.Dir(destination), resources)
 	if err != nil {
 		return "", err
 	}

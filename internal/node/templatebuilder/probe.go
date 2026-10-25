@@ -151,7 +151,10 @@ func boot(ctx context.Context, binary, work string, config vmm.VMConfig) (*vmSes
 }
 
 func bootWithLifetime(ctx, lifetime context.Context, binary, work string, config vmm.VMConfig) (*vmSession, error) {
-	session, err := startVMM(ctx, lifetime, binary, work)
+	return bootWithSockets(ctx, lifetime, binary, work, work, config)
+}
+func bootWithSockets(ctx, lifetime context.Context, binary, work, sockets string, config vmm.VMConfig) (*vmSession, error) {
+	session, err := startVMMAt(ctx, lifetime, binary, work, sockets)
 	if err != nil {
 		return nil, err
 	}
@@ -165,18 +168,21 @@ func bootWithLifetime(ctx, lifetime context.Context, binary, work string, config
 	return session, nil
 }
 func startVMM(ctx, lifetime context.Context, binary, work string) (*vmSession, error) {
+	return startVMMAt(ctx, lifetime, binary, work, work)
+}
+func startVMMAt(ctx, lifetime context.Context, binary, work, sockets string) (*vmSession, error) {
 	log, err := os.OpenFile(filepath.Join(work, "vmm.log"), os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0600)
 	if err != nil {
 		return nil, err
 	}
-	command := exec.CommandContext(lifetime, binary, "--api-socket", filepath.Join(work, "api.sock"))
+	command := exec.CommandContext(lifetime, binary, "--api-socket", filepath.Join(sockets, "api.sock"))
 	command.Stdout = log
 	command.Stderr = log
 	if err = command.Start(); err != nil {
 		log.Close()
 		return nil, err
 	}
-	client, err := vmm.NewClient(filepath.Join(work, "api.sock"))
+	client, err := vmm.NewClient(filepath.Join(sockets, "api.sock"))
 	if err != nil {
 		command.Process.Kill()
 		command.Wait()
@@ -194,7 +200,7 @@ func startVMM(ctx, lifetime context.Context, binary, work string) (*vmSession, e
 		select {
 		case <-session.done:
 			session.kill()
-			return nil, fmt.Errorf("VMM exited during startup: %w", session.waitErr)
+			return nil, withLogTail(fmt.Errorf("VMM exited during startup: %w", session.waitErr), filepath.Join(work, "vmm.log"))
 		case <-apiCtx.Done():
 			session.kill()
 			return nil, apiCtx.Err()
