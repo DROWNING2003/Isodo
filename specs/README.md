@@ -12,6 +12,7 @@
 | [guest-agent-runtime.md](guest-agent-runtime.md) | 首个模块 Guest Agent 的进程表、执行/回收、输出流、PTY master、断连与启动顺序 | 基于 Cocoon silkd/Agent 源码的实现规格；实现与 VM 验收未开始 |
 | [sandbox-lifecycle.md](sandbox-lifecycle.md) | 状态转移、操作 API、operation、去重、所有权、Redis active registry/routing、Create 补偿、Stop/Delete、接管/GC/Nomad | 具体状态表、阶段/故障矩阵与默认预算 |
 | [control-node-contract.md](control-node-contract.md) | Control API/Worker 到 Node Orchestrator 的 mTLS gRPC、异步 operation、Redis active record/index 与 Node routing record | 接入顺序、职责所有权、恢复与错误语义；尚未实现 |
+| [sandbox-endpoints.md](sandbox-endpoints.md) | 应用链接/端口预览的 URL 形状、app-link/preview 契约、generation、token/cookie 与 Lima/CHV 职责 | `POST /app-link`、Lima/CHV relay 与 API Preview Gateway 已实现；`t3-base-005` 4G 已在 jfcs1024 真实 CHV 通过 probe-t3（含出网/DNS）、probe-node-t3（含网络/Stop-Start）和 probe-api-t3（多宿主 relay）；本地 Registry 发布/拉取通过；公开 start/stop、UI、Node relay、CHV 出网已落地；真实 Casdoor/浏览器 E2E、Connection Gateway 凭证注入、preview 通用化未完成 |
 | [network-security.md](network-security.md) | API/mTLS 身份、IPv4/CIDR 默认/优先级、网络顺序、更新撤销、Secretless Gateway | 参数、API 行为、权限边界和安全负例验收 |
 | [template-service.md](template-service.md) | 系统默认模板、个人 public/private 模板、Build/tag、Guest Agent 基础模板与 API | 个人 Registry、Build 队列/tag/fork 和权限已实现并通过 PostgreSQL 集成测试；Build Worker 与真实 base build 待完成 |
 | [template-storage.md](template-storage.md) | manifest、Guest 基线、宿主布局、缓存、两盘、配额、Stop/GC、快照术语 | 模板字段、存储工作流与验收矩阵 |

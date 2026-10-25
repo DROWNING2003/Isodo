@@ -1,0 +1,22 @@
+{
+  "name": "@t3tools/desktop",
+  "version": "0.0.40",
+  "private": true,
+  "type": "module",
+  "main": "dist-electron/main.cjs",
+  "scripts": {
+    "ensure:electron": "node scripts/ensure-electron-runtime.mjs",
+    "dev": "vp pack --watch",
+    "build": "vp pack",
+    "start": "node scripts/start-electron.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "electron": "44.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "productName": "Isodo"
+}

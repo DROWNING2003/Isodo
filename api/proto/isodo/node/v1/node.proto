@@ -15,6 +15,9 @@ service NodeOrchestrator {
   rpc GetOperation(GetOperationRequest) returns (Operation);
   rpc InspectSandbox(InspectSandboxRequest) returns (SandboxInspection);
   rpc CreateSandboxAppLink(CreateSandboxAppLinkRequest) returns (SandboxAppLink);
+  // RelayPort bridges one API-side TCP connection to a Guest port without
+  // exposing a Node-local listener. The first frame must be RelayOpen.
+  rpc RelayPort(stream RelayFrame) returns (stream RelayFrame);
   rpc GetNodeStatus(google.protobuf.Empty) returns (NodeStatus);
   rpc WatchOperation(WatchOperationRequest) returns (stream NodeEvent);
 }
@@ -160,6 +163,21 @@ message NodeStatus {
 message WatchOperationRequest {
   string operation_id = 1;
   uint64 after_sequence = 2;
+}
+
+message RelayOpen {
+  string sandbox_id = 1;
+  uint64 ownership_generation = 2;
+  uint32 port = 3;
+  string service = 4;
+}
+
+message RelayFrame {
+  oneof frame {
+    RelayOpen open = 1;
+    bytes data = 2;
+    bool close_write = 3;
+  }
 }
 
 message NodeEvent {

@@ -1,0 +1,3 @@
+::respawn:/sbin/isodo-agent
+::respawn:/sbin/isodo-t3
+::shutdown:/bin/busybox sync

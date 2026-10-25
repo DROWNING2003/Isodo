@@ -1,0 +1,43 @@
+{
+  "name": "@isodo/workspace",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "prepare": "effect-tsgo patch && vp config --no-agent",
+    "dev": "pnpm --filter @t3tools/web dev",
+    "dev:web": "pnpm --filter @t3tools/web dev",
+    "dev:desktop": "pnpm --filter @t3tools/desktop build && (cd .. && go build -o isodo-node ./cmd/isodo-node) && VITE_DEV_SERVER_URL=${ISODO_WEB_URL:-http://127.0.0.1:5734} pnpm --filter @t3tools/desktop start",
+    "start:mock-update-server": "node scripts/mock-update-server.ts",
+    "screenshots:mobile": "node scripts/mobile-showcase.ts",
+    "icons:export": "node scripts/export-brand-icons.ts",
+    "icons:check": "node scripts/export-brand-icons.ts --check",
+    "licenses:sync": "node scripts/sync-third-party-license-notices.ts",
+    "icons:export:android": "node scripts/export-android-icons.ts",
+    "build": "pnpm --filter @t3tools/web build",
+    "build:desktop": "pnpm --filter @t3tools/web build && pnpm --filter @t3tools/desktop build",
+    "typecheck": "vp run -r --concurrency-limit 2 typecheck",
+    "tc": "vp run -r --concurrency-limit 2 typecheck",
+    "lint": "vp lint --report-unused-disable-directives",
+    "knip": "knip --preprocessor ./scripts/knip-schemas.ts",
+    "knip:check": "knip --include files,dependencies --no-config-hints && knip --workspace apps/server --workspace apps/desktop --workspace apps/web --workspace packages/client-runtime --workspace packages/contracts --workspace packages/effect-acp --workspace packages/effect-codex-app-server --workspace packages/shared --workspace packages/ssh --workspace packages/tailscale --exports --preprocessor ./scripts/knip-schemas.ts --no-config-hints",
+    "knip:production": "knip --production --preprocessor ./scripts/knip-schemas.ts",
+    "lint:mobile": "node scripts/mobile-native-static-check.ts",
+    "test": "vp run -r test",
+    "fmt": "vp fmt",
+    "fmt:check": "vp fmt --check",
+    "clean": "rm -rf node_modules apps/*/node_modules packages/*/node_modules apps/*/dist apps/*/dist-electron packages/*/dist .vite-plus apps/*/.vite-plus packages/*/.vite-plus",
+    "dev:mobile": "pnpm --filter @t3tools/mobile dev",
+    "build:sandbox-runtime": "pnpm --filter t3 build:bundle"
+  },
+  "devDependencies": {
+    "@effect/tsgo": "catalog:",
+    "@types/node": "catalog:",
+    "knip": "6.34.0",
+    "typescript": "catalog:",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": "^24.13.1"
+  },
+  "packageManager": "pnpm@11.10.0"
+}

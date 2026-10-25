@@ -25,7 +25,7 @@ func main() {
 }
 func run() error {
 	if len(os.Args) < 2 {
-		return errors.New("usage: isodo-template verify|probe|probe-bound|probe-node|probe-control|probe-warm|build-warm|probe-artifact|publish-system --dir DIRECTORY --digest SHA256 [--vmm-binary PATH]")
+		return errors.New("usage: isodo-template verify|probe|probe-bound|probe-node|probe-t3|probe-node-t3|probe-api-t3|probe-control|probe-warm|build-warm|probe-artifact|publish-system --dir DIRECTORY --digest SHA256 [--vmm-binary PATH]")
 	}
 	flags := flag.NewFlagSet(os.Args[1], flag.ContinueOnError)
 	directory := flags.String("dir", "", "candidate artifact directory")
@@ -33,12 +33,16 @@ func run() error {
 	binary := flags.String("vmm-binary", "cloud-hypervisor", "Cloud Hypervisor executable")
 	outputDirectory := flags.String("out-dir", "", "new immutable warm artifact directory")
 	cache := flags.String("cache-dir", "", "download artifact with Node read-only S3 credentials before probe-bound")
-	name := flags.String("name", "linux-base", "system catalog name")
-	description := flags.String("description", "Linux workspace with Isodo Guest Agent", "system template description")
+	name := flags.String("name", "base", "system catalog name")
+	description := flags.String("description", "Isodo base workspace with Guest Agent, T3, terminal and files", "system template description")
 	restoreMode := flags.String("restore-mode", "copyonwrite", "probe-warm memory mode: copy, ondemand, copyonwrite")
 	templateID := flags.String("template-id", "", "published template ID for probe-node")
 	buildID := flags.String("build-id", "", "published build ID for probe-node")
 	expected := flags.String("expected-build-id", "", "current catalog build ID required for replacement")
+	networkTap := flags.String("tap", "", "pre-created host TAP for a CHV network probe")
+	networkGuestIP := flags.String("guest-ip", "", "guest address for a CHV network probe, e.g. 10.77.0.2/16")
+	networkGateway := flags.String("gateway", "", "guest default gateway for a CHV network probe")
+	networkBridge := flags.String("network-bridge", "", "host bridge for CHV Node network allocation")
 	if err := flags.Parse(os.Args[2:]); err != nil {
 		return err
 	}
@@ -84,6 +88,30 @@ func run() error {
 		probeCtx, stop := context.WithTimeout(ctx, 15*time.Minute)
 		defer stop()
 		result, err := probeNode(probeCtx, *binary, *cache, *digest, *templateID, *buildID)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(result)
+	case "probe-t3":
+		probeCtx, stop := context.WithTimeout(ctx, 15*time.Minute)
+		defer stop()
+		result, err := probeT3(probeCtx, *binary, *directory, *digest, *networkTap, *networkGuestIP, *networkGateway)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(result)
+	case "probe-node-t3":
+		probeCtx, stop := context.WithTimeout(ctx, 15*time.Minute)
+		defer stop()
+		result, err := probeNodeT3(probeCtx, *binary, *directory, *digest, *networkBridge)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(os.Stdout).Encode(result)
+	case "probe-api-t3":
+		probeCtx, stop := context.WithTimeout(ctx, 15*time.Minute)
+		defer stop()
+		result, err := probeAPIT3(probeCtx, *binary, *directory, *digest)
 		if err != nil {
 			return err
 		}
@@ -162,6 +190,12 @@ func run() error {
 		if err != nil {
 			return fmt.Errorf("system template probe: %w", err)
 		}
+		if err := requireBaseApplication(*name, func() error {
+			_, probeErr := probeT3(publishCtx, *binary, *directory, *digest, *networkTap, *networkGuestIP, *networkGateway)
+			return probeErr
+		}); err != nil {
+			return err
+		}
 		if err = storage.Publish(publishCtx, *directory, *digest); err != nil {
 			return fmt.Errorf("publish system artifact: %w", err)
 		}
@@ -176,4 +210,15 @@ func run() error {
 	default:
 		return errors.New("unknown template command")
 	}
+}
+
+// A default base must be usable by the App, not merely boot a Guest Agent.
+func requireBaseApplication(name string, probe func() error) error {
+	if name != "base" {
+		return nil
+	}
+	if err := probe(); err != nil {
+		return fmt.Errorf("base requires T3 HTTP and pairing readiness: %w", err)
+	}
+	return nil
 }

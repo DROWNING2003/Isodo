@@ -26,6 +26,7 @@ type VMConfig struct {
 	Memory  MemoryConfig  `json:"memory"`
 	Payload PayloadConfig `json:"payload"`
 	Vsock   VsockConfig   `json:"vsock"`
+	Net     []NetConfig   `json:"net,omitempty"`
 	Serial  ConsoleConfig `json:"serial"`
 	Console ConsoleConfig `json:"console"`
 }
@@ -55,6 +56,13 @@ type PayloadConfig struct {
 type VsockConfig struct {
 	CID    uint32 `json:"cid"`
 	Socket string `json:"socket"`
+}
+
+type NetConfig struct {
+	Tap       string `json:"tap"`
+	Mac       string `json:"mac,omitempty"`
+	NumQueues uint32 `json:"num_queues,omitempty"`
+	QueueSize uint32 `json:"queue_size,omitempty"`
 }
 
 type ConsoleConfig struct {

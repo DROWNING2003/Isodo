@@ -31,3 +31,16 @@ func TestRunCreateRejectsLegacyCHVJobWithoutResources(t *testing.T) {
 		t.Fatalf("completion code = %q, want INVALID_RESOURCE_SPEC", queue.code)
 	}
 }
+
+func (q *rejectingQueue) ClaimSandboxLifecycle(context.Context, string, string) (operation.LifecycleJob, error) {
+	return operation.LifecycleJob{}, operation.ErrNoLifecycleOperation
+}
+func (q *rejectingQueue) ExtendSandboxLifecycleLease(context.Context, string, string) error {
+	return nil
+}
+func (q *rejectingQueue) CompleteSandboxLifecycle(context.Context, operation.LifecycleJob, string) error {
+	return nil
+}
+func (q *rejectingQueue) RetrySandboxLifecycle(context.Context, operation.LifecycleJob) error {
+	return nil
+}

@@ -30,6 +30,7 @@ type verifiedArtifactFetcher interface {
 }
 type CHVRuntime interface {
 	Identity() *guestv1.RuntimeIdentity
+	VsockSocket() string
 	Running(context.Context) (bool, error)
 	Stop(context.Context) error
 	Close()
@@ -41,23 +42,27 @@ type CHVConfig struct {
 	CacheDirectory            string
 	Fetcher                   ArtifactFetcher
 	Launch                    RuntimeLauncher
+	Restart                   RuntimeLauncher
+	NetworkBridge             string
 }
 type CHVServer struct {
 	stateLock *os.File
 	nodev1.UnimplementedNodeOrchestratorServer
-	status    *StatusServer
-	config    CHVConfig
-	journal   *limaJournal
-	mu        sync.Mutex
-	closed    bool
-	busy      map[string]bool
-	live      map[string]CHVRuntime
-	allocated map[string]*nodev1.ResourceSpec
-	ctx       context.Context
-	cancel    context.CancelFunc
-	life      context.Context
-	endLife   context.CancelFunc
-	workers   sync.WaitGroup
+	status     *StatusServer
+	config     CHVConfig
+	journal    *limaJournal
+	mu         sync.Mutex
+	closed     bool
+	busy       map[string]bool
+	live       map[string]CHVRuntime
+	appLinks   map[string]*appRelay
+	allocated  map[string]*nodev1.ResourceSpec
+	networkIPs map[string]string
+	ctx        context.Context
+	cancel     context.CancelFunc
+	life       context.Context
+	endLife    context.CancelFunc
+	workers    sync.WaitGroup
 }
 
 var sha256Text = regexp.MustCompile(`^[0-9a-f]{64}$`)
@@ -117,10 +122,15 @@ func NewCHVServer(nodeStatus NodeStatus, config CHVConfig) (*CHVServer, error) {
 			return templatebuilder.StartRuntime(ctx, life, c)
 		}
 	}
+	if config.Restart == nil {
+		config.Restart = func(ctx, life context.Context, c templatebuilder.RuntimeConfig) (CHVRuntime, error) {
+			return templatebuilder.RestartRuntime(ctx, life, c)
+		}
+	}
 	ctx, cancel := context.WithCancel(context.Background())
 	life, end := context.WithCancel(context.Background())
 	retained = true
-	return &CHVServer{stateLock: stateLock, status: ss, config: config, journal: journal, busy: make(map[string]bool), live: make(map[string]CHVRuntime), allocated: make(map[string]*nodev1.ResourceSpec), ctx: ctx, cancel: cancel, life: life, endLife: end}, nil
+	return &CHVServer{stateLock: stateLock, status: ss, config: config, journal: journal, busy: make(map[string]bool), live: make(map[string]CHVRuntime), appLinks: make(map[string]*appRelay), allocated: make(map[string]*nodev1.ResourceSpec), networkIPs: make(map[string]string), ctx: ctx, cancel: cancel, life: life, endLife: end}, nil
 }
 
 func (s *CHVServer) validate(request *nodev1.ApplyOperationRequest) error {
@@ -137,15 +147,23 @@ func (s *CHVServer) validate(request *nodev1.ApplyOperationRequest) error {
 		if r == nil || r.Vcpu == 0 || r.Vcpu > 64 || r.MemoryBytes < 128<<20 || r.MemoryBytes > 4<<30 {
 			return status.Error(codes.InvalidArgument, "explicit supported CPU and memory resources are required")
 		}
-		if request.Network != nil && (request.Network.EgressMode != nodev1.EgressMode_EGRESS_MODE_DENY || len(request.Network.AllowedCidrs) > 0) {
-			return status.Error(codes.FailedPrecondition, "this CHV backend currently supports egress deny only")
+		if request.Network != nil {
+			if request.Network.EgressMode != nodev1.EgressMode_EGRESS_MODE_DENY && request.Network.EgressMode != nodev1.EgressMode_EGRESS_MODE_ALLOW {
+				return status.Error(codes.FailedPrecondition, "unsupported CHV egress mode")
+			}
+			if request.Network.EgressMode == nodev1.EgressMode_EGRESS_MODE_ALLOW && s.config.NetworkBridge == "" {
+				return status.Error(codes.FailedPrecondition, "CHV egress bridge is not configured")
+			}
+			if len(request.Network.AllowedCidrs) > 0 {
+				return status.Error(codes.FailedPrecondition, "CHV per-sandbox CIDR allowlists are not implemented")
+			}
 		}
-	case nodev1.OperationAction_OPERATION_ACTION_STOP, nodev1.OperationAction_OPERATION_ACTION_DELETE:
+	case nodev1.OperationAction_OPERATION_ACTION_STOP, nodev1.OperationAction_OPERATION_ACTION_DELETE, nodev1.OperationAction_OPERATION_ACTION_START:
 		if request.TemplateArtifact != nil || request.TemplateId != "" || request.TemplateBuildId != "" || request.Resources != nil || request.Network != nil {
-			return status.Error(codes.InvalidArgument, "stop/delete must not replace template or runtime configuration")
+			return status.Error(codes.InvalidArgument, "start/stop/delete must not replace template or runtime configuration")
 		}
 	default:
-		return status.Error(codes.Unimplemented, "this CHV backend supports create, stop and delete; disk-preserving start is pending")
+		return status.Error(codes.Unimplemented, "this CHV backend supports create, start, stop and delete")
 	}
 	return nil
 }
@@ -203,6 +221,27 @@ func (s *CHVServer) ApplyOperation(ctx context.Context, request *nodev1.ApplyOpe
 		record.State = "creating"
 		record.TemplateID = request.TemplateId
 		record.TemplateBuildID = request.TemplateBuildId
+		record.TemplateDigest = request.TemplateArtifact.ManifestDigest
+		record.ArtifactBucket = request.TemplateArtifact.Bucket
+		record.ArtifactPrefix = request.TemplateArtifact.Prefix
+		record.VCPU = request.Resources.Vcpu
+		record.MemoryBytes = request.Resources.MemoryBytes
+		record.EgressAllowed = request.Network == nil || request.Network.EgressMode == nodev1.EgressMode_EGRESS_MODE_ALLOW
+		if record.EgressAllowed {
+			if err := s.ensureSandboxNetwork(&record); err != nil {
+				return nil, status.Error(codes.Unavailable, "CHV egress network could not be prepared")
+			}
+		}
+		record.BootID = uuid.NewString()
+		record.GuestEpoch = ""
+	}
+	if request.Action == nodev1.OperationAction_OPERATION_ACTION_START {
+		record.State = "starting"
+		if record.EgressAllowed {
+			if err := s.ensureSandboxNetwork(&record); err != nil {
+				return nil, status.Error(codes.Unavailable, "CHV egress network could not be prepared")
+			}
+		}
 		record.BootID = uuid.NewString()
 		record.GuestEpoch = ""
 	}
@@ -213,6 +252,8 @@ func (s *CHVServer) ApplyOperation(ctx context.Context, request *nodev1.ApplyOpe
 	s.busy[request.SandboxId] = true
 	if request.Action == nodev1.OperationAction_OPERATION_ACTION_CREATE {
 		s.allocated[request.SandboxId] = proto.Clone(request.Resources).(*nodev1.ResourceSpec)
+	} else if request.Action == nodev1.OperationAction_OPERATION_ACTION_START {
+		s.allocated[request.SandboxId] = &nodev1.ResourceSpec{Vcpu: record.VCPU, MemoryBytes: record.MemoryBytes}
 	}
 	saved, _ := s.journal.getOperation(request.OperationId)
 	response := &nodev1.ApplyOperationResponse{Operation: saved.Operation}
@@ -227,6 +268,29 @@ func (s *CHVServer) availableLocked() (uint32, uint64) {
 	}
 	return cpus, memory
 }
+func (s *CHVServer) fetchArtifact(ctx context.Context, digest string) (string, *templateartifact.Artifact, error) {
+	if fetcher, ok := s.config.Fetcher.(verifiedArtifactFetcher); ok {
+		verified, err := fetcher.FetchVerified(ctx, s.config.CacheDirectory, digest)
+		if err != nil {
+			return "", nil, err
+		}
+		return verified.Directory(), verified, nil
+	}
+	artifact, err := s.config.Fetcher.Fetch(ctx, s.config.CacheDirectory, digest)
+	return artifact, nil, err
+}
+
+func validateRuntimeIdentity(instance CHVRuntime, record sandboxRecord) error {
+	if instance == nil {
+		return errors.New("runtime launcher returned no VM")
+	}
+	identity := instance.Identity()
+	if identity == nil || identity.SandboxId != record.SandboxID || identity.OwnershipGeneration != record.Generation || identity.BootId != record.BootID || identity.GuestEpoch == "" {
+		return errors.New("runtime returned an incompatible identity")
+	}
+	return nil
+}
+
 func (s *CHVServer) execute(entry journalOperation, record sandboxRecord) {
 	ctx, cancel := context.WithTimeout(s.ctx, 10*time.Minute)
 	defer cancel()
@@ -245,30 +309,30 @@ func (s *CHVServer) execute(entry journalOperation, record sandboxRecord) {
 	case nodev1.OperationAction_OPERATION_ACTION_CREATE:
 		var artifact string
 		var verified *templateartifact.Artifact
-		if fetcher, ok := s.config.Fetcher.(verifiedArtifactFetcher); ok {
-			verified, err = fetcher.FetchVerified(ctx, s.config.CacheDirectory, entry.Request.TemplateArtifact.ManifestDigest)
-			if err == nil {
-				artifact = verified.Directory()
-			}
-		} else {
-			artifact, err = s.config.Fetcher.Fetch(ctx, s.config.CacheDirectory, entry.Request.TemplateArtifact.ManifestDigest)
-		}
+		artifact, verified, err = s.fetchArtifact(ctx, entry.Request.TemplateArtifact.ManifestDigest)
 		if err == nil {
 			entry.Operation.Stage = nodev1.OperationStage_OPERATION_STAGE_LAUNCH
 			err = s.persistOperation(entry)
 		}
 		if err == nil {
-			instance, err = s.config.Launch(ctx, s.life, templatebuilder.RuntimeConfig{Verified: verified, VMMBinary: s.config.Binary, ArtifactDirectory: artifact, ManifestDigest: entry.Request.TemplateArtifact.ManifestDigest, Directory: filepath.Join(s.config.Directory, "vms", record.SandboxID), Identity: &guestv1.RuntimeIdentity{SandboxId: record.SandboxID, OwnershipGeneration: record.Generation, BootId: record.BootID}, CPUs: entry.Request.Resources.Vcpu, MemoryBytes: entry.Request.Resources.MemoryBytes, DiskBytes: entry.Request.Resources.DiskBytes})
+			instance, err = s.config.Launch(ctx, s.life, templatebuilder.RuntimeConfig{Verified: verified, VMMBinary: s.config.Binary, ArtifactDirectory: artifact, ManifestDigest: entry.Request.TemplateArtifact.ManifestDigest, Directory: filepath.Join(s.config.Directory, "vms", record.SandboxID), Identity: &guestv1.RuntimeIdentity{SandboxId: record.SandboxID, OwnershipGeneration: record.Generation, BootId: record.BootID}, CPUs: entry.Request.Resources.Vcpu, MemoryBytes: entry.Request.Resources.MemoryBytes, DiskBytes: entry.Request.Resources.DiskBytes, Tap: runtimeTap(record), MAC: runtimeMAC(record), GuestIP: runtimeGuestIP(record), Gateway: runtimeGateway(record)})
 		}
 		if err == nil {
-			if instance == nil {
-				err = errors.New("runtime launcher returned no VM")
-			} else {
-				identity := instance.Identity()
-				if identity == nil || identity.SandboxId != record.SandboxID || identity.OwnershipGeneration != record.Generation || identity.BootId != record.BootID || identity.GuestEpoch == "" {
-					err = errors.New("runtime returned an incompatible identity")
-				}
-			}
+			err = validateRuntimeIdentity(instance, record)
+		}
+	case nodev1.OperationAction_OPERATION_ACTION_START:
+		var artifact string
+		var verified *templateartifact.Artifact
+		artifact, verified, err = s.fetchArtifact(ctx, record.TemplateDigest)
+		if err == nil {
+			entry.Operation.Stage = nodev1.OperationStage_OPERATION_STAGE_LAUNCH
+			err = s.persistOperation(entry)
+		}
+		if err == nil {
+			instance, err = s.config.Restart(ctx, s.life, templatebuilder.RuntimeConfig{Verified: verified, VMMBinary: s.config.Binary, ArtifactDirectory: artifact, ManifestDigest: record.TemplateDigest, Directory: filepath.Join(s.config.Directory, "vms", record.SandboxID), Identity: &guestv1.RuntimeIdentity{SandboxId: record.SandboxID, OwnershipGeneration: record.Generation, BootId: record.BootID}, CPUs: record.VCPU, MemoryBytes: record.MemoryBytes, Tap: runtimeTap(record), MAC: runtimeMAC(record), GuestIP: runtimeGuestIP(record), Gateway: runtimeGateway(record)})
+		}
+		if err == nil {
+			err = validateRuntimeIdentity(instance, record)
 		}
 	case nodev1.OperationAction_OPERATION_ACTION_STOP, nodev1.OperationAction_OPERATION_ACTION_DELETE:
 		s.mu.Lock()
@@ -295,12 +359,14 @@ func (s *CHVServer) execute(entry journalOperation, record sandboxRecord) {
 		if instance != nil {
 			instance.Close()
 		}
+		s.closeAppLinkLocked(record.SandboxID)
 		delete(s.live, record.SandboxID)
 		delete(s.allocated, record.SandboxID)
 	} else {
 		entry.Operation.State = nodev1.OperationState_OPERATION_STATE_SUCCEEDED
 		switch entry.Operation.Action {
-		case nodev1.OperationAction_OPERATION_ACTION_CREATE:
+		case nodev1.OperationAction_OPERATION_ACTION_CREATE, nodev1.OperationAction_OPERATION_ACTION_START:
+			s.closeAppLinkLocked(record.SandboxID)
 			identity := instance.Identity()
 			record.State = "running"
 			record.BootID = identity.BootId
@@ -309,12 +375,15 @@ func (s *CHVServer) execute(entry journalOperation, record sandboxRecord) {
 			entry.Operation.Stage = nodev1.OperationStage_OPERATION_STAGE_GUEST_READY
 			s.live[record.SandboxID] = instance
 		case nodev1.OperationAction_OPERATION_ACTION_STOP:
+			s.closeAppLinkLocked(record.SandboxID)
 			record.State = "stopped"
 			record.BootID = ""
 			record.GuestEpoch = ""
 			delete(s.live, record.SandboxID)
 			delete(s.allocated, record.SandboxID)
 		case nodev1.OperationAction_OPERATION_ACTION_DELETE:
+			s.closeAppLinkLocked(record.SandboxID)
+			s.removeSandboxNetwork(record)
 			record.State = "deleted"
 			record.BootID = ""
 			record.GuestEpoch = ""
@@ -361,7 +430,7 @@ func (s *CHVServer) GetNodeStatus(ctx context.Context, e *emptypb.Empty) (*nodev
 	defer s.mu.Unlock()
 	result.AvailableVcpu, result.AvailableMemoryBytes = s.availableLocked()
 	result.Draining = result.Draining || s.closed
-	result.Capabilities = append(result.Capabilities, "sandbox.provider.chv.v1", "sandbox.create.v1", "sandbox.stop.v1", "sandbox.delete.v1", "sandbox.egress.deny.v1")
+	result.Capabilities = append(result.Capabilities, "sandbox.provider.chv.v1", "sandbox.create.v1", "sandbox.start.v1", "sandbox.stop.v1", "sandbox.delete.v1", "sandbox.egress.deny.v1", "sandbox.egress.allow.v1")
 	return result, nil
 }
 func (s *CHVServer) InspectSandbox(ctx context.Context, request *nodev1.InspectSandboxRequest) (*nodev1.SandboxInspection, error) {
@@ -418,6 +487,9 @@ func (s *CHVServer) Close() {
 		if err := s.journal.saveSandbox(record); err != nil {
 			slog.Error("persist CHV shutdown state", "error", err)
 		}
+	}
+	for id := range s.appLinks {
+		s.closeAppLinkLocked(id)
 	}
 	s.endLife()
 	_ = s.stateLock.Close()

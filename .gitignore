@@ -1,6 +1,5 @@
-# Product prototype and imported workbench reference are kept locally for now.
+# Product prototype remains local; the app client is part of the Isodo delivery.
 /prototype/
-/app/
 /.tools/
 /docs-site/node_modules/
 /docs-site/.next/
@@ -33,3 +32,18 @@ coverage.out
 
 # Guest binary is supplied to the isolated base-image build context.
 /images/linux-base/isodo-guest
+
+# Base image build context includes the T3 server bundle.
+/images/base/t3-server-dist.bundle
+
+# Isodo app build/runtime outputs (source remains tracked)
+/app/artifacts/
+/app/apps/desktop/dist-electron/
+/app/apps/mobile/.expo/
+/app/apps/mobile/ios/Pods/
+/app/apps/mobile/ios/build/
+/app/apps/mobile/android/.gradle/
+/app/apps/mobile/android/app/build/
+*.tsbuildinfo
+.turbo/
+.pnpm-store/

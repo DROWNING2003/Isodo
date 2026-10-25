@@ -51,6 +51,39 @@ func (e ForkTemplateVisibility) Valid() bool {
 	}
 }
 
+// Defines values for InjectionRuleType.
+const (
+	Anthropic InjectionRuleType = "anthropic"
+	Gemini    InjectionRuleType = "gemini"
+	Github    InjectionRuleType = "github"
+	Http      InjectionRuleType = "http"
+	Mcp       InjectionRuleType = "mcp"
+	Openai    InjectionRuleType = "openai"
+	Qiniu     InjectionRuleType = "qiniu"
+)
+
+// Valid indicates whether the value is a known member of the InjectionRuleType enum.
+func (e InjectionRuleType) Valid() bool {
+	switch e {
+	case Anthropic:
+		return true
+	case Gemini:
+		return true
+	case Github:
+		return true
+	case Http:
+		return true
+	case Mcp:
+		return true
+	case Openai:
+		return true
+	case Qiniu:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PatchTemplateVisibility.
 const (
 	PatchTemplateVisibilityPrivate PatchTemplateVisibility = "private"
@@ -63,6 +96,48 @@ func (e PatchTemplateVisibility) Valid() bool {
 	case PatchTemplateVisibilityPrivate:
 		return true
 	case PatchTemplateVisibilityPublic:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SandboxAppLinkService.
+const (
+	T3 SandboxAppLinkService = "t3"
+)
+
+// Valid indicates whether the value is a known member of the SandboxAppLinkService enum.
+func (e SandboxAppLinkService) Valid() bool {
+	switch e {
+	case T3:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SandboxAppLinkStatus.
+const (
+	SandboxAppLinkStatusFailed      SandboxAppLinkStatus = "failed"
+	SandboxAppLinkStatusPending     SandboxAppLinkStatus = "pending"
+	SandboxAppLinkStatusReady       SandboxAppLinkStatus = "ready"
+	SandboxAppLinkStatusStopped     SandboxAppLinkStatus = "stopped"
+	SandboxAppLinkStatusUnsupported SandboxAppLinkStatus = "unsupported"
+)
+
+// Valid indicates whether the value is a known member of the SandboxAppLinkStatus enum.
+func (e SandboxAppLinkStatus) Valid() bool {
+	switch e {
+	case SandboxAppLinkStatusFailed:
+		return true
+	case SandboxAppLinkStatusPending:
+		return true
+	case SandboxAppLinkStatusReady:
+		return true
+	case SandboxAppLinkStatusStopped:
+		return true
+	case SandboxAppLinkStatusUnsupported:
 		return true
 	default:
 		return false
@@ -107,25 +182,25 @@ func (e TemplateVisibility) Valid() bool {
 
 // Defines values for TemplateBuildStatus.
 const (
-	Building   TemplateBuildStatus = "building"
-	Failed     TemplateBuildStatus = "failed"
-	Queued     TemplateBuildStatus = "queued"
-	Ready      TemplateBuildStatus = "ready"
-	Validating TemplateBuildStatus = "validating"
+	TemplateBuildStatusBuilding   TemplateBuildStatus = "building"
+	TemplateBuildStatusFailed     TemplateBuildStatus = "failed"
+	TemplateBuildStatusQueued     TemplateBuildStatus = "queued"
+	TemplateBuildStatusReady      TemplateBuildStatus = "ready"
+	TemplateBuildStatusValidating TemplateBuildStatus = "validating"
 )
 
 // Valid indicates whether the value is a known member of the TemplateBuildStatus enum.
 func (e TemplateBuildStatus) Valid() bool {
 	switch e {
-	case Building:
+	case TemplateBuildStatusBuilding:
 		return true
-	case Failed:
+	case TemplateBuildStatusFailed:
 		return true
-	case Queued:
+	case TemplateBuildStatusQueued:
 		return true
-	case Ready:
+	case TemplateBuildStatusReady:
 		return true
-	case Validating:
+	case TemplateBuildStatusValidating:
 		return true
 	default:
 		return false
@@ -163,14 +238,25 @@ type BuildRecipe struct {
 	SourceBuildID string      `json:"source_build_id"`
 }
 
+// CreateInjectionRule defines model for CreateInjectionRule.
+type CreateInjectionRule struct {
+	BaseUrl    *string            `json:"base_url,omitempty"`
+	HeaderName *string            `json:"header_name,omitempty"`
+	IfHeaders  *map[string]string `json:"if_headers,omitempty"`
+	IfQueries  *map[string]string `json:"if_queries,omitempty"`
+	Name       string             `json:"name"`
+	Secret     string             `json:"secret"`
+	Type       InjectionRuleType  `json:"type"`
+}
+
 // CreateSandbox defines model for CreateSandbox.
 type CreateSandbox struct {
 	Metadata Metadata `json:"metadata,omitempty"`
 	Name     string   `json:"name"`
 
-	// Template System catalog name or template UUID, optionally followed by :tag. Defaults to linux-base:default. Resolved to an immutable build at creation.
+	// Template System catalog name or template UUID, optionally followed by :tag. Defaults to base:default. Resolved to an immutable build at creation.
 	//
-	// Example: linux-base
+	// Example: base
 	Template *string `json:"template,omitempty"`
 }
 
@@ -187,8 +273,11 @@ type CreateTemplateVisibility string
 // Error defines model for Error.
 type Error struct {
 	Error struct {
-		Code    string `json:"code"`
-		Message string `json:"message"`
+		Code      string  `json:"code"`
+		Field     *string `json:"field,omitempty"`
+		Message   string  `json:"message"`
+		RequestId *string `json:"request_id,omitempty"`
+		Retryable *bool   `json:"retryable,omitempty"`
 	} `json:"error"`
 }
 
@@ -202,8 +291,55 @@ type ForkTemplate struct {
 // ForkTemplateVisibility defines model for ForkTemplate.Visibility.
 type ForkTemplateVisibility string
 
+// InjectionRule defines model for InjectionRule.
+type InjectionRule struct {
+	BaseUrl    *string            `json:"base_url,omitempty"`
+	CreatedAt  time.Time          `json:"created_at"`
+	HeaderName *string            `json:"header_name,omitempty"`
+	Id         string             `json:"id"`
+	IfHeaders  *map[string]string `json:"if_headers,omitempty"`
+	IfQueries  *map[string]string `json:"if_queries,omitempty"`
+	Name       string             `json:"name"`
+	SecretHint string             `json:"secret_hint"`
+	SecretSet  bool               `json:"secret_set"`
+	Type       InjectionRuleType  `json:"type"`
+	UpdatedAt  time.Time          `json:"updated_at"`
+}
+
+// InjectionRuleList defines model for InjectionRuleList.
+type InjectionRuleList struct {
+	Items []InjectionRule `json:"items"`
+	Total int64           `json:"total"`
+}
+
+// InjectionRuleMaterial defines model for InjectionRuleMaterial.
+type InjectionRuleMaterial struct {
+	ApiKey     *string            `json:"api_key,omitempty"`
+	BaseUrl    *string            `json:"base_url,omitempty"`
+	HeaderName *string            `json:"header_name,omitempty"`
+	Headers    *map[string]string `json:"headers,omitempty"`
+	Id         string             `json:"id"`
+	IfHeaders  *map[string]string `json:"if_headers,omitempty"`
+	IfQueries  *map[string]string `json:"if_queries,omitempty"`
+	Token      *string            `json:"token,omitempty"`
+	Type       InjectionRuleType  `json:"type"`
+}
+
+// InjectionRuleType defines model for InjectionRuleType.
+type InjectionRuleType string
+
 // Metadata defines model for Metadata.
 type Metadata = json.RawMessage
+
+// PatchInjectionRule defines model for PatchInjectionRule.
+type PatchInjectionRule struct {
+	BaseUrl    *string            `json:"base_url,omitempty"`
+	HeaderName *string            `json:"header_name,omitempty"`
+	IfHeaders  *map[string]string `json:"if_headers,omitempty"`
+	IfQueries  *map[string]string `json:"if_queries,omitempty"`
+	Name       *string            `json:"name,omitempty"`
+	Secret     *string            `json:"secret,omitempty"`
+}
 
 // PatchSandbox defines model for PatchSandbox.
 type PatchSandbox struct {
@@ -234,6 +370,33 @@ type Sandbox struct {
 	TemplateID      *string   `json:"template_id,omitempty"`
 	UpdatedAt       time.Time `json:"updated_at"`
 }
+
+// SandboxAppLink defines model for SandboxAppLink.
+type SandboxAppLink struct {
+	// Capabilities Named capabilities available through this application link, for example `terminal` and `files`. Clients must treat unknown values as optional.
+	Capabilities *[]string `json:"capabilities,omitempty"`
+	ExpiresAt    time.Time `json:"expires_at"`
+
+	// Generation Opaque runtime generation. When present, the link is valid only for this generation; a Stop/Start/Restore changes it. Clients must not parse it.
+	Generation *string `json:"generation,omitempty"`
+
+	// PairingUrl A ready-to-open URL whose fragment carries the short-lived T3 pairing credential.
+	PairingUrl string `json:"pairing_url"`
+	SandboxId  string `json:"sandbox_id"`
+
+	// Service The named Guest service this link targets.
+	Service SandboxAppLinkService `json:"service"`
+	Status  SandboxAppLinkStatus  `json:"status"`
+
+	// Url The application base URL. Clients must treat this value as opaque and must not construct or rewrite it.
+	Url string `json:"url"`
+}
+
+// SandboxAppLinkService The named Guest service this link targets.
+type SandboxAppLinkService string
+
+// SandboxAppLinkStatus defines model for SandboxAppLink.Status.
+type SandboxAppLinkStatus string
 
 // SandboxList defines model for SandboxList.
 type SandboxList struct {
@@ -300,6 +463,9 @@ type TemplateTag struct {
 	Tag     string `json:"tag"`
 }
 
+// PutCredentialDocumentJSONBody defines parameters for PutCredentialDocument.
+type PutCredentialDocumentJSONBody map[string]interface{}
+
 // ListSandboxesParams defines parameters for ListSandboxes.
 type ListSandboxesParams struct {
 	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
@@ -321,6 +487,15 @@ type ListTemplatesParams struct {
 
 // ListTemplatesParamsScope defines parameters for ListTemplates.
 type ListTemplatesParamsScope string
+
+// PutCredentialDocumentJSONRequestBody defines body for PutCredentialDocument for application/json ContentType.
+type PutCredentialDocumentJSONRequestBody PutCredentialDocumentJSONBody
+
+// CreateInjectionRuleJSONRequestBody defines body for CreateInjectionRule for application/json ContentType.
+type CreateInjectionRuleJSONRequestBody = CreateInjectionRule
+
+// UpdateInjectionRuleJSONRequestBody defines body for UpdateInjectionRule for application/json ContentType.
+type UpdateInjectionRuleJSONRequestBody = PatchInjectionRule
 
 // CreateSandboxJSONRequestBody defines body for CreateSandbox for application/json ContentType.
 type CreateSandboxJSONRequestBody = CreateSandbox
@@ -345,6 +520,33 @@ type SetTemplateTagJSONRequestBody = SetTemplateTag
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
+	// ListCredentialDocuments List encrypted account credential configurations
+	// (GET /v1/credential-documents/{kind})
+	ListCredentialDocuments(w http.ResponseWriter, r *http.Request, kind string)
+	// DeleteCredentialDocument Delete one configuration owned by the current account
+	// (DELETE /v1/credential-documents/{kind}/{id})
+	DeleteCredentialDocument(w http.ResponseWriter, r *http.Request, kind string, id string)
+	// PutCredentialDocument Save an account Agent configuration or sandbox credential selection
+	// (PUT /v1/credential-documents/{kind}/{id})
+	PutCredentialDocument(w http.ResponseWriter, r *http.Request, kind string, id string)
+	// ListInjectionRules List account injection rules
+	// (GET /v1/injection-rules)
+	ListInjectionRules(w http.ResponseWriter, r *http.Request)
+	// CreateInjectionRule Create an account injection rule
+	// (POST /v1/injection-rules)
+	CreateInjectionRule(w http.ResponseWriter, r *http.Request)
+	// DeleteInjectionRule Delete an account injection rule
+	// (DELETE /v1/injection-rules/{ruleID})
+	DeleteInjectionRule(w http.ResponseWriter, r *http.Request, ruleID string)
+	// GetInjectionRule Get an account injection rule
+	// (GET /v1/injection-rules/{ruleID})
+	GetInjectionRule(w http.ResponseWriter, r *http.Request, ruleID string)
+	// UpdateInjectionRule Update an account injection rule
+	// (PATCH /v1/injection-rules/{ruleID})
+	UpdateInjectionRule(w http.ResponseWriter, r *http.Request, ruleID string)
+	// GetInjectionRuleMaterial Read injection material
+	// (GET /v1/injection-rules/{ruleID}/material)
+	GetInjectionRuleMaterial(w http.ResponseWriter, r *http.Request, ruleID string)
 	// ListSandboxes List sandboxes
 	// (GET /v1/sandboxes)
 	ListSandboxes(w http.ResponseWriter, r *http.Request, params ListSandboxesParams)
@@ -363,6 +565,15 @@ type ServerInterface interface {
 	// GetSandboxApp Open a sandbox application
 	// (GET /v1/sandboxes/{sandboxID}/app)
 	GetSandboxApp(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// CreateSandboxAppLink Create a sandbox application link
+	// (POST /v1/sandboxes/{sandboxID}/app-link)
+	CreateSandboxAppLink(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// StartSandbox Start a stopped sandbox
+	// (POST /v1/sandboxes/{sandboxID}/start)
+	StartSandbox(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// StopSandbox Stop a running sandbox
+	// (POST /v1/sandboxes/{sandboxID}/stop)
+	StopSandbox(w http.ResponseWriter, r *http.Request, sandboxID string)
 	// ListSystemTemplates List platform default templates
 	// (GET /v1/system-templates)
 	ListSystemTemplates(w http.ResponseWriter, r *http.Request, params ListSystemTemplatesParams)
@@ -409,6 +620,234 @@ type ServerInterfaceWrapper struct {
 }
 
 type MiddlewareFunc func(http.Handler) http.Handler
+
+// ListCredentialDocuments operation middleware
+func (siw *ServerInterfaceWrapper) ListCredentialDocuments(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "kind" -------------
+	var kind string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "kind", r.PathValue("kind"), &kind, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListCredentialDocuments(w, r, kind)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteCredentialDocument operation middleware
+func (siw *ServerInterfaceWrapper) DeleteCredentialDocument(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "kind" -------------
+	var kind string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "kind", r.PathValue("kind"), &kind, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteCredentialDocument(w, r, kind, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PutCredentialDocument operation middleware
+func (siw *ServerInterfaceWrapper) PutCredentialDocument(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "kind" -------------
+	var kind string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "kind", r.PathValue("kind"), &kind, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "kind", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "id" -------------
+	var id string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", r.PathValue("id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PutCredentialDocument(w, r, kind, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListInjectionRules operation middleware
+func (siw *ServerInterfaceWrapper) ListInjectionRules(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListInjectionRules(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateInjectionRule operation middleware
+func (siw *ServerInterfaceWrapper) CreateInjectionRule(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateInjectionRule(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteInjectionRule operation middleware
+func (siw *ServerInterfaceWrapper) DeleteInjectionRule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ruleID" -------------
+	var ruleID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ruleID", r.PathValue("ruleID"), &ruleID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ruleID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteInjectionRule(w, r, ruleID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetInjectionRule operation middleware
+func (siw *ServerInterfaceWrapper) GetInjectionRule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ruleID" -------------
+	var ruleID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ruleID", r.PathValue("ruleID"), &ruleID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ruleID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetInjectionRule(w, r, ruleID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateInjectionRule operation middleware
+func (siw *ServerInterfaceWrapper) UpdateInjectionRule(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ruleID" -------------
+	var ruleID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ruleID", r.PathValue("ruleID"), &ruleID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ruleID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateInjectionRule(w, r, ruleID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetInjectionRuleMaterial operation middleware
+func (siw *ServerInterfaceWrapper) GetInjectionRuleMaterial(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "ruleID" -------------
+	var ruleID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "ruleID", r.PathValue("ruleID"), &ruleID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "ruleID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetInjectionRuleMaterial(w, r, ruleID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
 
 // ListSandboxes operation middleware
 func (siw *ServerInterfaceWrapper) ListSandboxes(w http.ResponseWriter, r *http.Request) {
@@ -565,6 +1004,84 @@ func (siw *ServerInterfaceWrapper) GetSandboxApp(w http.ResponseWriter, r *http.
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetSandboxApp(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateSandboxAppLink operation middleware
+func (siw *ServerInterfaceWrapper) CreateSandboxAppLink(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSandboxAppLink(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartSandbox operation middleware
+func (siw *ServerInterfaceWrapper) StartSandbox(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartSandbox(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StopSandbox operation middleware
+func (siw *ServerInterfaceWrapper) StopSandbox(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StopSandbox(w, r, sandboxID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -1083,12 +1600,24 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/credential-documents/{kind}", wrapper.ListCredentialDocuments)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/credential-documents/{kind}/{id}", wrapper.DeleteCredentialDocument)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/credential-documents/{kind}/{id}", wrapper.PutCredentialDocument)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes", wrapper.ListSandboxes)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes", wrapper.CreateSandbox)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}", wrapper.DeleteSandbox)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}", wrapper.GetSandbox)
 	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}", wrapper.UpdateSandbox)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/start", wrapper.StartSandbox)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/stop", wrapper.StopSandbox)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/app", wrapper.GetSandboxApp)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/app-link", wrapper.CreateSandboxAppLink)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/injection-rules", wrapper.ListInjectionRules)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/injection-rules", wrapper.CreateInjectionRule)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/injection-rules/{ruleID}", wrapper.DeleteInjectionRule)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/injection-rules/{ruleID}", wrapper.GetInjectionRule)
+	m.HandleFunc(http.MethodPatch+" "+options.BaseURL+"/v1/injection-rules/{ruleID}", wrapper.UpdateInjectionRule)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/injection-rules/{ruleID}/material", wrapper.GetInjectionRuleMaterial)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/system-templates", wrapper.ListSystemTemplates)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/templates", wrapper.ListTemplates)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/templates", wrapper.CreateTemplate)

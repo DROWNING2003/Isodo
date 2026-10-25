@@ -64,10 +64,15 @@ func (m *Manager) ensureBaseLocked(ctx context.Context) (string, error) {
 	} else if err != nil {
 		return "", err
 	}
+	// BaseInstanceName includes the template and provisioner version, and a
+	// stopped instance with that name is the completed immutable artifact. A
+	// previous EnsureBase call only leaves the Base stopped after all readiness
+	// checks pass, so reusing it avoids a second boot on every template build.
+	if strings.EqualFold(instance.Status, "stopped") {
+		return baseName, nil
+	}
 	if !strings.EqualFold(instance.Status, "running") {
-		if _, err := m.run(ctx, "start", "--yes", baseName); err != nil {
-			return "", fmt.Errorf("start Isodo Lima Base for provisioning: %w", err)
-		}
+		return "", fmt.Errorf("Isodo Lima Base has unexpected status %q", instance.Status)
 	}
 	if _, err := m.run(ctx, "shell", baseName, "--", "sudo", "test", "-f", "/var/lib/isodo/base-ready"); err != nil {
 		if err := m.provisionGuestLocked(ctx, baseName); err != nil {
@@ -166,14 +171,14 @@ func (m *Manager) SandboxAppHostPort(sandboxID string) (uint16, error) {
 
 // SandboxAppURL gives each Sandbox a separate host-only origin so browser
 // cookies for its T3 session cannot collide with another Sandbox's cookies.
+// The host follows the public <port>-<sandboxID> shape so the T3 client can
+// recover the Sandbox ID without a second API call.
 func (m *Manager) SandboxAppURL(sandboxID string) (string, error) {
 	port, err := m.SandboxAppHostPort(sandboxID)
 	if err != nil {
 		return "", err
 	}
-	digest := sha256.Sum256([]byte("sandbox-app-host:" + sandboxID))
-	host := hex.EncodeToString(digest[:8])
-	return fmt.Sprintf("http://sbx-%s.localhost:%d", host, port), nil
+	return fmt.Sprintf("http://%d-%s.localhost:%d", t3ServerGuestPort, sandboxID, port), nil
 }
 
 func (m *Manager) provisionT3RuntimeLocked(ctx context.Context, instanceName string) error {
@@ -271,6 +276,9 @@ WantedBy=multi-user.target
 		{"sudo", "install", "-d", "-m", "0755", "/var/lib/isodo"},
 		{"sudo", "systemctl", "daemon-reload"},
 		{"sudo", "systemctl", "enable", "--now", "isodo-guest.service"},
+		// The readiness marker must never outlive a failed service start: a Base
+		// whose Guest Agent is not running cannot serve any sandbox.
+		{"sudo", "sh", "-c", "systemctl is-active --quiet isodo-guest.service || { journalctl -u isodo-guest.service -n 5 --no-pager; exit 1; }"},
 		{"sudo", "install", "-m", "0444", "/dev/null", "/var/lib/isodo/base-ready"},
 	}
 	for _, command := range commands {

@@ -21,6 +21,22 @@ type ApiKey struct {
 	RevokedAt  pgtype.Timestamptz
 }
 
+type InjectionRule struct {
+	ID               pgtype.UUID
+	TenantID         pgtype.UUID
+	Name             string
+	Type             string
+	BaseUrl          string
+	HeaderName       string
+	IfHeaders        []byte
+	IfQueries        []byte
+	SecretNonce      []byte
+	SecretCiphertext []byte
+	SecretHint       string
+	CreatedAt        pgtype.Timestamptz
+	UpdatedAt        pgtype.Timestamptz
+}
+
 type OauthState struct {
 	StateHash    []byte
 	Nonce        string
@@ -29,18 +45,39 @@ type OauthState struct {
 }
 
 type Sandbox struct {
-	ID              pgtype.UUID
-	TenantID        pgtype.UUID
-	Name            string
-	Metadata        []byte
-	DesiredState    string
-	ObservedState   string
-	CreatedAt       pgtype.Timestamptz
-	UpdatedAt       pgtype.Timestamptz
-	DeletedAt       pgtype.Timestamptz
-	TemplateID      pgtype.UUID
-	TemplateBuildID pgtype.UUID
-	TemplateDigest  *string
+	ID                  pgtype.UUID
+	TenantID            pgtype.UUID
+	Name                string
+	Metadata            []byte
+	DesiredState        string
+	ObservedState       string
+	CreatedAt           pgtype.Timestamptz
+	UpdatedAt           pgtype.Timestamptz
+	DeletedAt           pgtype.Timestamptz
+	TemplateID          pgtype.UUID
+	TemplateBuildID     pgtype.UUID
+	TemplateDigest      *string
+	NodeID              *string
+	OwnershipGeneration int64
+	Revision            int64
+}
+
+type SandboxOperation struct {
+	ID             pgtype.UUID
+	TenantID       pgtype.UUID
+	SandboxID      pgtype.UUID
+	NodeID         *string
+	Action         string
+	RequestHash    string
+	Payload        []byte
+	Status         string
+	Stage          string
+	Attempt        int32
+	LeaseOwner     *string
+	LeaseExpiresAt pgtype.Timestamptz
+	ErrorCode      string
+	CreatedAt      pgtype.Timestamptz
+	UpdatedAt      pgtype.Timestamptz
 }
 
 type SystemTemplateCatalog struct {

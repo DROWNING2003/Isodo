@@ -1,0 +1,57 @@
+{
+  "name": "t3",
+  "version": "0.0.40",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/pingdotgg/t3code",
+    "directory": "apps/server"
+  },
+  "bin": {
+    "t3": "./dist/bin.mjs"
+  },
+  "files": [
+    "dist"
+  ],
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch src/bin.ts",
+    "build:bundle": "NATIVE_ARCH=${TARGET_ARCH:-$(node -p 'process.arch')} && case \"$NATIVE_ARCH\" in arm64|x64) ;; *) echo \"Unsupported sandbox bundle architecture: $NATIVE_ARCH\" >&2; exit 1 ;; esac && vp pack && vp pack src/service-launcher.ts --out-dir dist --no-clean && (cd ../web && pnpm build) && cp -RL ../web/dist dist/client && mkdir -p dist/node_modules/@ff-labs dist/node_modules/@yuuang && cp -RL node_modules/@ff-labs/fff-node dist/node_modules/@ff-labs/ && cp -RL ../../node_modules/.pnpm/node_modules/ffi-rs dist/node_modules/ && cp -RL ../../node_modules/.pnpm/node_modules/@ff-labs/fff-bin-linux-$NATIVE_ARCH-gnu dist/node_modules/@ff-labs/ && cp -RL ../../node_modules/.pnpm/node_modules/@yuuang/ffi-rs-linux-$NATIVE_ARCH-gnu dist/node_modules/@yuuang/ && bash scripts/build-sandbox-node-pty.sh dist && mkdir -p ../../artifacts/sandbox && tar -czf ../../artifacts/sandbox/t3-server-dist.bundle --exclude='*.map' -C . dist",
+    "start": "node dist/bin.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vp test run"
+  },
+  "dependencies": {
+    "@anthropic-ai/claude-agent-sdk": "^0.3.260",
+    "@effect/platform-bun": "catalog:",
+    "@effect/platform-node": "catalog:",
+    "@effect/platform-node-shared": "catalog:",
+    "@effect/sql-sqlite-bun": "catalog:",
+    "@ff-labs/fff-node": "0.9.4",
+    "@opencode-ai/sdk": "^1.3.15",
+    "effect": "catalog:",
+    "msgpackr-extract": "3.0.4",
+    "node-pty": "^1.1.0",
+    "stream-chain": "^4.2.5",
+    "stream-json": "3.6.0",
+    "yaml": "catalog:",
+    "yauzl": "^3.4.0"
+  },
+  "devDependencies": {
+    "@effect/vitest": "catalog:",
+    "@t3tools/contracts": "workspace:*",
+    "@t3tools/shared": "workspace:*",
+    "@t3tools/ssh": "workspace:*",
+    "@t3tools/tailscale": "workspace:*",
+    "@t3tools/web": "workspace:*",
+    "@types/bun": "1.3.14",
+    "@types/node": "catalog:",
+    "@types/yauzl": "^3.4.0",
+    "effect-acp": "workspace:*",
+    "effect-codex-app-server": "workspace:*",
+    "vite-plus": "catalog:"
+  },
+  "engines": {
+    "node": "^22.16 || ^23.11 || >=24.10"
+  }
+}

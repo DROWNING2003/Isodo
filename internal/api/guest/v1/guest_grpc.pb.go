@@ -36,6 +36,7 @@ const (
 	GuestService_MakeDirectory_FullMethodName    = "/isodo.guest.v1.GuestService/MakeDirectory"
 	GuestService_Remove_FullMethodName           = "/isodo.guest.v1.GuestService/Remove"
 	GuestService_Move_FullMethodName             = "/isodo.guest.v1.GuestService/Move"
+	GuestService_PortForward_FullMethodName      = "/isodo.guest.v1.GuestService/PortForward"
 )
 
 // GuestServiceClient is the client API for GuestService service.
@@ -62,6 +63,8 @@ type GuestServiceClient interface {
 	MakeDirectory(ctx context.Context, in *MakeDirectoryRequest, opts ...grpc.CallOption) (*FileInfo, error)
 	Remove(ctx context.Context, in *RemoveRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	Move(ctx context.Context, in *MoveRequest, opts ...grpc.CallOption) (*FileInfo, error)
+	// Relay one approved Guest-local TCP service over the existing Guest transport.
+	PortForward(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PortForwardFrame, PortForwardFrame], error)
 }
 
 type guestServiceClient struct {
@@ -256,6 +259,19 @@ func (c *guestServiceClient) Move(ctx context.Context, in *MoveRequest, opts ...
 	return out, nil
 }
 
+func (c *guestServiceClient) PortForward(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[PortForwardFrame, PortForwardFrame], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &GuestService_ServiceDesc.Streams[4], GuestService_PortForward_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[PortForwardFrame, PortForwardFrame]{ClientStream: stream}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GuestService_PortForwardClient = grpc.BidiStreamingClient[PortForwardFrame, PortForwardFrame]
+
 // GuestServiceServer is the server API for GuestService service.
 // All implementations must embed UnimplementedGuestServiceServer
 // for forward compatibility.
@@ -280,6 +296,8 @@ type GuestServiceServer interface {
 	MakeDirectory(context.Context, *MakeDirectoryRequest) (*FileInfo, error)
 	Remove(context.Context, *RemoveRequest) (*emptypb.Empty, error)
 	Move(context.Context, *MoveRequest) (*FileInfo, error)
+	// Relay one approved Guest-local TCP service over the existing Guest transport.
+	PortForward(grpc.BidiStreamingServer[PortForwardFrame, PortForwardFrame]) error
 	mustEmbedUnimplementedGuestServiceServer()
 }
 
@@ -337,6 +355,9 @@ func (UnimplementedGuestServiceServer) Remove(context.Context, *RemoveRequest) (
 }
 func (UnimplementedGuestServiceServer) Move(context.Context, *MoveRequest) (*FileInfo, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method Move not implemented")
+}
+func (UnimplementedGuestServiceServer) PortForward(grpc.BidiStreamingServer[PortForwardFrame, PortForwardFrame]) error {
+	return status.Errorf(codes.Unimplemented, "method PortForward not implemented")
 }
 func (UnimplementedGuestServiceServer) mustEmbedUnimplementedGuestServiceServer() {}
 func (UnimplementedGuestServiceServer) testEmbeddedByValue()                      {}
@@ -611,6 +632,13 @@ func _GuestService_Move_Handler(srv interface{}, ctx context.Context, dec func(i
 	return interceptor(ctx, in, info, handler)
 }
 
+func _GuestService_PortForward_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(GuestServiceServer).PortForward(&grpc.GenericServerStream[PortForwardFrame, PortForwardFrame]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type GuestService_PortForwardServer = grpc.BidiStreamingServer[PortForwardFrame, PortForwardFrame]
+
 // GuestService_ServiceDesc is the grpc.ServiceDesc for GuestService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -687,6 +715,12 @@ var GuestService_ServiceDesc = grpc.ServiceDesc{
 		{
 			StreamName:    "WriteFile",
 			Handler:       _GuestService_WriteFile_Handler,
+			ClientStreams: true,
+		},
+		{
+			StreamName:    "PortForward",
+			Handler:       _GuestService_PortForward_Handler,
+			ServerStreams: true,
 			ClientStreams: true,
 		},
 	},

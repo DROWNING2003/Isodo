@@ -15,6 +15,7 @@ import (
 	guestv1 "github.com/DROWNING2003/Isodo/internal/api/guest/v1"
 	"github.com/DROWNING2003/Isodo/internal/api/node/v1"
 	"github.com/DROWNING2003/Isodo/internal/node/guesttransport"
+	"github.com/DROWNING2003/Isodo/internal/node/injection"
 	"github.com/DROWNING2003/Isodo/internal/node/lima"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -29,6 +30,7 @@ type LimaServer struct {
 	status      *StatusServer
 	manager     *lima.Manager
 	t3Bundle    string
+	injections  *injection.Manager
 	journal     *limaJournal
 	applyMu     sync.Mutex
 	inFlight    map[string]string
@@ -47,6 +49,16 @@ type sandboxRecord struct {
 	TemplateBuildID string         `json:"template_build_id,omitempty"`
 	BootID          string         `json:"boot_id,omitempty"`
 	GuestEpoch      string         `json:"guest_epoch,omitempty"`
+	TemplateDigest  string         `json:"template_digest,omitempty"`
+	ArtifactBucket  string         `json:"artifact_bucket,omitempty"`
+	ArtifactPrefix  string         `json:"artifact_prefix,omitempty"`
+	VCPU            uint32         `json:"vcpu,omitempty"`
+	MemoryBytes     uint64         `json:"memory_bytes,omitempty"`
+	EgressAllowed   bool           `json:"egress_allowed,omitempty"`
+	Tap             string         `json:"tap,omitempty"`
+	MAC             string         `json:"mac,omitempty"`
+	GuestIP         string         `json:"guest_ip,omitempty"`
+	Gateway         string         `json:"gateway,omitempty"`
 	Resources       lima.Resources `json:"resources"`
 	UpdatedAt       time.Time      `json:"updated_at"`
 }

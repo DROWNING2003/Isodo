@@ -2889,6 +2889,336 @@ func (x *MoveRequest) GetOverwrite() bool {
 	return false
 }
 
+type PortForwardOpen struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Identity      *RuntimeIdentity       `protobuf:"bytes,1,opt,name=identity,proto3" json:"identity,omitempty"`
+	RequestId     string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	Port          uint32                 `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
+	Service       string                 `protobuf:"bytes,4,opt,name=service,proto3" json:"service,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PortForwardOpen) Reset() {
+	*x = PortForwardOpen{}
+	mi := &file_isodo_guest_v1_guest_proto_msgTypes[38]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortForwardOpen) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortForwardOpen) ProtoMessage() {}
+
+func (x *PortForwardOpen) ProtoReflect() protoreflect.Message {
+	mi := &file_isodo_guest_v1_guest_proto_msgTypes[38]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortForwardOpen.ProtoReflect.Descriptor instead.
+func (*PortForwardOpen) Descriptor() ([]byte, []int) {
+	return file_isodo_guest_v1_guest_proto_rawDescGZIP(), []int{38}
+}
+
+func (x *PortForwardOpen) GetIdentity() *RuntimeIdentity {
+	if x != nil {
+		return x.Identity
+	}
+	return nil
+}
+
+func (x *PortForwardOpen) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+func (x *PortForwardOpen) GetPort() uint32 {
+	if x != nil {
+		return x.Port
+	}
+	return 0
+}
+
+func (x *PortForwardOpen) GetService() string {
+	if x != nil {
+		return x.Service
+	}
+	return ""
+}
+
+type PortForwardData struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Data          []byte                 `protobuf:"bytes,1,opt,name=data,proto3" json:"data,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PortForwardData) Reset() {
+	*x = PortForwardData{}
+	mi := &file_isodo_guest_v1_guest_proto_msgTypes[39]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortForwardData) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortForwardData) ProtoMessage() {}
+
+func (x *PortForwardData) ProtoReflect() protoreflect.Message {
+	mi := &file_isodo_guest_v1_guest_proto_msgTypes[39]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortForwardData.ProtoReflect.Descriptor instead.
+func (*PortForwardData) Descriptor() ([]byte, []int) {
+	return file_isodo_guest_v1_guest_proto_rawDescGZIP(), []int{39}
+}
+
+func (x *PortForwardData) GetData() []byte {
+	if x != nil {
+		return x.Data
+	}
+	return nil
+}
+
+type PortForwardEnd struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Write         bool                   `protobuf:"varint,1,opt,name=write,proto3" json:"write,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PortForwardEnd) Reset() {
+	*x = PortForwardEnd{}
+	mi := &file_isodo_guest_v1_guest_proto_msgTypes[40]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortForwardEnd) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortForwardEnd) ProtoMessage() {}
+
+func (x *PortForwardEnd) ProtoReflect() protoreflect.Message {
+	mi := &file_isodo_guest_v1_guest_proto_msgTypes[40]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortForwardEnd.ProtoReflect.Descriptor instead.
+func (*PortForwardEnd) Descriptor() ([]byte, []int) {
+	return file_isodo_guest_v1_guest_proto_rawDescGZIP(), []int{40}
+}
+
+func (x *PortForwardEnd) GetWrite() bool {
+	if x != nil {
+		return x.Write
+	}
+	return false
+}
+
+type PortForwardError struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Code          string                 `protobuf:"bytes,1,opt,name=code,proto3" json:"code,omitempty"`
+	Message       string                 `protobuf:"bytes,2,opt,name=message,proto3" json:"message,omitempty"`
+	Retryable     bool                   `protobuf:"varint,3,opt,name=retryable,proto3" json:"retryable,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PortForwardError) Reset() {
+	*x = PortForwardError{}
+	mi := &file_isodo_guest_v1_guest_proto_msgTypes[41]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortForwardError) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortForwardError) ProtoMessage() {}
+
+func (x *PortForwardError) ProtoReflect() protoreflect.Message {
+	mi := &file_isodo_guest_v1_guest_proto_msgTypes[41]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortForwardError.ProtoReflect.Descriptor instead.
+func (*PortForwardError) Descriptor() ([]byte, []int) {
+	return file_isodo_guest_v1_guest_proto_rawDescGZIP(), []int{41}
+}
+
+func (x *PortForwardError) GetCode() string {
+	if x != nil {
+		return x.Code
+	}
+	return ""
+}
+
+func (x *PortForwardError) GetMessage() string {
+	if x != nil {
+		return x.Message
+	}
+	return ""
+}
+
+func (x *PortForwardError) GetRetryable() bool {
+	if x != nil {
+		return x.Retryable
+	}
+	return false
+}
+
+type PortForwardFrame struct {
+	state protoimpl.MessageState `protogen:"open.v1"`
+	// Types that are valid to be assigned to Frame:
+	//
+	//	*PortForwardFrame_Open
+	//	*PortForwardFrame_Data
+	//	*PortForwardFrame_End
+	//	*PortForwardFrame_Error
+	Frame         isPortForwardFrame_Frame `protobuf_oneof:"frame"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *PortForwardFrame) Reset() {
+	*x = PortForwardFrame{}
+	mi := &file_isodo_guest_v1_guest_proto_msgTypes[42]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *PortForwardFrame) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*PortForwardFrame) ProtoMessage() {}
+
+func (x *PortForwardFrame) ProtoReflect() protoreflect.Message {
+	mi := &file_isodo_guest_v1_guest_proto_msgTypes[42]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use PortForwardFrame.ProtoReflect.Descriptor instead.
+func (*PortForwardFrame) Descriptor() ([]byte, []int) {
+	return file_isodo_guest_v1_guest_proto_rawDescGZIP(), []int{42}
+}
+
+func (x *PortForwardFrame) GetFrame() isPortForwardFrame_Frame {
+	if x != nil {
+		return x.Frame
+	}
+	return nil
+}
+
+func (x *PortForwardFrame) GetOpen() *PortForwardOpen {
+	if x != nil {
+		if x, ok := x.Frame.(*PortForwardFrame_Open); ok {
+			return x.Open
+		}
+	}
+	return nil
+}
+
+func (x *PortForwardFrame) GetData() *PortForwardData {
+	if x != nil {
+		if x, ok := x.Frame.(*PortForwardFrame_Data); ok {
+			return x.Data
+		}
+	}
+	return nil
+}
+
+func (x *PortForwardFrame) GetEnd() *PortForwardEnd {
+	if x != nil {
+		if x, ok := x.Frame.(*PortForwardFrame_End); ok {
+			return x.End
+		}
+	}
+	return nil
+}
+
+func (x *PortForwardFrame) GetError() *PortForwardError {
+	if x != nil {
+		if x, ok := x.Frame.(*PortForwardFrame_Error); ok {
+			return x.Error
+		}
+	}
+	return nil
+}
+
+type isPortForwardFrame_Frame interface {
+	isPortForwardFrame_Frame()
+}
+
+type PortForwardFrame_Open struct {
+	Open *PortForwardOpen `protobuf:"bytes,1,opt,name=open,proto3,oneof"`
+}
+
+type PortForwardFrame_Data struct {
+	Data *PortForwardData `protobuf:"bytes,2,opt,name=data,proto3,oneof"`
+}
+
+type PortForwardFrame_End struct {
+	End *PortForwardEnd `protobuf:"bytes,3,opt,name=end,proto3,oneof"`
+}
+
+type PortForwardFrame_Error struct {
+	Error *PortForwardError `protobuf:"bytes,4,opt,name=error,proto3,oneof"`
+}
+
+func (*PortForwardFrame_Open) isPortForwardFrame_Frame() {}
+
+func (*PortForwardFrame_Data) isPortForwardFrame_Frame() {}
+
+func (*PortForwardFrame_End) isPortForwardFrame_Frame() {}
+
+func (*PortForwardFrame_Error) isPortForwardFrame_Frame() {}
+
 // Serialized in google.rpc.Status.details as this protobuf Any type.
 // Transport uses standard gRPC status codes; no fabricated exit event on RPC failure.
 type ErrorDetail struct {
@@ -2903,7 +3233,7 @@ type ErrorDetail struct {
 
 func (x *ErrorDetail) Reset() {
 	*x = ErrorDetail{}
-	mi := &file_isodo_guest_v1_guest_proto_msgTypes[38]
+	mi := &file_isodo_guest_v1_guest_proto_msgTypes[43]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -2915,7 +3245,7 @@ func (x *ErrorDetail) String() string {
 func (*ErrorDetail) ProtoMessage() {}
 
 func (x *ErrorDetail) ProtoReflect() protoreflect.Message {
-	mi := &file_isodo_guest_v1_guest_proto_msgTypes[38]
+	mi := &file_isodo_guest_v1_guest_proto_msgTypes[43]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -2928,7 +3258,7 @@ func (x *ErrorDetail) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use ErrorDetail.ProtoReflect.Descriptor instead.
 func (*ErrorDetail) Descriptor() ([]byte, []int) {
-	return file_isodo_guest_v1_guest_proto_rawDescGZIP(), []int{38}
+	return file_isodo_guest_v1_guest_proto_rawDescGZIP(), []int{43}
 }
 
 func (x *ErrorDetail) GetCode() string {
@@ -3178,7 +3508,27 @@ const file_isodo_guest_v1_guest_proto_rawDesc = "" +
 	"request_id\x18\x02 \x01(\tR\trequestId\x12\x16\n" +
 	"\x06source\x18\x03 \x01(\tR\x06source\x12 \n" +
 	"\vdestination\x18\x04 \x01(\tR\vdestination\x12\x1c\n" +
-	"\toverwrite\x18\x05 \x01(\bR\toverwrite\"t\n" +
+	"\toverwrite\x18\x05 \x01(\bR\toverwrite\"\x9b\x01\n" +
+	"\x0fPortForwardOpen\x12;\n" +
+	"\bidentity\x18\x01 \x01(\v2\x1f.isodo.guest.v1.RuntimeIdentityR\bidentity\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\x12\x12\n" +
+	"\x04port\x18\x03 \x01(\rR\x04port\x12\x18\n" +
+	"\aservice\x18\x04 \x01(\tR\aservice\"%\n" +
+	"\x0fPortForwardData\x12\x12\n" +
+	"\x04data\x18\x01 \x01(\fR\x04data\"&\n" +
+	"\x0ePortForwardEnd\x12\x14\n" +
+	"\x05write\x18\x01 \x01(\bR\x05write\"^\n" +
+	"\x10PortForwardError\x12\x12\n" +
+	"\x04code\x18\x01 \x01(\tR\x04code\x12\x18\n" +
+	"\amessage\x18\x02 \x01(\tR\amessage\x12\x1c\n" +
+	"\tretryable\x18\x03 \x01(\bR\tretryable\"\xf7\x01\n" +
+	"\x10PortForwardFrame\x125\n" +
+	"\x04open\x18\x01 \x01(\v2\x1f.isodo.guest.v1.PortForwardOpenH\x00R\x04open\x125\n" +
+	"\x04data\x18\x02 \x01(\v2\x1f.isodo.guest.v1.PortForwardDataH\x00R\x04data\x122\n" +
+	"\x03end\x18\x03 \x01(\v2\x1e.isodo.guest.v1.PortForwardEndH\x00R\x03end\x128\n" +
+	"\x05error\x18\x04 \x01(\v2 .isodo.guest.v1.PortForwardErrorH\x00R\x05errorB\a\n" +
+	"\x05frame\"t\n" +
 	"\vErrorDetail\x12\x12\n" +
 	"\x04code\x18\x01 \x01(\tR\x04code\x12\x1d\n" +
 	"\n" +
@@ -3209,7 +3559,8 @@ const file_isodo_guest_v1_guest_proto_rawDesc = "" +
 	"\x15FILE_KIND_UNSPECIFIED\x10\x00\x12\x15\n" +
 	"\x11FILE_KIND_REGULAR\x10\x01\x12\x17\n" +
 	"\x13FILE_KIND_DIRECTORY\x10\x02\x12\x15\n" +
-	"\x11FILE_KIND_SYMLINK\x10\x032\xea\t\n" +
+	"\x11FILE_KIND_SYMLINK\x10\x032\xc1\n" +
+	"\n" +
 	"\fGuestService\x12>\n" +
 	"\x05Ready\x12\x16.google.protobuf.Empty\x1a\x1d.isodo.guest.v1.ReadyResponse\x12P\n" +
 	"\vBindRuntime\x12\".isodo.guest.v1.BindRuntimeRequest\x1a\x1d.isodo.guest.v1.ReadyResponse\x12P\n" +
@@ -3228,7 +3579,8 @@ const file_isodo_guest_v1_guest_proto_rawDesc = "" +
 	"\tWriteFile\x12\x1e.isodo.guest.v1.WriteFileFrame\x1a!.isodo.guest.v1.WriteFileResponse(\x01\x12O\n" +
 	"\rMakeDirectory\x12$.isodo.guest.v1.MakeDirectoryRequest\x1a\x18.isodo.guest.v1.FileInfo\x12?\n" +
 	"\x06Remove\x12\x1d.isodo.guest.v1.RemoveRequest\x1a\x16.google.protobuf.Empty\x12=\n" +
-	"\x04Move\x12\x1b.isodo.guest.v1.MoveRequest\x1a\x18.isodo.guest.v1.FileInfoB=Z;github.com/DROWNING2003/Isodo/internal/api/guest/v1;guestv1b\x06proto3"
+	"\x04Move\x12\x1b.isodo.guest.v1.MoveRequest\x1a\x18.isodo.guest.v1.FileInfo\x12U\n" +
+	"\vPortForward\x12 .isodo.guest.v1.PortForwardFrame\x1a .isodo.guest.v1.PortForwardFrame(\x010\x01B=Z;github.com/DROWNING2003/Isodo/internal/api/guest/v1;guestv1b\x06proto3"
 
 var (
 	file_isodo_guest_v1_guest_proto_rawDescOnce sync.Once
@@ -3243,7 +3595,7 @@ func file_isodo_guest_v1_guest_proto_rawDescGZIP() []byte {
 }
 
 var file_isodo_guest_v1_guest_proto_enumTypes = make([]protoimpl.EnumInfo, 5)
-var file_isodo_guest_v1_guest_proto_msgTypes = make([]protoimpl.MessageInfo, 40)
+var file_isodo_guest_v1_guest_proto_msgTypes = make([]protoimpl.MessageInfo, 45)
 var file_isodo_guest_v1_guest_proto_goTypes = []any{
 	(ProcessState)(0),               // 0: isodo.guest.v1.ProcessState
 	(ExitReason)(0),                 // 1: isodo.guest.v1.ExitReason
@@ -3288,10 +3640,15 @@ var file_isodo_guest_v1_guest_proto_goTypes = []any{
 	(*MakeDirectoryRequest)(nil),    // 40: isodo.guest.v1.MakeDirectoryRequest
 	(*RemoveRequest)(nil),           // 41: isodo.guest.v1.RemoveRequest
 	(*MoveRequest)(nil),             // 42: isodo.guest.v1.MoveRequest
-	(*ErrorDetail)(nil),             // 43: isodo.guest.v1.ErrorDetail
-	nil,                             // 44: isodo.guest.v1.StartProcessRequest.EnvEntry
-	(*timestamppb.Timestamp)(nil),   // 45: google.protobuf.Timestamp
-	(*emptypb.Empty)(nil),           // 46: google.protobuf.Empty
+	(*PortForwardOpen)(nil),         // 43: isodo.guest.v1.PortForwardOpen
+	(*PortForwardData)(nil),         // 44: isodo.guest.v1.PortForwardData
+	(*PortForwardEnd)(nil),          // 45: isodo.guest.v1.PortForwardEnd
+	(*PortForwardError)(nil),        // 46: isodo.guest.v1.PortForwardError
+	(*PortForwardFrame)(nil),        // 47: isodo.guest.v1.PortForwardFrame
+	(*ErrorDetail)(nil),             // 48: isodo.guest.v1.ErrorDetail
+	nil,                             // 49: isodo.guest.v1.StartProcessRequest.EnvEntry
+	(*timestamppb.Timestamp)(nil),   // 50: google.protobuf.Timestamp
+	(*emptypb.Empty)(nil),           // 51: google.protobuf.Empty
 }
 var file_isodo_guest_v1_guest_proto_depIdxs = []int32{
 	5,  // 0: isodo.guest.v1.ReadyResponse.identity:type_name -> isodo.guest.v1.RuntimeIdentity
@@ -3299,15 +3656,15 @@ var file_isodo_guest_v1_guest_proto_depIdxs = []int32{
 	5,  // 2: isodo.guest.v1.ProcessRef.identity:type_name -> isodo.guest.v1.RuntimeIdentity
 	5,  // 3: isodo.guest.v1.StartProcessRequest.identity:type_name -> isodo.guest.v1.RuntimeIdentity
 	10, // 4: isodo.guest.v1.StartProcessRequest.command:type_name -> isodo.guest.v1.Command
-	44, // 5: isodo.guest.v1.StartProcessRequest.env:type_name -> isodo.guest.v1.StartProcessRequest.EnvEntry
+	49, // 5: isodo.guest.v1.StartProcessRequest.env:type_name -> isodo.guest.v1.StartProcessRequest.EnvEntry
 	11, // 6: isodo.guest.v1.StartProcessRequest.pty:type_name -> isodo.guest.v1.TerminalSize
 	1,  // 7: isodo.guest.v1.ProcessExit.reason:type_name -> isodo.guest.v1.ExitReason
-	45, // 8: isodo.guest.v1.ProcessExit.exited_at:type_name -> google.protobuf.Timestamp
+	50, // 8: isodo.guest.v1.ProcessExit.exited_at:type_name -> google.protobuf.Timestamp
 	9,  // 9: isodo.guest.v1.ProcessInfo.ref:type_name -> isodo.guest.v1.ProcessRef
 	0,  // 10: isodo.guest.v1.ProcessInfo.state:type_name -> isodo.guest.v1.ProcessState
-	45, // 11: isodo.guest.v1.ProcessInfo.started_at:type_name -> google.protobuf.Timestamp
+	50, // 11: isodo.guest.v1.ProcessInfo.started_at:type_name -> google.protobuf.Timestamp
 	13, // 12: isodo.guest.v1.ProcessInfo.result:type_name -> isodo.guest.v1.ProcessExit
-	45, // 13: isodo.guest.v1.ProcessInfo.result_expires_at:type_name -> google.protobuf.Timestamp
+	50, // 13: isodo.guest.v1.ProcessInfo.result_expires_at:type_name -> google.protobuf.Timestamp
 	5,  // 14: isodo.guest.v1.ListProcessesRequest.identity:type_name -> isodo.guest.v1.RuntimeIdentity
 	14, // 15: isodo.guest.v1.ListProcessesResponse.processes:type_name -> isodo.guest.v1.ProcessInfo
 	9,  // 16: isodo.guest.v1.SubscribeProcessRequest.ref:type_name -> isodo.guest.v1.ProcessRef
@@ -3320,13 +3677,13 @@ var file_isodo_guest_v1_guest_proto_depIdxs = []int32{
 	21, // 23: isodo.guest.v1.ProcessEvent.heartbeat:type_name -> isodo.guest.v1.Heartbeat
 	9,  // 24: isodo.guest.v1.InputOpen.ref:type_name -> isodo.guest.v1.ProcessRef
 	23, // 25: isodo.guest.v1.InputFrame.open:type_name -> isodo.guest.v1.InputOpen
-	46, // 26: isodo.guest.v1.InputFrame.close_stdin:type_name -> google.protobuf.Empty
+	51, // 26: isodo.guest.v1.InputFrame.close_stdin:type_name -> google.protobuf.Empty
 	9,  // 27: isodo.guest.v1.ResizeTerminalRequest.ref:type_name -> isodo.guest.v1.ProcessRef
 	11, // 28: isodo.guest.v1.ResizeTerminalRequest.size:type_name -> isodo.guest.v1.TerminalSize
 	9,  // 29: isodo.guest.v1.SignalProcessRequest.ref:type_name -> isodo.guest.v1.ProcessRef
 	3,  // 30: isodo.guest.v1.SignalProcessRequest.signal:type_name -> isodo.guest.v1.ProcessSignal
 	4,  // 31: isodo.guest.v1.FileInfo.kind:type_name -> isodo.guest.v1.FileKind
-	45, // 32: isodo.guest.v1.FileInfo.modified_at:type_name -> google.protobuf.Timestamp
+	50, // 32: isodo.guest.v1.FileInfo.modified_at:type_name -> google.protobuf.Timestamp
 	5,  // 33: isodo.guest.v1.StatRequest.identity:type_name -> isodo.guest.v1.RuntimeIdentity
 	5,  // 34: isodo.guest.v1.ListDirectoryRequest.identity:type_name -> isodo.guest.v1.RuntimeIdentity
 	28, // 35: isodo.guest.v1.ListDirectoryResponse.entries:type_name -> isodo.guest.v1.FileInfo
@@ -3342,43 +3699,50 @@ var file_isodo_guest_v1_guest_proto_depIdxs = []int32{
 	5,  // 45: isodo.guest.v1.MakeDirectoryRequest.identity:type_name -> isodo.guest.v1.RuntimeIdentity
 	5,  // 46: isodo.guest.v1.RemoveRequest.identity:type_name -> isodo.guest.v1.RuntimeIdentity
 	5,  // 47: isodo.guest.v1.MoveRequest.identity:type_name -> isodo.guest.v1.RuntimeIdentity
-	46, // 48: isodo.guest.v1.GuestService.Ready:input_type -> google.protobuf.Empty
-	7,  // 49: isodo.guest.v1.GuestService.BindRuntime:input_type -> isodo.guest.v1.BindRuntimeRequest
-	12, // 50: isodo.guest.v1.GuestService.StartProcess:input_type -> isodo.guest.v1.StartProcessRequest
-	9,  // 51: isodo.guest.v1.GuestService.GetProcess:input_type -> isodo.guest.v1.ProcessRef
-	15, // 52: isodo.guest.v1.GuestService.ListProcesses:input_type -> isodo.guest.v1.ListProcessesRequest
-	17, // 53: isodo.guest.v1.GuestService.SubscribeProcess:input_type -> isodo.guest.v1.SubscribeProcessRequest
-	24, // 54: isodo.guest.v1.GuestService.WriteInput:input_type -> isodo.guest.v1.InputFrame
-	26, // 55: isodo.guest.v1.GuestService.ResizeTerminal:input_type -> isodo.guest.v1.ResizeTerminalRequest
-	27, // 56: isodo.guest.v1.GuestService.SignalProcess:input_type -> isodo.guest.v1.SignalProcessRequest
-	29, // 57: isodo.guest.v1.GuestService.Stat:input_type -> isodo.guest.v1.StatRequest
-	30, // 58: isodo.guest.v1.GuestService.ListDirectory:input_type -> isodo.guest.v1.ListDirectoryRequest
-	32, // 59: isodo.guest.v1.GuestService.ReadFile:input_type -> isodo.guest.v1.ReadFileRequest
-	38, // 60: isodo.guest.v1.GuestService.WriteFile:input_type -> isodo.guest.v1.WriteFileFrame
-	40, // 61: isodo.guest.v1.GuestService.MakeDirectory:input_type -> isodo.guest.v1.MakeDirectoryRequest
-	41, // 62: isodo.guest.v1.GuestService.Remove:input_type -> isodo.guest.v1.RemoveRequest
-	42, // 63: isodo.guest.v1.GuestService.Move:input_type -> isodo.guest.v1.MoveRequest
-	6,  // 64: isodo.guest.v1.GuestService.Ready:output_type -> isodo.guest.v1.ReadyResponse
-	6,  // 65: isodo.guest.v1.GuestService.BindRuntime:output_type -> isodo.guest.v1.ReadyResponse
-	14, // 66: isodo.guest.v1.GuestService.StartProcess:output_type -> isodo.guest.v1.ProcessInfo
-	14, // 67: isodo.guest.v1.GuestService.GetProcess:output_type -> isodo.guest.v1.ProcessInfo
-	16, // 68: isodo.guest.v1.GuestService.ListProcesses:output_type -> isodo.guest.v1.ListProcessesResponse
-	22, // 69: isodo.guest.v1.GuestService.SubscribeProcess:output_type -> isodo.guest.v1.ProcessEvent
-	25, // 70: isodo.guest.v1.GuestService.WriteInput:output_type -> isodo.guest.v1.InputAck
-	46, // 71: isodo.guest.v1.GuestService.ResizeTerminal:output_type -> google.protobuf.Empty
-	46, // 72: isodo.guest.v1.GuestService.SignalProcess:output_type -> google.protobuf.Empty
-	28, // 73: isodo.guest.v1.GuestService.Stat:output_type -> isodo.guest.v1.FileInfo
-	31, // 74: isodo.guest.v1.GuestService.ListDirectory:output_type -> isodo.guest.v1.ListDirectoryResponse
-	36, // 75: isodo.guest.v1.GuestService.ReadFile:output_type -> isodo.guest.v1.ReadFileFrame
-	39, // 76: isodo.guest.v1.GuestService.WriteFile:output_type -> isodo.guest.v1.WriteFileResponse
-	28, // 77: isodo.guest.v1.GuestService.MakeDirectory:output_type -> isodo.guest.v1.FileInfo
-	46, // 78: isodo.guest.v1.GuestService.Remove:output_type -> google.protobuf.Empty
-	28, // 79: isodo.guest.v1.GuestService.Move:output_type -> isodo.guest.v1.FileInfo
-	64, // [64:80] is the sub-list for method output_type
-	48, // [48:64] is the sub-list for method input_type
-	48, // [48:48] is the sub-list for extension type_name
-	48, // [48:48] is the sub-list for extension extendee
-	0,  // [0:48] is the sub-list for field type_name
+	5,  // 48: isodo.guest.v1.PortForwardOpen.identity:type_name -> isodo.guest.v1.RuntimeIdentity
+	43, // 49: isodo.guest.v1.PortForwardFrame.open:type_name -> isodo.guest.v1.PortForwardOpen
+	44, // 50: isodo.guest.v1.PortForwardFrame.data:type_name -> isodo.guest.v1.PortForwardData
+	45, // 51: isodo.guest.v1.PortForwardFrame.end:type_name -> isodo.guest.v1.PortForwardEnd
+	46, // 52: isodo.guest.v1.PortForwardFrame.error:type_name -> isodo.guest.v1.PortForwardError
+	51, // 53: isodo.guest.v1.GuestService.Ready:input_type -> google.protobuf.Empty
+	7,  // 54: isodo.guest.v1.GuestService.BindRuntime:input_type -> isodo.guest.v1.BindRuntimeRequest
+	12, // 55: isodo.guest.v1.GuestService.StartProcess:input_type -> isodo.guest.v1.StartProcessRequest
+	9,  // 56: isodo.guest.v1.GuestService.GetProcess:input_type -> isodo.guest.v1.ProcessRef
+	15, // 57: isodo.guest.v1.GuestService.ListProcesses:input_type -> isodo.guest.v1.ListProcessesRequest
+	17, // 58: isodo.guest.v1.GuestService.SubscribeProcess:input_type -> isodo.guest.v1.SubscribeProcessRequest
+	24, // 59: isodo.guest.v1.GuestService.WriteInput:input_type -> isodo.guest.v1.InputFrame
+	26, // 60: isodo.guest.v1.GuestService.ResizeTerminal:input_type -> isodo.guest.v1.ResizeTerminalRequest
+	27, // 61: isodo.guest.v1.GuestService.SignalProcess:input_type -> isodo.guest.v1.SignalProcessRequest
+	29, // 62: isodo.guest.v1.GuestService.Stat:input_type -> isodo.guest.v1.StatRequest
+	30, // 63: isodo.guest.v1.GuestService.ListDirectory:input_type -> isodo.guest.v1.ListDirectoryRequest
+	32, // 64: isodo.guest.v1.GuestService.ReadFile:input_type -> isodo.guest.v1.ReadFileRequest
+	38, // 65: isodo.guest.v1.GuestService.WriteFile:input_type -> isodo.guest.v1.WriteFileFrame
+	40, // 66: isodo.guest.v1.GuestService.MakeDirectory:input_type -> isodo.guest.v1.MakeDirectoryRequest
+	41, // 67: isodo.guest.v1.GuestService.Remove:input_type -> isodo.guest.v1.RemoveRequest
+	42, // 68: isodo.guest.v1.GuestService.Move:input_type -> isodo.guest.v1.MoveRequest
+	47, // 69: isodo.guest.v1.GuestService.PortForward:input_type -> isodo.guest.v1.PortForwardFrame
+	6,  // 70: isodo.guest.v1.GuestService.Ready:output_type -> isodo.guest.v1.ReadyResponse
+	6,  // 71: isodo.guest.v1.GuestService.BindRuntime:output_type -> isodo.guest.v1.ReadyResponse
+	14, // 72: isodo.guest.v1.GuestService.StartProcess:output_type -> isodo.guest.v1.ProcessInfo
+	14, // 73: isodo.guest.v1.GuestService.GetProcess:output_type -> isodo.guest.v1.ProcessInfo
+	16, // 74: isodo.guest.v1.GuestService.ListProcesses:output_type -> isodo.guest.v1.ListProcessesResponse
+	22, // 75: isodo.guest.v1.GuestService.SubscribeProcess:output_type -> isodo.guest.v1.ProcessEvent
+	25, // 76: isodo.guest.v1.GuestService.WriteInput:output_type -> isodo.guest.v1.InputAck
+	51, // 77: isodo.guest.v1.GuestService.ResizeTerminal:output_type -> google.protobuf.Empty
+	51, // 78: isodo.guest.v1.GuestService.SignalProcess:output_type -> google.protobuf.Empty
+	28, // 79: isodo.guest.v1.GuestService.Stat:output_type -> isodo.guest.v1.FileInfo
+	31, // 80: isodo.guest.v1.GuestService.ListDirectory:output_type -> isodo.guest.v1.ListDirectoryResponse
+	36, // 81: isodo.guest.v1.GuestService.ReadFile:output_type -> isodo.guest.v1.ReadFileFrame
+	39, // 82: isodo.guest.v1.GuestService.WriteFile:output_type -> isodo.guest.v1.WriteFileResponse
+	28, // 83: isodo.guest.v1.GuestService.MakeDirectory:output_type -> isodo.guest.v1.FileInfo
+	51, // 84: isodo.guest.v1.GuestService.Remove:output_type -> google.protobuf.Empty
+	28, // 85: isodo.guest.v1.GuestService.Move:output_type -> isodo.guest.v1.FileInfo
+	47, // 86: isodo.guest.v1.GuestService.PortForward:output_type -> isodo.guest.v1.PortForwardFrame
+	70, // [70:87] is the sub-list for method output_type
+	53, // [53:70] is the sub-list for method input_type
+	53, // [53:53] is the sub-list for extension type_name
+	53, // [53:53] is the sub-list for extension extendee
+	0,  // [0:53] is the sub-list for field type_name
 }
 
 func init() { file_isodo_guest_v1_guest_proto_init() }
@@ -3414,13 +3778,19 @@ func file_isodo_guest_v1_guest_proto_init() {
 		(*WriteFileFrame_Chunk)(nil),
 	}
 	file_isodo_guest_v1_guest_proto_msgTypes[35].OneofWrappers = []any{}
+	file_isodo_guest_v1_guest_proto_msgTypes[42].OneofWrappers = []any{
+		(*PortForwardFrame_Open)(nil),
+		(*PortForwardFrame_Data)(nil),
+		(*PortForwardFrame_End)(nil),
+		(*PortForwardFrame_Error)(nil),
+	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
 		File: protoimpl.DescBuilder{
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_isodo_guest_v1_guest_proto_rawDesc), len(file_isodo_guest_v1_guest_proto_rawDesc)),
 			NumEnums:      5,
-			NumMessages:   40,
+			NumMessages:   45,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

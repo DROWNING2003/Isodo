@@ -6,6 +6,27 @@ mountpoint -q /proc || mount -t proc proc /proc
 mountpoint -q /sys || mount -t sysfs sysfs /sys
 mountpoint -q /run || mount -t tmpfs -o mode=0755 tmpfs /run
 mountpoint -q /tmp || mount -t tmpfs -o mode=1777 tmpfs /tmp
+# Guest-local services (T3, agent helpers) bind 127.0.0.1; loopback is not
+# brought up by the minimal initramfs automatically.
+ip link set lo up 2>/dev/null || /sbin/ip link set lo up 2>/dev/null || true
+# Optional Cloud Hypervisor virtio-net. The Node passes a per-instance address
+# on the kernel command line and attaches an isolated TAP to its bridge.
+isodo_net=$(tr ' ' '\n' < /proc/cmdline | sed -n 's/^isodo.net=//p')
+if [ -n "$isodo_net" ]; then
+    isodo_ip=${isodo_net%%,*}
+    isodo_gateway=${isodo_net#*,}
+    isodo_if=eth0
+    if ! ip link show "$isodo_if" >/dev/null 2>&1 && ! /sbin/ip link show "$isodo_if" >/dev/null 2>&1; then
+        for isodo_candidate in /sys/class/net/*; do
+            isodo_name=${isodo_candidate##*/}
+            if [ "$isodo_name" != "lo" ]; then isodo_if=$isodo_name; break; fi
+        done
+    fi
+    ip link set "$isodo_if" up 2>/dev/null || /sbin/ip link set "$isodo_if" up 2>/dev/null || true
+    ip addr add "$isodo_ip" dev "$isodo_if" 2>/dev/null || /sbin/ip addr add "$isodo_ip" dev "$isodo_if" 2>/dev/null || true
+    ip route add default via "$isodo_gateway" dev "$isodo_if" 2>/dev/null || /sbin/ip route add default via "$isodo_gateway" dev "$isodo_if" 2>/dev/null || true
+    printf 'nameserver 1.1.1.1\nnameserver 8.8.8.8\n' > /etc/resolv.conf
+fi
 # Every instance receives an independent workspace block device.
 for attempt in $(seq 1 100); do
     [ -b /dev/vdb ] && break

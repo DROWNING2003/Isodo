@@ -6,6 +6,7 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -33,6 +34,7 @@ type fakeCHV struct {
 func (f *fakeCHV) Identity() *guestv1.RuntimeIdentity {
 	return proto.Clone(f.identity).(*guestv1.RuntimeIdentity)
 }
+func (f *fakeCHV) VsockSocket() string                   { return "" }
 func (f *fakeCHV) Running(context.Context) (bool, error) { return f.running.Load(), nil }
 func (f *fakeCHV) Stop(context.Context) error            { f.running.Store(false); return nil }
 func (f *fakeCHV) Close()                                { f.running.Store(false) }
@@ -68,6 +70,7 @@ func TestCHVJournalFencingCapacityAndLifecycle(t *testing.T) {
 	request := createCHVRequest()
 	release := make(chan struct{})
 	fetched := make(chan struct{})
+	var fetchedOnce sync.Once
 	var launches atomic.Int32
 	config := CHVConfig{Directory: directory, Binary: "test", Bucket: "templates"}
 	config.Fetcher = fetchFunc(func(ctx context.Context, _, _ string) (string, error) {
@@ -75,7 +78,7 @@ func TestCHVJournalFencingCapacityAndLifecycle(t *testing.T) {
 		if err != nil || !strings.Contains(string(data), request.OperationId) {
 			return "", errors.New("intent was not durable before fetch")
 		}
-		close(fetched)
+		fetchedOnce.Do(func() { close(fetched) })
 		select {
 		case <-release:
 			return "fixture", nil
@@ -99,6 +102,16 @@ func TestCHVJournalFencingCapacityAndLifecycle(t *testing.T) {
 		}
 		identity := proto.Clone(c.Identity).(*guestv1.RuntimeIdentity)
 		identity.GuestEpoch = "epoch"
+		f := &fakeCHV{identity: identity, directory: c.Directory}
+		f.running.Store(true)
+		return f, nil
+	}
+	config.Restart = func(ctx, life context.Context, c templatebuilder.RuntimeConfig) (CHVRuntime, error) {
+		if _, err := os.Stat(filepath.Join(c.Directory, "workspace")); err != nil {
+			return nil, err
+		}
+		identity := proto.Clone(c.Identity).(*guestv1.RuntimeIdentity)
+		identity.GuestEpoch = "epoch-2"
 		f := &fakeCHV{identity: identity, directory: c.Directory}
 		f.running.Store(true)
 		return f, nil
@@ -143,6 +156,10 @@ func TestCHVJournalFencingCapacityAndLifecycle(t *testing.T) {
 	if result.State != nodev1.OperationState_OPERATION_STATE_SUCCEEDED || launches.Load() != 1 {
 		t.Fatalf("create result: %+v", result)
 	}
+	firstBoot := result.BootId
+	if firstBoot == "" {
+		t.Fatal("create did not record a boot ID")
+	}
 	inspection, err := server.InspectSandbox(t.Context(), &nodev1.InspectSandboxRequest{SandboxId: request.SandboxId, OwnershipGeneration: 1})
 	if err != nil || inspection.ObservedState != "running" || inspection.GuestEpoch != "epoch" {
 		t.Fatalf("inspection %+v %v", inspection, err)
@@ -161,9 +178,34 @@ func TestCHVJournalFencingCapacityAndLifecycle(t *testing.T) {
 	if _, err = os.Stat(filepath.Join(directory, "vms", request.SandboxId, "workspace")); err != nil {
 		t.Fatalf("stop removed disk: %v", err)
 	}
+	start := &nodev1.ApplyOperationRequest{OperationId: uuid.NewString(), RequestHash: strings.Repeat("d", 64), SandboxId: request.SandboxId, OwnershipGeneration: 1, Revision: 3, Action: nodev1.OperationAction_OPERATION_ACTION_START}
+	if _, err = server.ApplyOperation(t.Context(), start); err != nil {
+		t.Fatal(err)
+	}
+	if result = waitCHV(t, server, start.OperationId); result.State != nodev1.OperationState_OPERATION_STATE_SUCCEEDED {
+		t.Fatal(result)
+	}
+	if result.BootId == "" || result.BootId == firstBoot {
+		t.Fatalf("start reused boot ID: %+v", result)
+	}
+	inspection, err = server.InspectSandbox(t.Context(), &nodev1.InspectSandboxRequest{SandboxId: request.SandboxId, OwnershipGeneration: 1})
+	if err != nil || inspection.ObservedState != "running" || inspection.GuestEpoch != "epoch-2" {
+		t.Fatalf("start inspection %+v %v", inspection, err)
+	}
+	stop2 := proto.Clone(stop).(*nodev1.ApplyOperationRequest)
+	stop2.OperationId = uuid.NewString()
+	stop2.RequestHash = strings.Repeat("e", 64)
+	stop2.Revision = 4
+	if _, err = server.ApplyOperation(t.Context(), stop2); err != nil {
+		t.Fatal(err)
+	}
+	if result = waitCHV(t, server, stop2.OperationId); result.State != nodev1.OperationState_OPERATION_STATE_SUCCEEDED {
+		t.Fatal(result)
+	}
 	deletion := proto.Clone(stop).(*nodev1.ApplyOperationRequest)
 	deletion.OperationId = uuid.NewString()
-	deletion.Revision = 3
+	deletion.RequestHash = strings.Repeat("f", 64)
+	deletion.Revision = 5
 	deletion.Action = nodev1.OperationAction_OPERATION_ACTION_DELETE
 	if _, err = server.ApplyOperation(t.Context(), deletion); err != nil {
 		t.Fatal(err)

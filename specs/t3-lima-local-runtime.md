@@ -2,6 +2,10 @@
 
 状态：2026-10-24，基于当前 T3 源码和 Lima 本机运行情况完成的可行性规格；不是已实现能力或产品 P0 范围变更。调查目标是复用 T3 现有服务/客户端协议，由 Isodo 在 macOS 上把 Lima VM 管理成逐沙箱的本地运行时，并在 Guest 中运行 T3 Server、Codex、Claude 等工作负载。
 
+## 当前实现状态（2026-10-25）
+
+本地 Lima 路径已接通 create/start/stop/delete、Guest Ready/BindRuntime、T3 bundle 上传/启动/app link、桌面 loopback 和本地模板；新增 `POST /sandboxes/{id}/stop`（保盘）与 Guest 内 T3 supervisor。仍按 Node 配置固定 CPU/内存/磁盘（尚无逐沙箱资源选择），host T3/Agent 端口由 sandbox ID 哈希分配（无冲突表），通用端口预览、快照和 Connection Gateway 凭证注入未实现。
+
 ## 结论
 
 **可行，建议把 Lima 做成 Isodo Node 的本地 VM 后端，每个 Sandbox 对应一个 Lima Linux 实例。** Isodo 继续负责身份、沙箱生命周期、Guest 进程/文件接口和本地 HTTP/WebSocket 代理；T3 Server 使用原有 server bundle 和 RPC contracts。不要另写一套 T3 RPC，也不需要在 Lima VM 里面再运行 Cloud Hypervisor。
