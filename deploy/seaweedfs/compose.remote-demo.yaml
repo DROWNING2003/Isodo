@@ -1,0 +1,36 @@
+# Run with an explicit project name and ISODO_DEMO_DIR pointing at the isolated run.
+# Supply docker-s3.runtime.json in that directory before starting the service.
+services:
+  seaweedfs:
+    image: ${ISODO_SEAWEEDFS_IMAGE:-chrislusf/seaweedfs:4.48}
+    platform: linux/amd64
+    entrypoint: ["/bin/sh", "/isodo-entrypoint.sh"]
+    restart: unless-stopped
+    command:
+      - mini
+      - -dir=/data
+      - -ip=seaweedfs
+      - -ip.bind=0.0.0.0
+      - -s3.port=8333
+      - -s3.config=/tmp/isodo-s3.json
+      - -bucket=${ISODO_TEMPLATE_S3_BUCKET:-isodo-unify-demo}
+      - -webdav=false
+      - -admin.ui=false
+      - -master.telemetry=false
+    ports:
+      - "127.0.0.1:${ISODO_DEMO_S3_PORT:-18333}:8333"
+    volumes:
+      - ${ISODO_DEMO_DIR:?set the isolated run directory}/docker-store:/data
+      - ${ISODO_DEMO_DIR:?set the isolated run directory}/docker-s3.runtime.json:/run/isodo-s3-source.json:ro
+      - ./entrypoint.sh:/isodo-entrypoint.sh:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "/dev/null", "http://127.0.0.1:8333/healthz"]
+      interval: 5s
+      timeout: 3s
+      retries: 30
+      start_period: 10s
+    logging:
+      driver: json-file
+      options:
+        max-size: "10m"
+        max-file: "3"
