@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help init infra-up infra-down infra-ps infra-logs casdoor-ready db-migrate dev-certs api node node-local node-local-t3 web electron mobile t3-app-bundle docs docs-build test test-integration
+.PHONY: help init infra-up infra-down infra-ps infra-logs casdoor-ready db-migrate dev-certs api node node-local node-local-agent-workspace web electron mobile agent-workspace-bundle docs docs-build test test-integration
 
 COMPOSE := docker compose -f compose.yaml
 IOS_SIMULATOR ?= iPhone 17
@@ -31,11 +31,11 @@ help:
 	  'make api         Apply schema and run the Go API on 127.0.0.1:8080' \
 	  'make node        Run the Linux Node Orchestrator gRPC endpoint' \
 	  'make node-local  Run the Lima-backed local Node Orchestrator' \
-	  'make node-local-t3 Build T3 and run the Lima-backed Node with T3 and Agent CLIs' \
+	  'make node-local-agent-workspace Build the Agent workspace and run the Lima-backed local Node' \
 	  'make web         Run the Isodo web UI on 127.0.0.1:5733 via pnpm' \
 	  'make electron    Build and open the Isodo desktop app via pnpm' \
 	  'make mobile      Build/install the iOS development app and open Simulator' \
-	  'make t3-app-bundle Build the T3 server bundle with its web application' \
+	  'make agent-workspace-bundle Build the Agent workspace server bundle with its web application' \
 	  'make docs        Run the Fumadocs site on 127.0.0.1:3000' \
 	  'make docs-build  Build the Fumadocs site for production' \
 	  'make generate    Generate OpenAPI bindings, gRPC code and docs' \
@@ -145,8 +145,8 @@ node:
 node-local: dev-certs $(ISODO_GUEST_AGENT_BINARY)
 	$(MAKE) node NODE_BACKEND=lima
 
-node-local-t3: dev-certs $(ISODO_GUEST_AGENT_BINARY) t3-app-bundle
-	$(MAKE) node NODE_BACKEND=lima ISODO_T3_SERVER_BUNDLE="$(CURDIR)/app/artifacts/sandbox/t3-server-dist.bundle"
+node-local-agent-workspace: dev-certs $(ISODO_GUEST_AGENT_BINARY) agent-workspace-bundle
+	$(MAKE) node NODE_BACKEND=lima ISODO_T3_SERVER_BUNDLE="$(CURDIR)/app/artifacts/sandbox/agent-workspace-server-dist.bundle"
 
 $(ISODO_GUEST_AGENT_BINARY):
 	mkdir -p "$(dir $@)"
@@ -164,15 +164,15 @@ electron:
 mobile:
 	cd app && $(MOBILE_DEV_ENV) pnpm --filter @t3tools/mobile exec expo run:ios --device "$(IOS_SIMULATOR)"
 
-# T3's server bundle normally omits dist/client. The Isodo Guest runs headless,
-# so ship the built web application beside bin.mjs for ServerConfig.resolveStaticDir.
-t3-app-bundle:
+# The Agent workspace server bundle normally omits dist/client. The Isodo Guest runs headless,
+# so ship the built web application beside the server entrypoint for static file serving.
+agent-workspace-bundle:
 	cd app && corepack pnpm@11.10.0 --filter @t3tools/web build
 	cd app && corepack pnpm@11.10.0 --filter t3 build:bundle
 	mkdir -p app/apps/server/dist/client
 	cp -R app/apps/web/dist/. app/apps/server/dist/client/
 	mkdir -p app/artifacts/sandbox
-	tar -czf app/artifacts/sandbox/t3-server-dist.bundle --exclude='*.map' -C app/apps/server dist
+	tar -czf app/artifacts/sandbox/agent-workspace-server-dist.bundle --exclude='*.map' -C app/apps/server dist
 
 docs:
 	npm --prefix docs-site run dev -- --hostname 127.0.0.1

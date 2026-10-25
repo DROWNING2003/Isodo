@@ -17,7 +17,7 @@
 - 修复 devpts 挂载后，真实 App 终端可用，UID/GID 1000；保盘重启后任务和文件保留。
 - 同一 App 创建新的 Lima 沙箱、应用 Agent 配置并连接工作台通过。本轮未据此声明完整本地模型回归已完成。
 
-录屏主线和交付核对见 [Demo 录制指南](docs/runbooks/demo-recording.md)，架构、模块规格与分工见 [MVP 架构文档](docs-site/content/docs/concepts/architecture.mdx)。
+录屏主线和交付核对见 [Demo 录制指南](docs/runbooks/demo-recording.md)。本次演示视频：[Isodo Demo 视频](assets/Isodo.mp4)，预览图：[Demo 预览](assets/isodo-demo-preview.jpg)。架构、模块规格与分工见 [MVP 架构文档](docs-site/content/docs/concepts/architecture.mdx)。
 
 ## 运行
 
@@ -32,7 +32,6 @@ go build -o isodo-node ./cmd/isodo-node
 mkdir -p .tools
 # Apple Silicon；Intel Mac 将 arm64 改为 amd64。
 GOOS=linux GOARCH=arm64 go build -o .tools/isodo-guest-linux-arm64 ./cmd/isodo-guest
-make t3-app-bundle
 ```
 
 分别启动 Control、Web 和桌面端：
@@ -43,7 +42,7 @@ make web
 make electron
 ```
 
-默认 App Web 地址 `http://127.0.0.1:5734`，Control 地址 `http://127.0.0.1:8080`。Electron 自己启动本地 Lima sidecar；独立 `make node-local-t3` 用于 Control 访问 Lima 的开发路径，不要为同一 journal 重复启动 Node。
+默认 App Web 地址 `http://127.0.0.1:5734`，Control 地址 `http://127.0.0.1:8080`。Electron 自己启动本地 Lima sidecar；需要单独运行本地 Node 时使用 `make node-local` 或 `make node-local-agent-workspace`，不要为同一 journal 重复启动 Node。
 
 双环境云端演示需要 Control 配置远端 Node 的 mTLS 与 SSH 转发，并发布 Ready 模板；不要将 Node RPC 地址作为 App API 地址。部署说明见 [云端运行手册](docs/runbooks/cloud-t3.md)、[基础镜像](images/base/README.md) 和 [Docker SeaweedFS](deploy/seaweedfs/remote-demo.md)。
 
@@ -70,17 +69,70 @@ Vite 仍监听 `127.0.0.1:5734`。以该 origin 打开 App 并登录。Guest 模
 ## 架构
 
 ```text
-Isodo App / SandboxClient
-  ├─ Electron IPC → 本机 Node → Lima → Guest / Agent 工作台
-  └─ HTTP → Control / PostgreSQL outbox
-                → SSH + mTLS → 远端 Node → CHV / Vsock → Guest
-
-App → Preview Gateway → Node Relay → Agent 工作台
-Guest → Vsock 出站代理 / 宿主凭证注入 → 真实模型
-Node → SeaweedFS S3 → 校验、缓存不可变模板工件
+                         ┌──────────────────────────────┐
+                         │        Isodo App              │
+                         │ SandboxClient / Agent 工作台 │
+                         └──────────────┬───────────────┘
+                                        │ HTTPS / IPC
+                         ┌──────────────▼───────────────┐
+                         │ Control                       │
+                         │ 账号、归属、模板、生命周期意图 │
+                         │ PostgreSQL + outbox           │
+                         └───────┬───────────────────────┘
+                                 │ SSH + mTLS
+                 ┌───────────────▼────────────────┐
+                 │ Node Runtime                    │
+                 │ journal / 运行身份 / relay      │
+                 │ egress proxy / 模板缓存         │
+                 └──────────┬──────────────┬────────┘
+                            │              │
+                   本地 Lima │              │ 云端 Cloud Hypervisor
+                            │              │
+                 ┌──────────▼──────┐  ┌────▼───────────────┐
+                 │ Guest            │  │ Guest               │
+                 │ Guest Agent      │  │ Guest Agent         │
+                 │ Agent 工作台     │  │ Agent 工作台        │
+                 └────────┬─────────┘  └────────┬────────────┘
+                          │                     │
+                          └────── Vsock ────────┘
+                                  │
+                         ┌────────▼────────┐
+                         │ 凭证代理         │
+                         │ 宿主侧规则注入    │
+                         │ 连接真实模型      │
+                         └──────────────────┘
 ```
 
-Control 管理账号、归属、模板来源与生命周期意图；Node journal 和运行身份约束实际 VM；Guest 提供受限工作区文件与进程能力。工作区、任务和 Agent 配置保存在实例持久盘。完整模块规格与维护分工见 [架构文档](docs-site/content/docs/concepts/architecture.mdx)。
+App 通过统一 Sandbox API 管理本地和云端沙箱。Control 保存账号、归属、模板固定和生命周期意图；Node Runtime 保存 journal、运行身份和实际 VM 状态，并把 App 请求转发到对应 Guest；Guest Agent 只提供受限的 `/workspace` 文件、进程和端口能力。Agent 工作台运行在 Guest 内，通过配对后的 Preview/Relay 供 App 使用。
+
+云端链路为 `App → Control → SSH/mTLS → Node Runtime → Cloud Hypervisor → Guest`，本地链路为 `App → 本地 Node Runtime → Lima → Guest`。两条链路共享 Sandbox API 和 Guest 能力，运行时差异收敛在 Node 的 backend adapter。CHV 无网卡运行时，Guest 通过 Vsock 访问 Node 的凭证代理；真实密钥留在沙箱外，Guest 内只使用占位配置。
+
+完整模块规格、数据流和职责见 [MVP 架构文档](docs-site/content/docs/concepts/architecture.mdx)。
+
+## 启动方式
+
+需要 Node.js 24.13.1、pnpm 11.10.0、Go 1.26.9、Docker Compose；云端 CHV 还需要 Linux x86_64、KVM、Cloud Hypervisor、远端 Node 的 mTLS/SSH 配置和已发布的 Ready 模板。先准备本地依赖和环境变量：
+
+```sh
+make init
+# 按 .env.example 填写 Casdoor / GitHub OAuth 等本地配置，秘密不要提交。
+make infra-up
+cd app && corepack pnpm@11.10.0 install && cd ..
+go build -o isodo-node ./cmd/isodo-node
+mkdir -p .tools
+GOOS=linux GOARCH=arm64 go build -o .tools/isodo-guest-linux-arm64 ./cmd/isodo-guest
+make agent-workspace-bundle
+```
+
+在三个终端按以下顺序启动 Control、Web 和桌面 App：
+
+```sh
+make api
+make web
+make electron
+```
+
+默认地址是 App `http://127.0.0.1:5734`、Control `http://127.0.0.1:8080`。启用本地 Preview 配对时，Control、Web 和 Electron 使用同一组 origin：`ISODO_WEB_ORIGIN=http://app.isodo.localhost:5734`、`ISODO_PREVIEW_DOMAIN=isodo.localhost`、`VITE_ISODO_PREVIEW_DOMAIN=isodo.localhost`、`ISODO_WEB_URL=http://app.isodo.localhost:5734`；Casdoor 需要配置精确回调 `http://app.isodo.localhost:5734/auth/callback`。Vite 仍监听 `127.0.0.1:5734`。CHV 的 Vsock egress 默认不需要启用 TAP/NAT bridge；只有明确配置 `ISODO_CHV_NETWORK_BRIDGE` 时才使用外部网桥。
 
 ## 验证与文档
 
