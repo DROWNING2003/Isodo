@@ -1,59 +1,30 @@
 import { afterEach, expect, it, vi } from "vite-plus/test";
-vi.mock("../../api/public.generated", () => ({ getSandbox: vi.fn(), stopSandbox: vi.fn() }));
-import { getSandbox, stopSandbox } from "../../api/public.generated";
+const fixture = vi.hoisted(() => ({ get: vi.fn(), stop: vi.fn(), select: vi.fn() }));
+vi.mock("./sandboxTransports", () => ({ sandboxClientFor: fixture.select }));
 import { pauseSandbox } from "./pauseSandbox";
-afterEach(() => {
-  vi.unstubAllGlobals();
-  vi.useRealTimers();
+const snapshot = (status: "running" | "stopped", revision = "1", actionStatus: "running" | "succeeded" = "succeeded") => ({
+  id: "local-a", name: "A", desired_state: status, observed_state: status,
+  revision, last_action: { revision, type: "stop", status: actionStatus, updated_at: "2026-10-25T00:00:00Z" },
 });
-it("waits for the VM to stop without affecting another sandbox", async () => {
-  vi.useFakeTimers();
-  const stop = vi.fn().mockResolvedValue({});
-  const list = vi
-    .fn()
-    .mockResolvedValueOnce({ items: [{ id: "local-a", state: "running" }] })
-    .mockResolvedValueOnce({ items: [{ id: "local-a", state: "stopping" }] })
-    .mockResolvedValue({
-      items: [
-        { id: "local-a", state: "stopped" },
-        { id: "local-b", state: "running" },
-      ],
-    });
-  vi.stubGlobal("window", { isodoDesktop: { listLocalSandboxes: list, stopLocalSandbox: stop } });
-  const result = pauseSandbox("local-a");
-  await vi.runAllTimersAsync();
-  await result;
-  expect(stop).toHaveBeenCalledExactlyOnceWith("local-a");
-  expect(list).toHaveBeenCalledTimes(3);
+afterEach(() => vi.resetAllMocks());
+it.each(["local-a", "cloud-a"])("uses the owning transport and waits for the exact stop action: %s", async (id) => {
+  fixture.select.mockReturnValue({ get: fixture.get, stop: fixture.stop });
+  fixture.get.mockResolvedValueOnce(snapshot("running")).mockResolvedValueOnce(snapshot("stopped", "2"));
+  fixture.stop.mockResolvedValue({ ...snapshot("stopped", "2", "running"), observed_state: "running" });
+  await pauseSandbox(id);
+  expect(fixture.select).toHaveBeenCalledWith(id.startsWith("local-") ? "local" : "cloud");
+  expect(fixture.stop).toHaveBeenCalledExactlyOnceWith(id);
+  expect(fixture.get).toHaveBeenCalledTimes(2);
 });
-it("does not issue another stop for an already paused sandbox", async () => {
-  const stop = vi.fn();
-  vi.stubGlobal("window", {
-    isodoDesktop: {
-      listLocalSandboxes: async () => ({ items: [{ id: "local-a", state: "stopped" }] }),
-      stopLocalSandbox: stop,
-    },
-  });
+it("does not stop an already stopped sandbox", async () => {
+  fixture.select.mockReturnValue({ get: fixture.get, stop: fixture.stop });
+  fixture.get.mockResolvedValue(snapshot("stopped"));
   await pauseSandbox("local-a");
-  expect(stop).not.toHaveBeenCalled();
+  expect(fixture.stop).not.toHaveBeenCalled();
 });
-
-it("pauses a cloud sandbox through its exact lifecycle endpoint", async () => {
-  const sandbox = {
-    id: "cloud-a",
-    name: "Cloud",
-    metadata: {},
-    desired_state: "running",
-    observed_state: "running",
-    created_at: "",
-    updated_at: "",
-  };
-  vi.stubGlobal("window", {});
-  vi.mocked(getSandbox)
-    .mockResolvedValueOnce(sandbox)
-    .mockResolvedValueOnce({ ...sandbox, observed_state: "stopped" });
-  vi.mocked(stopSandbox).mockResolvedValue({ ...sandbox, desired_state: "stopped" });
-  await pauseSandbox("cloud-a");
-  expect(getSandbox).toHaveBeenCalledWith("cloud-a");
-  expect(stopSandbox).toHaveBeenCalledExactlyOnceWith("cloud-a");
+it("does not mistake a newer running revision for stop success", async () => {
+  fixture.select.mockReturnValue({ get: fixture.get, stop: fixture.stop });
+  fixture.get.mockResolvedValueOnce(snapshot("running")).mockResolvedValueOnce(snapshot("running", "3"));
+  fixture.stop.mockResolvedValue(snapshot("stopped", "2", "running"));
+  await expect(pauseSandbox("local-a")).rejects.toMatchObject({ code: "ACTION_SUPERSEDED" });
 });

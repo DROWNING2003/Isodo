@@ -6,7 +6,9 @@ const fixture = vi.hoisted(() => ({
   create: vi.fn(),
   navigate: vi.fn(),
   pairing: vi.fn(),
+  templates: vi.fn(async () => [{ id: "template-uuid", label: "Agent workspace", ready: true }]),
 }));
+vi.mock("./cloudAppTemplates", () => ({ loadCloudAppTemplates: fixture.templates }));
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => fixture.navigate }));
 vi.mock("../../env", () => ({ isElectron: true }));
 vi.mock("./auth", () => ({ useAuth: () => ({ status: "authenticated" }) }));
@@ -79,20 +81,23 @@ vi.mock("../../components/ui/dialog", () => {
 });
 vi.mock("../../components/ui/select", () => {
   const Slot = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
-  return Object.fromEntries(
-    ["Select", "SelectItem", "SelectPopup", "SelectTrigger", "SelectValue"].map((name) => [
+  return {
+    ...Object.fromEntries(
+    ["Select", "SelectItem", "SelectPopup", "SelectTrigger"].map((name) => [
       name,
       Slot,
     ]),
-  );
+    ),
+    SelectValue: ({ children }: { children?: ReactNode }) => <span data-testid="selected-template">{children}</span>,
+  };
 });
 import { CreateSandboxDialog } from "./CreateSandboxDialog";
 let renderer: ReactTestRenderer;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   fixture.create.mockReset().mockResolvedValue({
-    sandbox_id: "local-sandbox",
-    operation: { operation_id: "op", state: 3 },
+    id: "local-sandbox", name: "Local", desired_state: "running", observed_state: "running",
+    revision: "1", last_action: { revision: "1", type: "create", status: "succeeded", updated_at: "2026-10-25T00:00:00Z" },
   });
   fixture.apply.mockReset().mockResolvedValue(undefined);
   fixture.navigate.mockReset();
@@ -100,7 +105,11 @@ beforeEach(() => {
   vi.stubGlobal("window", {
     isodoDesktop: {
       listLocalTemplates: async () => ({ items: [{ id: "base", ready: true }] }),
-      createLocalSandbox: fixture.create,
+      sandboxRequest: async (path: string, method: string, body?: string) => {
+        if (path.endsWith("/app-link")) return { sandbox_id: "local-sandbox", url: "http://localhost/pair", pairing_url: "http://localhost/pair" };
+        if (method === "POST") return fixture.create(JSON.parse(body ?? "{}"));
+        throw new Error(`Unexpected request: ${method} ${path}`);
+      },
       getLocalSandboxApp: async () => ({ url: "http://localhost/pair" }),
       setSandboxInjections: vi.fn(),
     },
@@ -117,6 +126,11 @@ async function click(text: string) {
   expect(button).toBeDefined();
   await act(async () => button.props.onClick());
 }
+it("shows the template label instead of its UUID before opening the dropdown", async () => {
+  await act(async () => { renderer = create(<CreateSandboxDialog />); });
+  await click("云端沙箱");
+  expect(renderer.root.findByProps({ "data-testid": "selected-template" }).children.join("")).toBe("Agent workspace");
+});
 it("offers collapsed options and applies selected credentials before pairing", async () => {
   await act(async () => {
     renderer = create(<CreateSandboxDialog />);

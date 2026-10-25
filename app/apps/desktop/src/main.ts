@@ -1,3 +1,5 @@
+import { SandboxFileUploads, type FileRequestInit } from "./fileUploads.js";
+import { validateSandboxRequest } from "./sandboxRequest.ts";
 import { createManagedQuit, pauseManagedSandboxes } from "./shutdown.js";
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import * as NodeChildProcess from "node:child_process";
@@ -99,7 +101,7 @@ async function stopLocalNode() {
   localRuntime = null;
 }
 
-async function localRequest(path: string, init?: RequestInit) {
+async function localRequest(path: string, init?: FileRequestInit) {
   if (!localRuntime) throw new Error("Local runtime is unavailable");
   // oxlint-disable-next-line t3code/no-global-fetch -- Electron main calls its loopback sidecar.
   const response = await fetch(`${localRuntime.address}${path}`, {
@@ -110,97 +112,42 @@ async function localRequest(path: string, init?: RequestInit) {
   const text = await response.text();
   const body = (text ? JSON.parse(text) : null) as unknown;
   if (!response.ok) {
+    const detail = typeof body === "object" && body !== null && "error" in body ? body.error : body;
     const message =
-      typeof body === "object" && body !== null && "message" in body
-        ? String(body.message)
+      typeof detail === "object" && detail !== null && "message" in detail
+        ? String(detail.message)
         : response.statusText;
     throw new Error(message);
   }
   return body;
 }
 
+ipcMain.handle(
+  "isodo:sandbox-request",
+  async (_event, path: unknown, method: unknown, body: unknown, idempotencyKey: unknown) => {
+    const request = validateSandboxRequest(path, method, body, idempotencyKey);
+    return localRequest(request.path, {
+      method: request.method,
+      headers: {
+        ...(request.body === undefined ? {} : { "Content-Type": "application/json" }),
+        ...(request.idempotencyKey ? { "Idempotency-Key": request.idempotencyKey } : {}),
+      },
+      ...(request.body === undefined ? {} : { body: request.body }),
+    });
+  },
+);
+
 ipcMain.handle("isodo:local-runtime-status", async () => {
   if (!localRuntime) return { available: false };
   const health = (await localRequest("/health")) as { node?: unknown };
   return { available: true, node: health.node };
 });
-ipcMain.handle("isodo:local-sandbox-create", async (_event, input: unknown) => {
-  if (
-    typeof input !== "object" ||
-    input === null ||
-    typeof (input as { name?: unknown }).name !== "string"
-  ) {
-    throw new Error("Sandbox name is required");
-  }
-  const template = (input as { template?: unknown }).template;
-  if (
-    template !== undefined &&
-    (typeof template !== "string" || !/^[a-z0-9][a-z0-9._-]{0,63}$/.test(template))
-  ) {
-    throw new Error("Invalid template");
-  }
-  let lastError: unknown;
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    try {
-      return await localRequest("/sandboxes", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: (input as { name: string }).name,
-          ...(typeof template === "string" ? { template } : {}),
-        }),
-      });
-    } catch (error) {
-      lastError = error;
-      if (
-        attempt === 2 ||
-        !(error instanceof Error) ||
-        !/tempor|unavailable|timeout|failed/i.test(error.message)
-      ) {
-        throw error;
-      }
-    }
-  }
-  throw lastError instanceof Error ? lastError : new Error("Sandbox creation failed");
-});
-ipcMain.handle("isodo:local-operation", async (_event, operationID: unknown) => {
-  if (typeof operationID !== "string" || !/^[a-zA-Z0-9-]{1,128}$/.test(operationID)) {
-    throw new Error("Invalid operation ID");
-  }
-  return localRequest(`/operations/${encodeURIComponent(operationID)}`);
-});
-ipcMain.handle("isodo:local-sandboxes", async () => localRequest("/sandboxes"));
-ipcMain.handle("isodo:local-sandbox-delete", async (_event, sandboxID: unknown) => {
-  if (typeof sandboxID !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(sandboxID)) {
-    throw new Error("Invalid sandbox ID");
-  }
-  return localRequest(`/sandboxes/${encodeURIComponent(sandboxID)}`, { method: "DELETE" });
-});
-ipcMain.handle("isodo:local-sandbox-start", async (_event, sandboxID: unknown) => {
-  if (typeof sandboxID !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(sandboxID)) {
-    throw new Error("Invalid sandbox ID");
-  }
-  return localRequest(`/sandboxes/${encodeURIComponent(sandboxID)}/start`, { method: "POST" });
-});
-ipcMain.handle("isodo:local-sandbox-stop", async (_event, sandboxID: unknown) => {
-  if (typeof sandboxID !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(sandboxID)) {
-    throw new Error("Invalid sandbox ID");
-  }
-  return localRequest(`/sandboxes/${encodeURIComponent(sandboxID)}/stop`, { method: "POST" });
-});
-ipcMain.handle("isodo:local-templates", async () => localRequest("/templates"));
+ipcMain.handle("isodo:local-templates", async () => localRequest("/v1/templates"));
 ipcMain.handle("isodo:local-template-build", async (_event, templateID: unknown) => {
   if (typeof templateID !== "string" || !/^[a-z0-9][a-z0-9._-]{0,63}$/.test(templateID)) {
     throw new Error("Invalid template ID");
   }
-  return localRequest(`/templates/${encodeURIComponent(templateID)}/build`, { method: "POST" });
-});
-
-ipcMain.handle("isodo:local-sandbox-app", async (_event, sandboxID: unknown) => {
-  if (typeof sandboxID !== "string" || !/^[a-zA-Z0-9_-]{1,128}$/.test(sandboxID)) {
-    throw new Error("Invalid sandbox ID");
-  }
-  return localRequest(`/sandboxes/${encodeURIComponent(sandboxID)}/app`);
+  return localRequest(`/v1/templates/${encodeURIComponent(templateID)}/build`, { method: "POST" });
 });
 
 function sandboxIDArgument(value: unknown): string {
@@ -211,7 +158,7 @@ function sandboxIDArgument(value: unknown): string {
 }
 
 ipcMain.handle("isodo:sandbox-injections", async (_event, sandboxID: unknown) =>
-  localRequest(`/sandboxes/${encodeURIComponent(sandboxIDArgument(sandboxID))}/injections`),
+  localRequest(`/v1/sandboxes/${encodeURIComponent(sandboxIDArgument(sandboxID))}/injections`),
 );
 ipcMain.handle(
   "isodo:set-sandbox-injections",
@@ -222,7 +169,7 @@ ipcMain.handle(
     }
     const body = JSON.stringify({ rules });
     if (body.length > 256 * 1024) throw new Error("Secure-connection rules are too large");
-    return localRequest(`/sandboxes/${encodeURIComponent(id)}/injections`, {
+    return localRequest(`/v1/sandboxes/${encodeURIComponent(id)}/injections`, {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body,
@@ -236,23 +183,28 @@ ipcMain.handle("isodo:remove-persistent-injection", async (_event, ruleID: unkno
   }
   return localRequest(`/injections/persistent/${encodeURIComponent(ruleID)}`, { method: "DELETE" });
 });
-ipcMain.handle("isodo:write-agent-config", async (_event, sandboxID: unknown, input: unknown) => {
-  const id = sandboxIDArgument(sandboxID);
-  if (!input || typeof input !== "object") throw new Error("Invalid Agent configuration");
-  const value = input as { path?: unknown; content?: unknown };
-  if (
-    typeof value.path !== "string" ||
-    typeof value.content !== "string" ||
-    value.content.length > 256 * 1024
-  ) {
-    throw new Error("Invalid Agent configuration");
+const fileUploads = new SandboxFileUploads(localRequest);
+const uploadOwners = new Set<number>();
+ipcMain.handle("isodo:file-upload-begin", async (event, input: unknown) => {
+  const owner = event.sender.id;
+  if (!uploadOwners.has(owner)) {
+    uploadOwners.add(owner);
+    event.sender.once("destroyed", () => {
+      uploadOwners.delete(owner);
+      void fileUploads.closeOwner(owner);
+    });
   }
-  return localRequest(`/sandboxes/${encodeURIComponent(id)}/agent-config`, {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ path: value.path, content: value.content }),
-  });
+  return fileUploads.begin(owner, input);
 });
+ipcMain.handle("isodo:file-upload-chunk", (event, id: unknown, offset: unknown, data: unknown) =>
+  fileUploads.append(event.sender.id, id, offset, data),
+);
+ipcMain.handle("isodo:file-upload-finish", (event, id: unknown) =>
+  fileUploads.finish(event.sender.id, id),
+);
+ipcMain.handle("isodo:file-upload-abort", (event, id: unknown) =>
+  fileUploads.abort(event.sender.id, id),
+);
 async function createWindow() {
   const icon = resolveIcon();
   app.dock?.setIcon(icon);

@@ -37,9 +37,11 @@ import { applySandboxCredentials, saveSandboxCredentialSelection } from "./apply
 export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
   const localRuntime = useLocalRuntimeSandbox(sandboxId);
   const platform = usePlatformSandbox(localRuntime.record ? "" : sandboxId);
-  const localSupported = Boolean(window.isodoDesktop) && Boolean(localRuntime.record);
+  const runtimeSupported =
+    Boolean(localRuntime.record || platform.record) &&
+    (!sandboxId.startsWith("local-") || Boolean(window.isodoDesktop));
   const rulesQuery = useInjectionRules();
-  const configQuery = useSandboxInjections(sandboxId, localSupported);
+  const configQuery = useSandboxInjections(sandboxId, runtimeSupported);
   const write = useSandboxInjectionWriter(sandboxId);
   const selectionQuery = useServerSandboxCredentials();
   const agentConfigsQuery = useServerAgentConfigs();
@@ -175,7 +177,7 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
     setEditing(undefined);
   };
   const supported =
-    localSupported &&
+    runtimeSupported &&
     initialized &&
     !rulesQuery.isLoading &&
     !rulesQuery.isError &&
@@ -188,8 +190,8 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
     );
   return (
     <CloudPage title="安全连接">
-      {!localSupported ? (
-        <p className="text-sm text-muted-foreground">当前仅支持为本地沙箱配置凭证。</p>
+      {!runtimeSupported ? (
+        <p className="text-sm text-muted-foreground">沙箱尚未就绪，暂时无法配置凭证。</p>
       ) : null}
       <section className="grid gap-4">
         <div>
@@ -198,7 +200,7 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
             选择凭证库中的配置，保存后在当前沙箱使用。
           </p>
         </div>
-        {rulesQuery.isLoading || (localSupported && !initialized && !configQuery.isError) ? (
+        {rulesQuery.isLoading || (runtimeSupported && !initialized && !configQuery.isError) ? (
           <p role="status" className="text-sm text-muted-foreground">
             正在读取凭证…
           </p>

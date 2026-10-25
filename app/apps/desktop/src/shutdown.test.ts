@@ -5,12 +5,12 @@ it("only stops owned active sandboxes and waits for observed stopped", async () 
   vi.useFakeTimers();
   let reads = 0;
   const request = vi.fn(async (path: string, _init?: RequestInit) => {
-    if (path === "/sandboxes") {
+    if (path === "/v1/sandboxes") {
       reads++;
       return {
         items: [
-          { id: "local-a", name: "A", state: reads > 2 ? "stopped" : "running" },
-          { id: "local-b", state: "stopped" },
+          { id: "local-a", name: "A", observed_state: reads > 2 ? "stopped" : "running" },
+          { id: "local-b", observed_state: "stopped" },
         ],
       };
     }
@@ -21,15 +21,15 @@ it("only stops owned active sandboxes and waits for observed stopped", async () 
   await result;
   expect(
     request.mock.calls.filter(([path]) => path.endsWith("/stop")).map(([path]) => path),
-  ).toEqual(["/sandboxes/local-a/stop"]);
+  ).toEqual(["/v1/sandboxes/local-a/stop"]);
   expect(reads).toBe(3);
 });
 it("does not report success if an owned sandbox disappears before stopping is confirmed", async () => {
   vi.useFakeTimers();
   let reads = 0;
   const request = vi.fn(async (path: string) =>
-    path === "/sandboxes"
-      ? { items: ++reads === 1 ? [{ id: "local-a", state: "running" }] : [] }
+    path === "/v1/sandboxes"
+      ? { items: ++reads === 1 ? [{ id: "local-a", observed_state: "running" }] : [] }
       : {},
   );
   const result = expect(pauseManagedSandboxes(request, 20)).rejects.toThrow("等待暂停超时");
@@ -43,11 +43,11 @@ it("finishes without stop requests when there are no owned sandboxes", async () 
 });
 it("reports failed stops while still attempting the other owned sandboxes", async () => {
   const request = vi.fn(async (path: string) => {
-    if (path === "/sandboxes")
+    if (path === "/v1/sandboxes")
       return {
         items: [
-          { id: "a", name: "Failed VM", state: "running" },
-          { id: "b", state: "running" },
+          { id: "a", name: "Failed VM", observed_state: "running" },
+          { id: "b", observed_state: "running" },
         ],
       };
     if (path.includes("/a/")) throw new Error("offline");
@@ -55,7 +55,7 @@ it("reports failed stops while still attempting the other owned sandboxes", asyn
   });
   await expect(pauseManagedSandboxes(request)).rejects.toThrow("Failed VM");
   expect(request).toHaveBeenCalledWith(
-    "/sandboxes/b/stop",
+    "/v1/sandboxes/b/stop",
     expect.objectContaining({ method: "POST" }),
   );
 });
@@ -126,15 +126,15 @@ it("also pauses owned sandboxes created while shutdown is waiting", async () => 
   vi.useFakeTimers();
   let reads = 0;
   const request = vi.fn(async (path: string, _init?: RequestInit) => {
-    if (path !== "/sandboxes") return {};
+    if (path !== "/v1/sandboxes") return {};
     reads++;
     return {
       items:
         reads === 1
-          ? [{ id: "a", state: "running" }]
+          ? [{ id: "a", observed_state: "running" }]
           : [
-              { id: "a", state: "stopped" },
-              { id: "b", state: reads === 2 ? "running" : "stopped" },
+              { id: "a", observed_state: "stopped" },
+              { id: "b", observed_state: reads === 2 ? "running" : "stopped" },
             ],
     };
   });
@@ -142,7 +142,7 @@ it("also pauses owned sandboxes created while shutdown is waiting", async () => 
   await vi.runAllTimersAsync();
   await result;
   expect(request).toHaveBeenCalledWith(
-    "/sandboxes/b/stop",
+    "/v1/sandboxes/b/stop",
     expect.objectContaining({ method: "POST" }),
   );
 });

@@ -23,7 +23,7 @@ it("finishes a successful write without waiting for a stalled background refresh
   });
   let write!: ReturnType<typeof useSandboxInjectionWriter>;
   function Harness() {
-    write = useSandboxInjectionWriter("sandbox");
+    write = useSandboxInjectionWriter("local-sandbox");
     return null;
   }
   await act(async () => {
@@ -36,7 +36,7 @@ it("finishes a successful write without waiting for a stalled background refresh
     ]),
   ).toEqual(result);
   expect(fixture.client.setQueryData).toHaveBeenCalledWith(
-    ["isodo", "sandbox-injections", "sandbox"],
+    ["isodo", "sandbox-injections", "local-sandbox"],
     result,
   );
 });
