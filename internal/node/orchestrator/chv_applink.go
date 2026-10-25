@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
@@ -67,10 +68,13 @@ func (s *CHVServer) CreateSandboxAppLink(ctx context.Context, request *nodev1.Cr
 			relay.Close()
 		}
 	}()
+	readyStarted := time.Now()
 	if err := waitT3Ready(ctx, relay.URL()); err != nil {
 		return nil, status.Errorf(codes.Unavailable, "T3 application is not ready: %v", err)
 	}
 
+	slog.Info("sandbox workbench HTTP ready", "sandbox_id", record.SandboxID, "duration_ms", time.Since(readyStarted).Milliseconds())
+	pairingStarted := time.Now()
 	connection, err := guesttransport.NewVsockClientConn(socket)
 	if err != nil {
 		return nil, status.Errorf(codes.Unavailable, "connect to Sandbox Guest: %v", err)
@@ -84,6 +88,7 @@ func (s *CHVServer) CreateSandboxAppLink(ctx context.Context, request *nodev1.Cr
 	if err != nil {
 		return nil, status.Errorf(codes.Unavailable, "create T3 pairing credential: %v", err)
 	}
+	slog.Info("sandbox workbench pairing issued", "sandbox_id", record.SandboxID, "duration_ms", time.Since(pairingStarted).Milliseconds())
 	var issued struct {
 		Credential string `json:"credential"`
 		ExpiresAt  string `json:"expiresAt"`

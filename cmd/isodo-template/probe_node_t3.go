@@ -22,23 +22,25 @@ import (
 )
 
 type nodeT3ProbeResult struct {
-	SandboxID          string `json:"sandbox_id"`
-	BootID             string `json:"boot_id"`
-	GuestEpoch         string `json:"guest_epoch"`
-	CreateToReadyMS    int64  `json:"create_to_ready_ms"`
-	CreateToAppLinkMS  int64  `json:"create_to_app_link_ms"`
-	AppHTTPStatus      int    `json:"app_http_status"`
-	AppHTMLOK          bool   `json:"app_html_ok"`
-	PairingTokenIssued bool   `json:"pairing_token_issued"`
-	Restarted          bool   `json:"restarted"`
-	RestartBootID      string `json:"restart_boot_id,omitempty"`
-	RestartGuestEpoch  string `json:"restart_guest_epoch,omitempty"`
-	RestartToAppLinkMS int64  `json:"restart_to_app_link_ms,omitempty"`
-	RestartHTTPStatus  int    `json:"restart_http_status,omitempty"`
-	RestartHTMLOK      bool   `json:"restart_html_ok,omitempty"`
-	Stopped            bool   `json:"stopped"`
-	Deleted            bool   `json:"deleted"`
-	AppURL             string `json:"app_url"`
+	ArtifactVerificationMS int64  `json:"artifact_verification_ms"`
+	RuntimeSnapshot        bool   `json:"runtime_snapshot"`
+	SandboxID              string `json:"sandbox_id"`
+	BootID                 string `json:"boot_id"`
+	GuestEpoch             string `json:"guest_epoch"`
+	CreateToReadyMS        int64  `json:"create_to_ready_ms"`
+	CreateToAppLinkMS      int64  `json:"create_to_app_link_ms"`
+	AppHTTPStatus          int    `json:"app_http_status"`
+	AppHTMLOK              bool   `json:"app_html_ok"`
+	PairingTokenIssued     bool   `json:"pairing_token_issued"`
+	Restarted              bool   `json:"restarted"`
+	RestartBootID          string `json:"restart_boot_id,omitempty"`
+	RestartGuestEpoch      string `json:"restart_guest_epoch,omitempty"`
+	RestartToAppLinkMS     int64  `json:"restart_to_app_link_ms,omitempty"`
+	RestartHTTPStatus      int    `json:"restart_http_status,omitempty"`
+	RestartHTMLOK          bool   `json:"restart_html_ok,omitempty"`
+	Stopped                bool   `json:"stopped"`
+	Deleted                bool   `json:"deleted"`
+	AppURL                 string `json:"app_url"`
 }
 
 type localArtifactFetcher struct {
@@ -75,9 +77,13 @@ func (f *localArtifactFetcher) FetchVerified(context.Context, string, string) (*
 }
 
 func probeNodeT3(ctx context.Context, binary, directory, digest, networkBridge string) (result nodeT3ProbeResult, err error) {
-	if _, err := templateartifact.VerifyArtifact(directory, digest); err != nil {
+	verificationStarted := time.Now()
+	verified, err := templateartifact.VerifyArtifact(directory, digest)
+	if err != nil {
 		return result, err
 	}
+	result.ArtifactVerificationMS = time.Since(verificationStarted).Milliseconds()
+	result.RuntimeSnapshot = verified.Manifest().RuntimeSnapshot != nil
 	state, err := os.MkdirTemp("", "isodo-node-t3-")
 	if err != nil {
 		return result, err
@@ -88,7 +94,7 @@ func probeNodeT3(ctx context.Context, binary, directory, digest, networkBridge s
 		TotalVCPU: 4, AvailableVCPU: 4, TotalMemoryBytes: 8 << 30, AvailableMemoryBytes: 8 << 30,
 	}, orchestrator.CHVConfig{
 		Directory: state, Binary: binary, Bucket: "local",
-		Fetcher:       &localArtifactFetcher{directory: directory, digest: digest},
+		Fetcher:       &localArtifactFetcher{directory: directory, digest: digest, artifact: verified},
 		NetworkBridge: networkBridge,
 	})
 	if err != nil {
