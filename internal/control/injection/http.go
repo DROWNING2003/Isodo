@@ -1,6 +1,7 @@
 package injection
 
 import (
+	"context"
 	"encoding/json"
 	"errors"
 	"io"
@@ -13,14 +14,20 @@ import (
 )
 
 // Handler serves the account-level injection rule API.
+type RuntimeRevoker interface {
+	RevokeInjectionCredential(context.Context, string) error
+}
 type Handler struct {
-	store  Store
-	sealer *Sealer
+	runtimeRevoker RuntimeRevoker
+	store          Store
+	sealer         *Sealer
 }
 
 func NewHandler(store Store, sealer *Sealer) *Handler {
 	return &Handler{store: store, sealer: sealer}
 }
+
+func (h *Handler) SetRuntimeRevoker(revoker RuntimeRevoker) { h.runtimeRevoker = revoker }
 
 func (h *Handler) identity(w http.ResponseWriter, r *http.Request) (auth.Identity, bool) {
 	identity, ok := auth.IdentityFromContext(r.Context())
@@ -211,6 +218,19 @@ func (h *Handler) DeleteInjectionRule(w http.ResponseWriter, r *http.Request, ru
 	if !validID(ruleID) {
 		w.WriteHeader(http.StatusNoContent)
 		return
+	}
+	if h.runtimeRevoker != nil {
+		if _, err := h.store.Get(r.Context(), identity.TenantID, ruleID); errors.Is(err, ErrNotFound) {
+			w.WriteHeader(http.StatusNoContent)
+			return
+		} else if err != nil {
+			fail(w, 503, "INJECTIONS_UNAVAILABLE", "The secure connection could not be loaded.")
+			return
+		}
+		if err := h.runtimeRevoker.RevokeInjectionCredential(r.Context(), ruleID); err != nil {
+			fail(w, 503, "INJECTION_REVOCATION_FAILED", "The runtime could not confirm revocation. Retry deletion.")
+			return
+		}
 	}
 	err := h.store.Delete(r.Context(), identity.TenantID, ruleID)
 	if err != nil && !errors.Is(err, ErrNotFound) {

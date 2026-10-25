@@ -48,6 +48,9 @@ func (s *CHVServer) CreateSandboxAppLink(ctx context.Context, request *nodev1.Cr
 	if identity == nil || identity.GetSandboxId() != record.SandboxID || identity.GetOwnershipGeneration() != record.Generation || identity.GetBootId() == "" || identity.GetGuestEpoch() == "" {
 		return nil, status.Error(codes.FailedPrecondition, "Sandbox Guest identity is not ready")
 	}
+	if err := s.prepareCHVEgress(ctx, record, instance); err != nil {
+		return nil, status.Error(codes.Unavailable, "Sandbox egress proxy could not be configured")
+	}
 	socket := instance.VsockSocket()
 	if socket == "" {
 		return nil, status.Error(codes.FailedPrecondition, "Sandbox runtime does not expose a Guest socket")
@@ -140,6 +143,7 @@ func (s *CHVServer) dialGuestPort(parent context.Context, socket string, identit
 }
 
 func (s *CHVServer) closeAppLinkLocked(sandboxID string) {
+	s.closeEgressLocked(sandboxID)
 	relay := s.appLinks[sandboxID]
 	if relay == nil {
 		return

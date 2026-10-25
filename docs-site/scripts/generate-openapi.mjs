@@ -21,7 +21,9 @@ await generateFiles({
     const groups = new Map([
       ['沙箱管理', []],
       ['应用访问', []],
+      ['文件', []],
       ['安全连接', []],
+      ['Agent 配置', []],
       ['模板管理', []],
       ['模板构建', []],
       ['模板版本与标签', []],
@@ -32,7 +34,9 @@ await generateFiles({
       }
       const route = entry.item.path;
       let group;
-      if (route.startsWith('/v1/injection-rules')) group = '安全连接';
+      if (route.startsWith('/v1/injection-rules') || route.endsWith('/injections')) group = '安全连接';
+      else if (route.startsWith('/v1/credential-documents')) group = 'Agent 配置';
+      else if (/\/(files|directories)$/.test(route)) group = '文件';
       else if (/\/app(?:-link)?$/.test(route)) group = '应用访问';
       else if (route.startsWith('/v1/sandboxes')) group = '沙箱管理';
       else if (route.includes('/builds')) group = '模板构建';

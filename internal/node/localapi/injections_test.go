@@ -51,7 +51,7 @@ func TestLocalInjectionEndpoints(t *testing.T) {
 	server := &Server{injections: backend}
 
 	put := httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodPut, "/sandboxes/sandbox-a/injections", strings.NewReader(`{"rules":[{"key":"one-off:1","name":"临时","kind":"one-off","spec":{"type":"openai","base_url":"https://api.openai.com"},"secret":{"api_key":"sk-test"}}]}`))
+	request := httptest.NewRequest(http.MethodPut, "/v1/sandboxes/sandbox-a/injections", strings.NewReader(`{"rules":[{"key":"one-off:1","name":"临时","kind":"one-off","spec":{"type":"openai","base_url":"https://api.openai.com"},"secret":{"api_key":"sk-test"}}]}`))
 	request.SetPathValue("sandboxID", "sandbox-a")
 	server.putSandboxInjections(put, request)
 	if put.Code != http.StatusOK {
@@ -62,7 +62,7 @@ func TestLocalInjectionEndpoints(t *testing.T) {
 	}
 
 	get := httptest.NewRecorder()
-	request = httptest.NewRequest(http.MethodGet, "/sandboxes/sandbox-a/injections", nil)
+	request = httptest.NewRequest(http.MethodGet, "/v1/sandboxes/sandbox-a/injections", nil)
 	request.SetPathValue("sandboxID", "sandbox-a")
 	server.getSandboxInjections(get, request)
 	if get.Code != http.StatusOK {
@@ -81,7 +81,7 @@ func TestLocalInjectionEndpoints(t *testing.T) {
 
 	invalid := httptest.NewRecorder()
 	tooMany := strings.Repeat(`{"key":"k","name":"n","kind":"one-off","spec":{"type":"openai"},"secret":{"api_key":"x"}},`, 33)
-	request = httptest.NewRequest(http.MethodPut, "/sandboxes/sandbox-a/injections", strings.NewReader(`{"rules":[`+strings.TrimSuffix(tooMany, ",")+`]}`))
+	request = httptest.NewRequest(http.MethodPut, "/v1/sandboxes/sandbox-a/injections", strings.NewReader(`{"rules":[`+strings.TrimSuffix(tooMany, ",")+`]}`))
 	request.SetPathValue("sandboxID", "sandbox-a")
 	server.putSandboxInjections(invalid, request)
 	if invalid.Code != http.StatusBadRequest {
@@ -89,7 +89,7 @@ func TestLocalInjectionEndpoints(t *testing.T) {
 	}
 
 	deleteResponse := httptest.NewRecorder()
-	request = httptest.NewRequest(http.MethodDelete, "/sandboxes/sandbox-a/injections", nil)
+	request = httptest.NewRequest(http.MethodDelete, "/v1/sandboxes/sandbox-a/injections", nil)
 	request.SetPathValue("sandboxID", "sandbox-a")
 	server.deleteSandboxInjections(deleteResponse, request)
 	if deleteResponse.Code != http.StatusNoContent {

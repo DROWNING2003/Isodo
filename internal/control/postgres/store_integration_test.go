@@ -85,18 +85,18 @@ func TestPostgresSandboxTenantIsolation(t *testing.T) {
 	if _, err := store.UpdateSandbox(ctx, tenantA, foreign.ID, sandbox.Patch{Name: &name}); !errors.Is(err, sandbox.ErrNotFound) {
 		t.Fatalf("foreign Update error = %v, want ErrNotFound", err)
 	}
-	if err := store.DeleteSandbox(ctx, tenantA, foreign.ID); !errors.Is(err, sandbox.ErrNotFound) {
+	if _, err := store.DeleteSandbox(ctx, tenantA, foreign.ID); !errors.Is(err, sandbox.ErrNotFound) {
 		t.Fatalf("foreign Delete error = %v, want ErrNotFound", err)
 	}
 	updated, err := store.UpdateSandbox(ctx, tenantA, owned.ID, sandbox.Patch{Name: &name})
 	if err != nil || updated.Name != name {
 		t.Fatalf("owner Update = (%v, %v), want updated name", updated, err)
 	}
-	if err := store.DeleteSandbox(ctx, tenantA, owned.ID); err != nil {
+	if _, err := store.DeleteSandbox(ctx, tenantA, owned.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := store.GetSandbox(ctx, tenantA, owned.ID); !errors.Is(err, sandbox.ErrNotFound) {
-		t.Fatalf("Get after soft delete error = %v, want ErrNotFound", err)
+	if deleted, err := store.GetSandbox(ctx, tenantA, owned.ID); err != nil || deleted.Deletion == nil || deleted.Deletion.CompletedAt != nil {
+		t.Fatalf("deletion must remain observable before Node cleanup: %+v, %v", deleted, err)
 	}
 }
 

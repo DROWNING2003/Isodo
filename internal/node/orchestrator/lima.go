@@ -27,6 +27,7 @@ import (
 
 type LimaServer struct {
 	nodev1.UnimplementedNodeOrchestratorServer
+	nodev1.UnimplementedSandboxRuntimeServer
 	status      *StatusServer
 	manager     *lima.Manager
 	t3Bundle    string

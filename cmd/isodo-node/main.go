@@ -64,7 +64,7 @@ func run(logger *slog.Logger) error {
 		defer closer.Close()
 	}
 	var injectionBackend localapi.InjectionBackend
-	if limaServer, ok := service.(*orchestrator.LimaServer); ok {
+	if injectable, ok := service.(interface{ EnableInjections(*injection.Manager) }); ok {
 		stateDir := os.Getenv("ISODO_NODE_STATE_DIR")
 		if stateDir == "" {
 			configDir, err := os.UserConfigDir()
@@ -73,17 +73,21 @@ func run(logger *slog.Logger) error {
 			}
 			stateDir = filepath.Join(configDir, "Isodo", "node")
 		}
+		_, remoteCHV := service.(*orchestrator.CHVServer)
 		manager, err := injection.NewManager(injection.ManagerConfig{
-			StateDir:    filepath.Join(stateDir, "injections"),
-			HostGateway: envOr("ISODO_INJECTION_HOST_GATEWAY", "192.168.5.2"),
-			Logger:      logger,
+			PublicEgressOnly: remoteCHV,
+			StateDir:         filepath.Join(stateDir, "injections"),
+			HostGateway:      envOr("ISODO_INJECTION_HOST_GATEWAY", "192.168.5.2"),
+			Logger:           logger,
 		})
 		if err != nil {
 			return fmt.Errorf("configure secure-connection injection: %w", err)
 		}
-		limaServer.EnableInjections(manager)
+		injectable.EnableInjections(manager)
 		defer manager.Close()
-		injectionBackend = limaServer
+		if backend, ok := service.(localapi.InjectionBackend); ok {
+			injectionBackend = backend
+		}
 	}
 	var listener net.Listener
 	if !localOnly {
@@ -105,6 +109,9 @@ func run(logger *slog.Logger) error {
 			grpc.MaxSendMsgSize(1<<20),
 		)
 		nodev1.RegisterNodeOrchestratorServer(server, service)
+		if runtimeService, ok := service.(nodev1.SandboxRuntimeServer); ok {
+			nodev1.RegisterSandboxRuntimeServer(server, runtimeService)
+		}
 	}
 	localToken, err := localapi.NewToken()
 	if err != nil {
@@ -124,9 +131,6 @@ func run(logger *slog.Logger) error {
 	}
 	if injectionBackend != nil {
 		localService.SetInjections(injectionBackend)
-	}
-	if limaServer, ok := service.(*orchestrator.LimaServer); ok {
-		localService.SetAgentConfigWriter(limaServer)
 	}
 	localAddress := os.Getenv("ISODO_LOCAL_API_LISTEN_ADDR")
 	if localAddress == "" {

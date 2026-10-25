@@ -177,7 +177,7 @@ func (s *Server) templateReady(ctx context.Context, templateID, buildID string) 
 // buildTemplate materializes a template image in the background so the HTTP
 // call returns immediately and the client can poll GET /templates.
 func (s *Server) buildTemplate(w http.ResponseWriter, r *http.Request) {
-	id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/templates/"), "/build")
+	id := strings.TrimSuffix(strings.TrimPrefix(r.URL.Path, "/v1/templates/"), "/build")
 	spec, ok := s.catalog.Find(id)
 	if !ok || id == BaseTemplateID {
 		writeError(w, http.StatusNotFound, "TEMPLATE_NOT_FOUND", "unknown template", false)

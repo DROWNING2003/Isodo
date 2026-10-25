@@ -4,6 +4,131 @@ info:
   version: 0.1.0
   description: Public sandbox API. Every operation requires a valid session, Casdoor bearer token, or scoped API key.
 paths:
+  /v1/sandboxes/{sandboxID}/files:
+    parameters:
+      - {name: sandboxID, in: path, required: true, schema: {type: string}}
+      - {name: path, in: query, required: true, schema: {type: string}, description: Canonical absolute path under /workspace}
+    post:
+      operationId: UploadSandboxFile
+      summary: Upload and atomically commit one file
+      description: Defaults to overwrite=true. One multipart part named file, up to 256 MiB. Upload bytes are staged in bounded private temporary storage before forwarding through Node and Guest. Success means Guest confirmed the SHA256 and atomic commit. COMMIT_UNKNOWN must be verified by reading the target before retrying.
+      tags: [Files]
+      security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
+      parameters:
+        - {name: overwrite, in: query, schema: {type: boolean, default: true}}
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file: {type: string, format: binary}
+      responses:
+        "200":
+          description: Guest confirmed atomic commit
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FileWriteResult"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+    get:
+      operationId: DownloadSandboxFile
+      summary: Download a verified binary file
+      description: Stages at most 256 MiB in private temporary storage and verifies the Guest completion digest before responding. X-Content-SHA256 describes the complete response body.
+      tags: [Files]
+      security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
+      responses:
+        "200":
+          description: Verified binary content
+          headers:
+            X-Content-SHA256: {schema: {type: string}}
+          content:
+            application/octet-stream:
+              schema: {type: string, format: binary}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/sandboxes/{sandboxID}/directories:
+    parameters:
+      - {name: sandboxID, in: path, required: true, schema: {type: string}}
+    post:
+      operationId: MakeSandboxDirectory
+      summary: Create a workspace directory
+      tags: [Files]
+      security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [path]
+              properties:
+                path: {type: string}
+                parents: {type: boolean, default: true}
+      responses:
+        "200":
+          description: Directory exists
+          content:
+            application/json:
+              schema: {type: object, required: [path], properties: {path: {type: string}}}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/sandboxes/{sandboxID}/injections:
+    parameters:
+      - {name: sandboxID, in: path, required: true, schema: {type: string}}
+    get:
+      operationId: GetSandboxInjections
+      summary: Read masked host-side injection configuration
+      tags: [Sandboxes]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      responses:
+        "200":
+          description: Masked configuration; never contains secret material
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SandboxInjectionState"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+    put:
+      operationId: SetSandboxInjections
+      summary: Replace sandbox host-side injection rules
+      description: Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+      tags: [Sandboxes]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [rules]
+              properties:
+                rules: {type: array, maxItems: 32, items: {$ref: "#/components/schemas/SandboxInjection"}}
+      responses:
+        "200":
+          description: Masked applied configuration
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SandboxInjectionState"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
   /v1/credential-documents/{kind}:
     parameters:
       - {name: kind, in: path, required: true, schema: {type: string}}
@@ -129,7 +254,7 @@ paths:
         - BearerAuth: []
         - APIKeyAuth: []
       responses:
-        "201":
+        "202":
           description: Success
           content:
             application/json:
@@ -215,8 +340,7 @@ paths:
     delete:
       operationId: DeleteSandbox
       summary: Delete a sandbox
-      description: Deletes a sandbox owned by the authenticated user. This operation is idempotent for an already deleted or
-        missing sandbox.
+      description: Requests Node cleanup. The resource remains readable until cleanup completes; repeated deletion returns the same action while pending or completed. Missing resources return 204.
       tags:
         - Sandboxes
       security:
@@ -224,8 +348,13 @@ paths:
         - BearerAuth: []
         - APIKeyAuth: []
       responses:
+        "202":
+          description: Cleanup accepted or its current result
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Sandbox"}
         "204":
-          description: Success
+          description: Sandbox does not exist
         default:
           description: Error
           content:
@@ -302,7 +431,7 @@ paths:
     get:
       operationId: GetSandboxApp
       summary: Open a sandbox application
-      description: Creates a short-lived T3 pairing link for an authenticated sandbox owner and redirects the browser to the sandbox application.
+      description: Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and redirects the browser to the sandbox application.
       tags:
         - Sandboxes
       security:
@@ -310,7 +439,7 @@ paths:
         - BearerAuth: []
       responses:
         "303":
-          description: Redirects to the sandbox application's T3 pairing page. The pairing credential is short-lived and is carried in the URL fragment.
+          description: Redirects to the sandbox application's Agent workbench pairing page. The pairing credential is short-lived and is carried in the URL fragment.
           headers:
             Location:
               schema:
@@ -339,7 +468,7 @@ paths:
     post:
       operationId: CreateSandboxAppLink
       summary: Create a sandbox application link
-      description: Creates a short-lived T3 pairing link for an authenticated sandbox owner and returns it as JSON. Desktop clients and SDKs use this endpoint; browsers can use `GET /v1/sandboxes/{sandboxID}/app` instead. The pairing credential is carried in the `pairing_url` fragment and is never sent to the Isodo API.
+      description: Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and returns it as JSON. Desktop clients and SDKs use this endpoint; browsers can use `GET /v1/sandboxes/{sandboxID}/app` instead. The pairing credential is carried in the `pairing_url` fragment and is never sent to the Isodo API.
       tags:
         - Sandboxes
       security:
@@ -814,6 +943,49 @@ components:
       in: header
       name: X-API-Key
   schemas:
+    FileWriteResult:
+      type: object
+      required: [path, bytes, sha256]
+      properties:
+        path: {type: string}
+        bytes: {type: integer, format: int64}
+        sha256: {type: string, pattern: "^[0-9a-f]{64}$"}
+    SandboxInjection:
+      type: object
+      required: [key, name, kind, spec]
+      properties:
+        key: {type: string}
+        name: {type: string}
+        kind: {type: string, enum: [persistent, one-off]}
+        persistent_id: {type: string}
+        secret_hint: {type: string, readOnly: true}
+        spec:
+          type: object
+          required: [type]
+          properties:
+            type: {$ref: "#/components/schemas/InjectionRuleType"}
+            base_url: {type: string}
+            header_name: {type: string}
+            if_headers: {type: object, additionalProperties: {type: string}}
+            if_queries: {type: object, additionalProperties: {type: string}}
+        secret:
+          type: object
+          writeOnly: true
+          properties:
+            api_key: {type: string}
+            token: {type: string}
+            headers: {type: object, additionalProperties: {type: string}}
+    SandboxInjectionState:
+      type: object
+      required: [rules, enabled, stats]
+      properties:
+        rules: {type: array, items: {$ref: "#/components/schemas/SandboxInjection"}}
+        enabled: {type: boolean}
+        stats:
+          type: object
+          required: [injected]
+          properties:
+            injected: {type: integer, format: int64}
     Error:
       type: object
       additionalProperties: false
@@ -841,6 +1013,68 @@ components:
       type: object
       additionalProperties: true
       x-go-type: json.RawMessage
+    SandboxDesiredState:
+      type: string
+      enum: [running, stopped]
+    SandboxObservedState:
+      type: string
+      enum: [requested, preparing, starting, running, stopping, stopped, error, unknown]
+    SandboxAction:
+      type: object
+      additionalProperties: false
+      required: [revision, type, status, updated_at]
+      properties:
+        revision:
+          type: string
+          pattern: '^[1-9][0-9]*$'
+        type:
+          type: string
+          enum: [create, start, stop, delete]
+        status:
+          type: string
+          enum: [accepted, running, succeeded, failed, superseded]
+        stage:
+          type: string
+        error:
+          $ref: '#/components/schemas/ActionError'
+        updated_at:
+          type: string
+          format: date-time
+    ActionError:
+      type: object
+      additionalProperties: false
+      required: [code, message, retryable]
+      properties:
+        code:
+          type: string
+        message:
+          type: string
+        retryable:
+          type: boolean
+        request_id:
+          type: string
+    SandboxDeletion:
+      type: object
+      additionalProperties: false
+      required: [requested_at]
+      properties:
+        requested_at:
+          type: string
+          format: date-time
+        completed_at:
+          type: string
+          format: date-time
+    SandboxResources:
+      type: object
+      properties:
+        vcpu:
+          type: integer
+        memory_bytes:
+          type: integer
+          format: int64
+        disk_bytes:
+          type: integer
+          format: int64
     Sandbox:
       type: object
       additionalProperties: false
@@ -860,10 +1094,26 @@ components:
           x-go-name: TemplateBuildID
         template_digest:
           type: string
+        revision:
+          type: string
+          pattern: '^[1-9][0-9]*$'
+          description: Lifecycle intent revision. PATCH name or metadata does not change it.
+        last_action:
+          $ref: '#/components/schemas/SandboxAction'
+        deletion:
+          $ref: '#/components/schemas/SandboxDeletion'
+        observed_at:
+          type: string
+          format: date-time
+        runtime_id:
+          type: string
+          description: Opaque handle for the current running instance, never caller-selected.
+        resources:
+          $ref: "#/components/schemas/SandboxResources"
         desired_state:
-          type: string
+          $ref: "#/components/schemas/SandboxDesiredState"
         observed_state:
-          type: string
+          $ref: "#/components/schemas/SandboxObservedState"
         created_at:
           type: string
           format: date-time
@@ -893,8 +1143,6 @@ components:
         metadata:
           $ref: "#/components/schemas/Metadata"
           x-go-type-skip-optional-pointer: true
-      required:
-        - name
     PatchSandbox:
       type: object
       additionalProperties: false
@@ -943,7 +1191,7 @@ components:
         pairing_url:
           type: string
           format: uri
-          description: A ready-to-open URL whose fragment carries the short-lived T3 pairing credential.
+          description: A ready-to-open URL whose fragment carries the short-lived Agent workbench pairing credential.
         status:
           type: string
           enum:

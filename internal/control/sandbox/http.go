@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/google/uuid"
 	"io"
 	"net/http"
 	"net/url"
@@ -13,6 +14,7 @@ import (
 
 	publicapi "github.com/DROWNING2003/Isodo/internal/api/public"
 	"github.com/DROWNING2003/Isodo/internal/control/auth"
+	"github.com/DROWNING2003/Isodo/internal/sandboxfiles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
@@ -29,17 +31,42 @@ const (
 )
 
 type Sandbox struct {
-	ID              string          `json:"id"`
-	TenantID        string          `json:"-"`
-	Name            string          `json:"name"`
-	Metadata        json.RawMessage `json:"metadata"`
-	DesiredState    string          `json:"desired_state"`
-	ObservedState   string          `json:"observed_state"`
-	CreatedAt       time.Time       `json:"created_at"`
-	UpdatedAt       time.Time       `json:"updated_at"`
-	TemplateID      *string         `json:"template_id,omitempty"`
-	TemplateBuildID *string         `json:"template_build_id,omitempty"`
-	TemplateDigest  *string         `json:"template_digest,omitempty"`
+	OwnershipGeneration uint64          `json:"-"`
+	NodeID              string          `json:"-"`
+	Deletion            *Deletion       `json:"deletion,omitempty"`
+	Revision            string          `json:"revision"`
+	LastAction          *Action         `json:"last_action,omitempty"`
+	ID                  string          `json:"id"`
+	TenantID            string          `json:"-"`
+	Name                string          `json:"name"`
+	Metadata            json.RawMessage `json:"metadata"`
+	DesiredState        string          `json:"desired_state"`
+	ObservedState       string          `json:"observed_state"`
+	CreatedAt           time.Time       `json:"created_at"`
+	UpdatedAt           time.Time       `json:"updated_at"`
+	TemplateID          *string         `json:"template_id,omitempty"`
+	TemplateBuildID     *string         `json:"template_build_id,omitempty"`
+	TemplateDigest      *string         `json:"template_digest,omitempty"`
+}
+
+// Action describes one lifecycle request, independently of the VM's observed state.
+type Deletion struct {
+	RequestedAt time.Time  `json:"requested_at"`
+	CompletedAt *time.Time `json:"completed_at,omitempty"`
+}
+
+type Action struct {
+	Revision  string       `json:"revision"`
+	Type      string       `json:"type"`
+	Status    string       `json:"status"`
+	Stage     *string      `json:"stage,omitempty"`
+	Error     *ActionError `json:"error,omitempty"`
+	UpdatedAt time.Time    `json:"updated_at"`
+}
+type ActionError struct {
+	Code      string `json:"code"`
+	Message   string `json:"message"`
+	Retryable bool   `json:"retryable"`
 }
 
 type Patch struct {
@@ -52,12 +79,14 @@ type Store interface {
 	ListSandboxes(ctx context.Context, tenantID string, limit, offset int) ([]Sandbox, int64, error)
 	GetSandbox(ctx context.Context, tenantID, sandboxID string) (Sandbox, error)
 	UpdateSandbox(ctx context.Context, tenantID, sandboxID string, patch Patch) (Sandbox, error)
-	DeleteSandbox(ctx context.Context, tenantID, sandboxID string) error
+	DeleteSandbox(ctx context.Context, tenantID, sandboxID string) (Sandbox, error)
 	StartSandbox(ctx context.Context, tenantID, sandboxID string) (Sandbox, error)
 	StopSandbox(ctx context.Context, tenantID, sandboxID string) (Sandbox, error)
 }
 
 type Handler struct {
+	files     *sandboxfiles.HTTP
+	runtime   RuntimeClient
 	store     Store
 	appLink   AppLinkIssuer
 	publisher AppLinkPublisher
@@ -107,7 +136,13 @@ func (h *Handler) CreateSandbox(w http.ResponseWriter, r *http.Request) {
 	if !decodeJSON(w, r, &request) {
 		return
 	}
-	name := strings.TrimSpace(request.Name)
+	name := ""
+	if request.Name != nil {
+		name = strings.TrimSpace(*request.Name)
+	}
+	if name == "" && request.Name == nil {
+		name = "sandbox-" + uuid.NewString()[:8]
+	}
 	if !validName(name) {
 		writeError(w, http.StatusBadRequest, "INVALID_SANDBOX_NAME", "name must contain 1 to 128 bytes.")
 		return
@@ -146,7 +181,7 @@ func (h *Handler) CreateSandbox(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "The sandbox could not be created.")
 		return
 	}
-	writeJSON(w, http.StatusCreated, sandboxResponse(sandbox))
+	writeJSON(w, http.StatusAccepted, sandboxResponse(sandbox))
 }
 
 func (h *Handler) ListSandboxes(w http.ResponseWriter, r *http.Request, params publicapi.ListSandboxesParams) {
@@ -221,11 +256,14 @@ func (h *Handler) issueSandboxAppLink(w http.ResponseWriter, r *http.Request, id
 		writeSandboxNotFound(w)
 		return "", time.Time{}, false
 	}
-	if _, err := h.store.GetSandbox(r.Context(), identity.TenantID, id); errors.Is(err, ErrNotFound) {
+	if item, err := h.store.GetSandbox(r.Context(), identity.TenantID, id); errors.Is(err, ErrNotFound) {
 		writeSandboxNotFound(w)
 		return "", time.Time{}, false
 	} else if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "The sandbox could not be loaded.")
+		return "", time.Time{}, false
+	} else if item.Deletion != nil {
+		writeError(w, http.StatusConflict, "SANDBOX_DELETING", "The sandbox is being deleted.")
 		return "", time.Time{}, false
 	}
 	if h.appLink == nil {
@@ -441,19 +479,23 @@ func (h *Handler) DeleteSandbox(w http.ResponseWriter, r *http.Request, id strin
 		return
 	}
 	if !sandboxIDPattern.MatchString(id) {
-		writeSandboxNotFound(w)
+		w.WriteHeader(http.StatusNoContent)
 		return
 	}
-	err := h.store.DeleteSandbox(r.Context(), identity.TenantID, id)
+	item, err := h.store.DeleteSandbox(r.Context(), identity.TenantID, id)
 	if errors.Is(err, ErrNotFound) {
-		writeSandboxNotFound(w)
+		w.WriteHeader(http.StatusNoContent)
+		return
+	}
+	if errors.Is(err, ErrConflict) {
+		writeError(w, http.StatusConflict, "SANDBOX_STATE_CONFLICT", "A sandbox action is already in progress.")
 		return
 	}
 	if err != nil {
 		writeError(w, http.StatusInternalServerError, "INTERNAL", "The sandbox could not be deleted.")
 		return
 	}
-	w.WriteHeader(http.StatusNoContent)
+	writeJSON(w, http.StatusAccepted, sandboxResponse(item))
 }
 
 func decodeJSON(w http.ResponseWriter, r *http.Request, destination any) bool {
@@ -506,6 +548,21 @@ func writeJSON(w http.ResponseWriter, status int, value any) {
 }
 
 func sandboxResponse(s Sandbox) publicapi.Sandbox {
-	return publicapi.Sandbox{ID: s.ID, Name: s.Name, TemplateID: s.TemplateID, TemplateBuildID: s.TemplateBuildID, TemplateDigest: s.TemplateDigest, Metadata: s.Metadata, DesiredState: s.DesiredState,
-		ObservedState: s.ObservedState, CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt}
+	view := publicapi.Sandbox{ID: s.ID, Name: s.Name, TemplateID: s.TemplateID, TemplateBuildID: s.TemplateBuildID, TemplateDigest: s.TemplateDigest, Metadata: s.Metadata, DesiredState: publicapi.SandboxDesiredState(s.DesiredState),
+		ObservedState: publicapi.SandboxObservedState(s.ObservedState), CreatedAt: s.CreatedAt, UpdatedAt: s.UpdatedAt}
+	if s.Revision != "" {
+		view.Revision = new(s.Revision)
+	}
+	if s.LastAction != nil {
+		action := s.LastAction
+		view.LastAction = &publicapi.SandboxAction{Revision: action.Revision, Type: publicapi.SandboxActionType(action.Type), Status: publicapi.SandboxActionStatus(action.Status), Stage: action.Stage, UpdatedAt: action.UpdatedAt}
+		if action.Error != nil {
+			view.LastAction.Error = &publicapi.ActionError{Code: action.Error.Code, Message: action.Error.Message, Retryable: action.Error.Retryable}
+		}
+	}
+	if s.Deletion != nil {
+		view.Deletion = &publicapi.SandboxDeletion{RequestedAt: s.Deletion.RequestedAt, CompletedAt: s.Deletion.CompletedAt}
+	}
+
+	return view
 }

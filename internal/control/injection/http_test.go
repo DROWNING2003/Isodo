@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"path/filepath"
@@ -306,5 +307,51 @@ func TestMCPCredentialLifecycle(t *testing.T) {
 		if BuildMaterial(TypeMCP, test.header, test.secret).Headers[test.header] != test.want {
 			t.Fatal("incorrect MCP header")
 		}
+	}
+}
+
+type revokerFake struct {
+	err   error
+	calls int
+}
+
+func (f *revokerFake) RevokeInjectionCredential(context.Context, string) error {
+	f.calls++
+	return f.err
+}
+func TestDeleteRetainsCredentialUntilRuntimeConfirmsRevocation(t *testing.T) {
+	sealer, err := NewSealer(bytes.Repeat([]byte{1}, 32))
+	if err != nil {
+		t.Fatal(err)
+	}
+	store := newMemoryStore()
+	const id = "5c716772-04d5-48bb-96c0-946fc16b6b10"
+	store.rules[id] = Rule{ID: id, TenantID: tenant.TenantID, Name: "model"}
+	handler := NewHandler(store, sealer)
+	revoker := &revokerFake{err: errors.New("unavailable")}
+	handler.SetRuntimeRevoker(revoker)
+	route := auth.Middleware(fixedAuth{identity: tenant}, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) { handler.DeleteInjectionRule(w, r, id) }))
+	call := func() int {
+		r := httptest.NewRequest(http.MethodDelete, "/", nil)
+		r.Header.Set("Authorization", "Bearer test")
+		w := httptest.NewRecorder()
+		route.ServeHTTP(w, r)
+		return w.Code
+	}
+	if code := call(); code != 503 {
+		t.Fatalf("failed revocation status=%d", code)
+	}
+	if _, err := store.Get(t.Context(), tenant.TenantID, id); err != nil {
+		t.Fatal("deleted credential before runtime acknowledged revocation")
+	}
+	revoker.err = nil
+	if code := call(); code != 204 {
+		t.Fatalf("confirmed revocation status=%d", code)
+	}
+	if _, err := store.Get(t.Context(), tenant.TenantID, id); !errors.Is(err, ErrNotFound) {
+		t.Fatal("credential retained after confirmed revocation")
+	}
+	if revoker.calls != 2 {
+		t.Fatalf("revocation calls=%d", revoker.calls)
 	}
 }

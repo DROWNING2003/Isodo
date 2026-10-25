@@ -73,8 +73,8 @@ func (s probeStore) StartSandbox(context.Context, string, string) (sandbox.Sandb
 func (s probeStore) StopSandbox(context.Context, string, string) (sandbox.Sandbox, error) {
 	return sandbox.Sandbox{}, errors.New("not implemented")
 }
-func (s probeStore) DeleteSandbox(context.Context, string, string) error {
-	return errors.New("not implemented")
+func (s probeStore) DeleteSandbox(context.Context, string, string) (sandbox.Sandbox, error) {
+	return sandbox.Sandbox{}, errors.New("not implemented")
 }
 
 type chvAppLink struct {
