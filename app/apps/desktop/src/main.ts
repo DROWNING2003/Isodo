@@ -1,6 +1,7 @@
 import { SandboxFileUploads, type FileRequestInit } from "./fileUploads.js";
 import { validateSandboxRequest } from "./sandboxRequest.ts";
 import { createManagedQuit, pauseManagedSandboxes } from "./shutdown.js";
+import { startDesktopServer } from "./desktopServer.mjs";
 import { app, BrowserWindow, dialog, ipcMain, shell } from "electron";
 import * as NodeChildProcess from "node:child_process";
 import * as NodeFSSync from "node:fs";
@@ -29,6 +30,17 @@ function resolveSidecarAsset(relativePath: string, packagedName: string) {
 // The menu bar and Dock read the bundle name; keep the runtime identity aligned
 // with the product for logs, menus, and user-data paths.
 app.setName("isodo");
+function configuredRemoteAPI(): string {
+  if (process.env.ISODO_REMOTE_API_URL) return process.env.ISODO_REMOTE_API_URL;
+  const file = NodePath.join(app.getPath("userData"), "desktop.json");
+  if (!NodeFSSync.existsSync(file)) return "";
+  const value: unknown = JSON.parse(NodeFSSync.readFileSync(file, "utf8"));
+  if (!value || typeof value !== "object" || typeof (value as { remoteApiUrl?: unknown }).remoteApiUrl !== "string") {
+    throw new Error("Invalid desktop.json: remoteApiUrl must be an HTTPS/loopback URL");
+  }
+  return (value as { remoteApiUrl: string }).remoteApiUrl;
+}
+
 
 function resolveIcon() {
   return app.isPackaged
@@ -38,6 +50,7 @@ function resolveIcon() {
 let mainWindow: BrowserWindow | null = null;
 let nodeProcess: NodeChildProcess.ChildProcess | null = null;
 let localRuntime: { address: string; token: string } | null = null;
+let desktopServer: { url: string; close(): Promise<void> } | null = null;
 
 async function startLocalNode() {
   const binary = resolveNodeBinary();
@@ -246,9 +259,17 @@ async function createWindow() {
   });
   // A development window must always load the dev server: it owns the /api and
   // /auth proxy, so file:// would leave sign-in and every request dead.
-  const devUrl =
+  let devUrl =
     process.env.VITE_DEV_SERVER_URL ??
     (app.isPackaged ? undefined : (process.env.ISODO_WEB_URL ?? "http://127.0.0.1:5734"));
+  if (app.isPackaged || process.env.ISODO_DESKTOP_STATIC === "1") {
+    desktopServer ??= await startDesktopServer({
+      staticDir: NodePath.join(__dirname, "../../web/dist"),
+      apiURL: configuredRemoteAPI(),
+      port: 5734,
+    });
+    devUrl = desktopServer.url;
+  }
   // Sign-in leaves the app origin for the identity provider and then the
   // upstream provider (GitHub) before coming back to /auth/callback. Only that
   // flow may leave the app origin; every other cross-origin navigation stays
@@ -283,7 +304,7 @@ async function createWindow() {
           ),
       );
     }
-  } else await window.loadFile(NodePath.join(__dirname, "../../web/dist/index.html"));
+  } else throw new Error("Bundled desktop origin is not configured");
 }
 
 void app
@@ -328,6 +349,9 @@ app.on("before-quit", (event) => {
 });
 // Keep Node alive if a window cancels closing because it has unsaved work.
 app.on("will-quit", () => {
+  void desktopServer?.close().catch((error: unknown) => {
+    console.error("Desktop HTTP server shutdown failed", error);
+  });
   void stopLocalNode().catch((error: unknown) => {
     console.error("Isodo Node shutdown failed", error);
   });
