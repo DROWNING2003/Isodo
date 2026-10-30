@@ -1,4 +1,5 @@
 import * as Context from "effect/Context";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import type * as Scope from "effect/Scope";
@@ -51,11 +52,35 @@ export const make = Effect.gen(function* () {
       "connection.target.kind": target._tag,
     });
     yield* reportProgress({ stage: "preparing" });
+    const prepareStartedAt = yield* Clock.currentTimeMillis;
     const prepared = yield* resolver.prepare(entry);
+    yield* Effect.logInfo("Connection stage completed.").pipe(
+      Effect.annotateLogs({
+        "environment.id": target.environmentId,
+        stage: "resolver_prepare",
+        duration_ms: (yield* Clock.currentTimeMillis) - prepareStartedAt,
+      }),
+    );
     yield* reportProgress({ stage: "opening", prepared });
+    const connectStartedAt = yield* Clock.currentTimeMillis;
     const session = yield* sessions.connect(prepared);
+    yield* Effect.logInfo("Connection stage completed.").pipe(
+      Effect.annotateLogs({
+        "environment.id": target.environmentId,
+        stage: "websocket_connect",
+        duration_ms: (yield* Clock.currentTimeMillis) - connectStartedAt,
+      }),
+    );
     yield* reportProgress({ stage: "synchronizing", prepared });
+    const readyStartedAt = yield* Clock.currentTimeMillis;
     yield* session.ready;
+    yield* Effect.logInfo("Connection stage completed.").pipe(
+      Effect.annotateLogs({
+        "environment.id": target.environmentId,
+        stage: "initial_sync_ready",
+        duration_ms: (yield* Clock.currentTimeMillis) - readyStartedAt,
+      }),
+    );
     return { prepared, session } satisfies EnvironmentConnectionLease;
   });
 

@@ -1,3 +1,5 @@
+import { logWorkspaceEntry, type WorkspaceEntryTrace } from "../features/isodo/workspaceEntryTrace";
+
 /** Only the configured Isodo preview hosts receive gateway cookies. */
 function isPreviewURL(url: URL): boolean {
   const domain = import.meta.env.VITE_ISODO_PREVIEW_DOMAIN?.trim().toLowerCase();
@@ -19,12 +21,16 @@ export const previewFetch: typeof globalThis.fetch = (input, init) => {
 };
 
 /** Establish the HttpOnly gateway cookie before T3 descriptor/session discovery. */
-export async function bootstrapSandboxPreview(pairingURL: string): Promise<void> {
+export async function bootstrapSandboxPreview(
+  pairingURL: string,
+  trace?: WorkspaceEntryTrace,
+): Promise<void> {
   const url = new URL(pairingURL);
   if (!url.pathname.startsWith("/__isodo/auth/")) return;
   if (!isPreviewURL(url)) throw new Error("预览网关域名与 App 配置不匹配。");
   url.hash = "";
   url.search = new URLSearchParams({ next: "/__isodo/ready" }).toString();
+  const startedAt = performance.now();
   const response = await previewFetch(url.toString(), {
     credentials: "include",
     cache: "no-store",
@@ -32,4 +38,8 @@ export async function bootstrapSandboxPreview(pairingURL: string): Promise<void>
     signal: AbortSignal.timeout(15_000),
   });
   if (response.status !== 204) throw new Error("预览网关认证未完成，请重试连接。");
+  if (trace)
+    logWorkspaceEntry(trace, "preview_cookie_http", performance.now() - startedAt, {
+      status: response.status,
+    });
 }

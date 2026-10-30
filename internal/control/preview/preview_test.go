@@ -166,3 +166,57 @@ func TestPreviewRelayDialsNodeWithoutLocalTarget(t *testing.T) {
 		t.Fatalf("relay proxy status=%d body=%q", response.Code, response.Body.String())
 	}
 }
+
+func TestPreviewRelaySurvivesPublisherRestartForExistingPairing(t *testing.T) {
+	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		_, _ = io.WriteString(w, "relay-after-restart")
+	}))
+	defer backend.Close()
+	backendURL, err := url.Parse(backend.URL)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	config := Config{
+		Secret:  "test-secret",
+		Domain:  "localhost",
+		Scheme:  "http",
+		APIPort: "43123",
+		Relay:   fakeRelay{address: backendURL.Host},
+	}
+	firstPublisher, err := New(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	const sandboxID = "4e59eb96-35e9-4f22-88d9-2a3f4097b62a"
+	_, pairing, err := firstPublisher.Publish(sandboxID, 8080, "http://8080-"+sandboxID+".localhost:9999/pair#token=relay-token")
+	if err != nil {
+		t.Fatal(err)
+	}
+	parsed, err := url.Parse(pairing)
+	if err != nil {
+		t.Fatal(err)
+	}
+	secondPublisher, err := New(config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	handler := secondPublisher.Wrap(http.NotFoundHandler())
+	host := "8080-" + sandboxID + ".localhost:43123"
+
+	auth := httptest.NewRequest(http.MethodGet, "http://"+host+parsed.EscapedPath()+"?next=/pair", nil)
+	authResponse := httptest.NewRecorder()
+	handler.ServeHTTP(authResponse, auth)
+	cookies := authResponse.Result().Cookies()
+	if authResponse.Code != http.StatusFound || len(cookies) != 1 {
+		t.Fatalf("auth status=%d cookies=%d", authResponse.Code, len(cookies))
+	}
+
+	request := httptest.NewRequest(http.MethodGet, "http://"+host+"/.well-known/t3/environment", nil)
+	request.AddCookie(cookies[0])
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK || response.Body.String() != "relay-after-restart" {
+		t.Fatalf("relay proxy after restart status=%d body=%q", response.Code, response.Body.String())
+	}
+}

@@ -27,6 +27,11 @@ import {
   useLocalRuntimeSandbox,
   usePlatformSandbox,
 } from "./usePlatformSandbox";
+import {
+  logWorkspaceEntry,
+  takeWorkspaceEntry,
+  type WorkspaceEntryTrace,
+} from "./workspaceEntryTrace";
 
 export const CLOUD_WORKSPACE_PANES = ["files", "connections", "snapshots", "security"] as const;
 export type CloudWorkspacePane = (typeof CLOUD_WORKSPACE_PANES)[number];
@@ -38,6 +43,24 @@ export function isCloudWorkspacePane(value: unknown): value is CloudWorkspacePan
 type ConnectionState =
   | { readonly kind: "connecting" }
   | { readonly kind: "failed"; readonly message: string };
+
+const sandboxPairingAttempts = new Map<string, Promise<EnvironmentId>>();
+
+function connectSandboxOnce(
+  sandboxId: string,
+  connect: () => Promise<EnvironmentId>,
+): Promise<EnvironmentId> {
+  const existing = sandboxPairingAttempts.get(sandboxId);
+  if (existing) return existing;
+
+  const attempt = Promise.resolve().then(connect);
+  sandboxPairingAttempts.set(sandboxId, attempt);
+  const clear = () => {
+    if (sandboxPairingAttempts.get(sandboxId) === attempt) sandboxPairingAttempts.delete(sandboxId);
+  };
+  void attempt.then(clear, clear);
+  return attempt;
+}
 
 /**
  * Entering a sandbox connects the app to the runtime that actually serves it.
@@ -70,6 +93,16 @@ export function CloudWorkspace({ sandboxId }: { sandboxId: string }) {
   );
   const [connection, setConnection] = useState<ConnectionState>({ kind: "connecting" });
   const [starting, setStarting] = useState(false);
+  const traceRef = useRef<WorkspaceEntryTrace | null>(null);
+  const sandboxStatusLogged = useRef(false);
+  if (!traceRef.current || traceRef.current.sandboxId !== sandboxId) {
+    traceRef.current = takeWorkspaceEntry(sandboxId);
+    logWorkspaceEntry(
+      traceRef.current,
+      "click_to_cloud_workspace_mount",
+      Date.now() - traceRef.current.clickedAt,
+    );
+  }
   const autoConnectFor = useRef<string | null>(null);
   const mounted = useRef(false);
   const currentSandboxId = useRef(sandboxId);
@@ -85,35 +118,71 @@ export function CloudWorkspace({ sandboxId }: { sandboxId: string }) {
     if (!mounted.current || currentSandboxId.current !== sandboxId) return;
     setConnection({ kind: "connecting" });
     try {
-      // Local VM state does not guarantee that its T3 HTTP service survived.
-      // Asking for a fresh link makes Node repair T3 before reusing a pairing.
-      const localPairingUrl = isLocalSandbox
-        ? await resolvePairingUrl(sandboxId, { local: true })
-        : null;
-      if (!mounted.current || currentSandboxId.current !== sandboxId) return;
       if (pairedEnvironmentId) {
+        // Local VM state does not guarantee that its T3 HTTP service survived.
+        // Asking for a fresh link makes Node repair T3 before reusing a pairing.
+        if (isLocalSandbox)
+          await resolvePairingUrl(sandboxId, {
+            local: true,
+            ...(traceRef.current ? { trace: traceRef.current } : {}),
+          });
+        if (!mounted.current || currentSandboxId.current !== sandboxId) return;
         const resumed = await setConnected({ environmentId: pairedEnvironmentId, connected: true });
         if (resumed._tag !== "Success") throw new Error("连接没有恢复，请重试");
         setSandboxEnvironmentDisconnected(pairedEnvironmentId, false);
         if (!mounted.current || currentSandboxId.current !== sandboxId) return;
         setActiveEnvironmentId(pairedEnvironmentId);
+        const navigateStartedAt = performance.now();
         await navigate(workspaceTargetForEnvironment(pairedEnvironmentId));
+        if (traceRef.current)
+          logWorkspaceEntry(
+            traceRef.current,
+            "navigate_to_workspace",
+            performance.now() - navigateStartedAt,
+            { already_paired: true },
+          );
         return;
       }
-      const pairingUrl = localPairingUrl ?? (await resolvePairingUrl(sandboxId, { local: false }));
-      if (!mounted.current || currentSandboxId.current !== sandboxId) return;
-      const result = await connectPairingEnv({ pairingUrl });
-      if (result._tag !== "Success") {
-        throw new Error("配对没有完成");
-      }
-      const environmentId = result.value as EnvironmentId;
-      rememberSandboxEnvironment(environmentId, sandboxId);
+      const environmentId = await connectSandboxOnce(sandboxId, async () => {
+        const pairingUrl = await resolvePairingUrl(sandboxId, {
+          local: isLocalSandbox,
+          ...(traceRef.current ? { trace: traceRef.current } : {}),
+        });
+        const pairingStartedAt = performance.now();
+        const result = await connectPairingEnv({
+          pairingUrl,
+          ...(traceRef.current ? { traceId: traceRef.current.traceId } : {}),
+        });
+        if (traceRef.current)
+          logWorkspaceEntry(
+            traceRef.current,
+            "pairing_registration_and_connection",
+            performance.now() - pairingStartedAt,
+            {
+              outcome: result._tag,
+            },
+          );
+        if (result._tag !== "Success") throw new Error("配对没有完成");
+        const pairedId = result.value as EnvironmentId;
+        // Persist the mapping before releasing the in-flight guard. A route
+        // remount can then take the paired fast path without minting another
+        // one-time pairing credential.
+        rememberSandboxEnvironment(pairedId, sandboxId);
+        return pairedId;
+      });
       setSandboxEnvironmentDisconnected(environmentId, false);
       if (!mounted.current || currentSandboxId.current !== sandboxId) return;
       setActiveEnvironmentId(environmentId);
       // Pairing has registered the environment. Keep the active selection in
       // memory while the index route waits for shell bootstrap and opens a draft.
+      const navigateStartedAt = performance.now();
       await navigate({ to: "/workspace", replace: true });
+      if (traceRef.current)
+        logWorkspaceEntry(
+          traceRef.current,
+          "navigate_to_workspace",
+          performance.now() - navigateStartedAt,
+        );
     } catch (reason) {
       if (!mounted.current || currentSandboxId.current !== sandboxId) return;
       setConnection({
@@ -125,6 +194,17 @@ export function CloudWorkspace({ sandboxId }: { sandboxId: string }) {
 
   useEffect(() => {
     if (localRuntime.loading || (!localRecord && platform.loading)) return;
+    if (!sandboxStatusLogged.current && traceRef.current && sandbox) {
+      sandboxStatusLogged.current = true;
+      logWorkspaceEntry(
+        traceRef.current,
+        "sandbox_status_available",
+        Date.now() - traceRef.current.clickedAt,
+        {
+          status: sandbox.status,
+        },
+      );
+    }
     if (!catalogReady || sandbox?.status !== "running") return;
     // One automatic attempt per sandbox; retries stay user-initiated so a failure
     // cannot spin forever.
@@ -217,8 +297,11 @@ export function CloudWorkspace({ sandboxId }: { sandboxId: string }) {
                   disabled={starting}
                   onClick={() => {
                     setStarting(true);
-                    void localSandboxClient.start(localRecord.id)
-                      .then((accepted) => waitForSandboxAction(localSandboxClient, accepted, { timeoutMs: 120_000 }))
+                    void localSandboxClient
+                      .start(localRecord.id)
+                      .then((accepted) =>
+                        waitForSandboxAction(localSandboxClient, accepted, { timeoutMs: 120_000 }),
+                      )
                       .then(async (running) => {
                         autoConnectFor.current = sandboxId;
                         updateLocalSandboxCache((items) => [

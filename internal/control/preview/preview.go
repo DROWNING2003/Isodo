@@ -55,10 +55,9 @@ type Publisher struct {
 	appOrigin string
 	ttl       time.Duration
 
-	relay        RelayDialer
-	mu           sync.RWMutex
-	targets      map[string]*url.URL
-	relayTargets map[string]uint16
+	relay   RelayDialer
+	mu      sync.RWMutex
+	targets map[string]*url.URL
 }
 
 type claims struct {
@@ -89,15 +88,14 @@ func New(config Config) (*Publisher, error) {
 		ttl = time.Hour
 	}
 	return &Publisher{
-		secret:       []byte(config.Secret),
-		domain:       strings.Trim(strings.ToLower(config.Domain), "."),
-		scheme:       scheme,
-		apiPort:      strings.TrimSpace(config.APIPort),
-		appOrigin:    config.AppOrigin,
-		ttl:          ttl,
-		relay:        config.Relay,
-		targets:      make(map[string]*url.URL),
-		relayTargets: make(map[string]uint16),
+		secret:    []byte(config.Secret),
+		domain:    strings.Trim(strings.ToLower(config.Domain), "."),
+		scheme:    scheme,
+		apiPort:   strings.TrimSpace(config.APIPort),
+		appOrigin: config.AppOrigin,
+		ttl:       ttl,
+		relay:     config.Relay,
+		targets:   make(map[string]*url.URL),
 	}, nil
 }
 
@@ -138,24 +136,15 @@ func (p *Publisher) Publish(sandboxID string, port uint16, nodeURL string) (stri
 
 	p.mu.Lock()
 	if p.relay != nil {
-		p.relayTargets[sandboxID] = port
 		delete(p.targets, sandboxID)
 	} else {
 		p.targets[sandboxID] = &target
-		delete(p.relayTargets, sandboxID)
 	}
 	p.mu.Unlock()
 
 	base := p.scheme + "://" + publicHost + "/"
 	pairing := p.scheme + "://" + publicHost + authPrefix + token + "?next=/pair#" + parsed.Fragment
 	return base, pairing, nil
-}
-
-func (p *Publisher) relayTarget(sandboxID string) (uint16, bool) {
-	p.mu.RLock()
-	defer p.mu.RUnlock()
-	port, ok := p.relayTargets[sandboxID]
-	return port, ok
 }
 
 func (p *Publisher) proxyRelay(w http.ResponseWriter, r *http.Request, sandboxID string, port uint16) {
@@ -230,11 +219,9 @@ func (p *Publisher) Wrap(next http.Handler) http.Handler {
 			return
 		}
 		if p.relay != nil {
-			port, ok := p.relayTarget(sandboxID)
-			if !ok {
-				http.Error(w, "sandbox preview is not ready", http.StatusBadGateway)
-				return
-			}
+			// The signed preview host already binds this request to the sandbox
+			// and service port. Derive the relay target from it so existing
+			// preview cookies continue working after an API process restart.
 			p.proxyRelay(w, r, sandboxID, port)
 			return
 		}

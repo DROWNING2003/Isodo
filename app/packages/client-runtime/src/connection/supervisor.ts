@@ -724,6 +724,15 @@ export const make = Effect.fn("EnvironmentSupervisor.make")(function* (
 
       failureCount += 1;
       const delayMs = retryDelayMs(failureCount - 1);
+      yield* Effect.logInfo("Connection supervisor scheduled a retry.").pipe(
+        Effect.annotateLogs({
+          "environment.id": target.environmentId,
+          stage: "supervisor_retry_backoff",
+          attempt,
+          delay_ms: delayMs,
+          reason: error.reason,
+        }),
+      );
       pendingRetry = Option.map(attemptSpan, (previousAttempt) => ({
         previousAttempt,
         failureCount,

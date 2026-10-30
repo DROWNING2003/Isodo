@@ -77,6 +77,25 @@ it("enters the workbench after pairing without waiting on a stale catalog or rel
   expect(fixture.navigate).toHaveBeenCalledWith({ to: "/workspace", replace: true });
 });
 
+it("shares one app-link and pairing attempt across concurrent route mounts", async () => {
+  fixture.savedId = null;
+  fixture.resolve.mockClear();
+  fixture.connect.mockClear();
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+
+  await act(async () => {
+    renderer = create(
+      <>
+        <CloudWorkspace sandboxId="sbx-local" />
+        <CloudWorkspace sandboxId="sbx-local" />
+      </>,
+    );
+  });
+
+  expect(fixture.resolve).toHaveBeenCalledTimes(1);
+  expect(fixture.connect).toHaveBeenCalledTimes(1);
+});
+
 it("reuses a paired sandbox after returning to the list without requesting another pairing", async () => {
   fixture.connect.mockClear();
   fixture.savedId = "env-local";
@@ -124,7 +143,10 @@ it("repairs the local runtime before resuming an existing pairing", async () => 
   await act(async () => {
     renderer = create(<CloudWorkspace sandboxId="sbx-local" />);
   });
-  expect(fixture.resolve).toHaveBeenCalledWith("sbx-local", { local: true });
+  expect(fixture.resolve).toHaveBeenCalledWith("sbx-local", {
+    local: true,
+    trace: expect.objectContaining({ sandboxId: "sbx-local", traceId: expect.any(String) }),
+  });
   expect(fixture.resolve.mock.invocationCallOrder[0]).toBeLessThan(
     fixture.resume.mock.invocationCallOrder[0]!,
   );
@@ -143,7 +165,10 @@ it("waits for sandbox ownership before resuming a saved pairing", async () => {
   expect(fixture.resume).not.toHaveBeenCalled();
   fixture.loading = false;
   await act(async () => renderer.update(<CloudWorkspace sandboxId="sbx-local" />));
-  expect(fixture.resolve).toHaveBeenCalledWith("sbx-local", { local: true });
+  expect(fixture.resolve).toHaveBeenCalledWith("sbx-local", {
+    local: true,
+    trace: expect.objectContaining({ sandboxId: "sbx-local", traceId: expect.any(String) }),
+  });
   expect(fixture.resume).toHaveBeenCalledTimes(1);
   fixture.savedId = null;
 });

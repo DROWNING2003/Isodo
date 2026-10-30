@@ -1,4 +1,5 @@
 import { sandboxClientFor } from "./sandboxTransports";
+import { beginWorkspaceEntry } from "./workspaceEntryTrace";
 import { waitForSandboxAction } from "./sandboxClient";
 import { toLocalSandboxItem } from "./sandboxQueries";
 import { useServerAgentConfigs, useAgentConfigMutations } from "./credentialDocuments";
@@ -244,6 +245,7 @@ export function CloudOverview() {
             // Opening a sandbox always lands on its workspace; the workspace
             // owns the T3 session so the list never navigates away from the app.
             const openSandbox = () => {
+              beginWorkspaceEntry(sandbox.id);
               if (!isPlatformSandbox && sandbox.status === "paused") {
                 cloud.setStatus(sandbox.id, "running");
               }

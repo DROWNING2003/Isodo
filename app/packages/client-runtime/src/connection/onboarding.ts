@@ -1,6 +1,7 @@
 import type { DesktopSshEnvironmentTarget, EnvironmentId } from "@t3tools/contracts";
 import { resolveRemotePairingTarget } from "@t3tools/shared/remote";
 import * as Context from "effect/Context";
+import * as Clock from "effect/Clock";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
@@ -36,6 +37,8 @@ export interface PairingConnectionInput {
   readonly pairingUrl?: string;
   readonly host?: string;
   readonly pairingCode?: string;
+  /** Diagnostic correlation only; never persisted or used as a credential. */
+  readonly traceId?: string;
 }
 
 export interface SshConnectionInput {
@@ -88,15 +91,35 @@ export const preparePairingRegistration = Effect.fn(
 )(function* (input: PairingConnectionInput) {
   const target = yield* resolvePairingTarget(input);
   const presentation = yield* ClientCapabilities.ClientPresentation;
+  const descriptorStartedAt = yield* Clock.currentTimeMillis;
   const descriptor = yield* fetchRemoteEnvironmentDescriptor({
     httpBaseUrl: target.httpBaseUrl,
   }).pipe(Effect.mapError(mapRemoteEnvironmentError));
+  if (input.traceId)
+    yield* Effect.logInfo("Workspace entry stage completed.").pipe(
+      Effect.annotateLogs({
+        trace_id: input.traceId,
+        stage: "t3_descriptor_http",
+        duration_ms: (yield* Clock.currentTimeMillis) - descriptorStartedAt,
+        environment_id: descriptor.environmentId,
+      }),
+    );
+  const tokenStartedAt = yield* Clock.currentTimeMillis;
   const access = yield* bootstrapRemoteBearerSession({
     httpBaseUrl: target.httpBaseUrl,
     credential: target.credential,
     scopes: presentation.scopes,
     clientMetadata: presentation.metadata,
   }).pipe(Effect.mapError(mapRemoteEnvironmentError));
+  if (input.traceId)
+    yield* Effect.logInfo("Workspace entry stage completed.").pipe(
+      Effect.annotateLogs({
+        trace_id: input.traceId,
+        stage: "oauth_token_exchange",
+        duration_ms: (yield* Clock.currentTimeMillis) - tokenStartedAt,
+        environment_id: descriptor.environmentId,
+      }),
+    );
   const connectionId = `bearer:${descriptor.environmentId}`;
 
   return new BearerConnectionRegistration({
@@ -123,7 +146,17 @@ const registerPairingConnection = Effect.fn(
 )(function* (input: PairingConnectionInput) {
   const registration = yield* preparePairingRegistration(input);
   const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
+  const startedAt = yield* Clock.currentTimeMillis;
   yield* registry.register(registration);
+  if (input.traceId)
+    yield* Effect.logInfo("Workspace entry stage completed.").pipe(
+      Effect.annotateLogs({
+        trace_id: input.traceId,
+        stage: "environment_registry_register",
+        duration_ms: (yield* Clock.currentTimeMillis) - startedAt,
+        environment_id: registration.target.environmentId,
+      }),
+    );
   return registration.target.environmentId;
 });
 

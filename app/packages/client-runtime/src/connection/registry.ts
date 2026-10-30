@@ -415,7 +415,10 @@ export const makeWithOptions = (options: EnvironmentRegistryOptions = {}) =>
             next.set(environmentId, registration.target);
             return next;
           });
-          yield* installEntryLocked(entry);
+          // A repeated pairing refreshes the stored bearer credential. If its
+          // target and profile are unchanged, keep a healthy supervisor/session
+          // instead of tearing down its WebSocket and reconnecting.
+          yield* installEntryLocked(entry, { retainEquivalentRuntime: true });
         }),
       );
     });

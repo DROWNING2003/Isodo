@@ -656,6 +656,43 @@ describe("EnvironmentRegistry", () => {
     }),
   );
 
+  it.effect(
+    "keeps a healthy session when an equivalent bearer registration refreshes its token",
+    () =>
+      Effect.gen(function* () {
+        const harness = yield* makeHarness([]);
+        const refreshedCredential = new BearerConnectionCredential({ token: "refreshed-token" });
+
+        yield* Effect.gen(function* () {
+          const registry = yield* EnvironmentRegistry.EnvironmentRegistry;
+          const registration = new BearerConnectionRegistration({
+            target: BEARER_TARGET,
+            profile: BEARER_PROFILE,
+            credential: BEARER_CREDENTIAL,
+          });
+          yield* registry.register(registration);
+          yield* awaitConnectionState(
+            registry,
+            BEARER_TARGET.environmentId,
+            (state) => state.phase === "connected",
+          );
+
+          yield* registry.register(
+            new BearerConnectionRegistration({
+              target: BEARER_TARGET,
+              profile: BEARER_PROFILE,
+              credential: refreshedCredential,
+            }),
+          );
+
+          expect(yield* Ref.get(harness.sessions)).toHaveLength(1);
+          expect(
+            (yield* Ref.get(harness.storedCredentials)).get(BEARER_TARGET.connectionId),
+          ).toEqual(refreshedCredential);
+        }).pipe(Effect.provide(harness.layer), Effect.scoped);
+      }),
+  );
+
   it.effect("moves durable streams to a replacement supervisor", () =>
     Effect.gen(function* () {
       const replacement = new RelayConnectionTarget({

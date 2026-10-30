@@ -1,5 +1,5 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 import ChatView from "../components/ChatView";
 import { threadHasStarted } from "../components/ChatView.logic";
@@ -19,6 +19,11 @@ import { environmentShell } from "../state/shell";
 import { useEnvironment, useEnvironments } from "../state/environments";
 import { shouldRedirectSandboxWebEnvironment } from "../sandboxWebRouting";
 import { isSandboxOnlyWeb } from "../webSurface";
+import {
+  clearActiveWorkspaceEntryTrace,
+  getActiveWorkspaceEntryTrace,
+  logWorkspaceEntry,
+} from "../features/isodo/workspaceEntryTrace";
 
 function ChatThreadRouteView() {
   const navigate = useNavigate();
@@ -68,6 +73,23 @@ function ChatThreadRouteView() {
   });
   const serverThreadStarted = threadHasStarted(serverThreadDetail);
   const environmentHasAnyThreads = environmentHasServerThreads || environmentHasDraftThreads;
+  const entryTrace = getActiveWorkspaceEntryTrace();
+  const entryTraceCompleted = useRef<string | null>(null);
+
+  useEffect(() => {
+    if (
+      renderState !== "ready" ||
+      !entryTrace ||
+      entryTraceCompleted.current === entryTrace.traceId
+    ) {
+      return;
+    }
+    entryTraceCompleted.current = entryTrace.traceId;
+    logWorkspaceEntry(entryTrace, "t3_workspace_interactive", Date.now() - entryTrace.clickedAt, {
+      environment_id: threadRef?.environmentId ?? "unknown",
+    });
+    clearActiveWorkspaceEntryTrace(entryTrace.traceId);
+  }, [entryTrace, renderState, threadRef?.environmentId]);
 
   useEffect(() => {
     if (!shouldRedirect) {

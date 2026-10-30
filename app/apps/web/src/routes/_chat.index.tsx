@@ -1,5 +1,6 @@
 import { RefreshIcon } from "~/components/ui/refresh-icon";
 import { scopeProjectRef } from "@t3tools/client-runtime/environment";
+import type { EnvironmentId } from "@t3tools/contracts";
 import {
   createFileRoute,
   Link,
@@ -7,7 +8,6 @@ import {
   useNavigate,
   useRouteContext,
 } from "@tanstack/react-router";
-import { isSandboxUrl } from "@t3tools/shared/sandbox";
 import { CloudIcon, LinkIcon, LoaderIcon, PlusIcon } from "lucide-react";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 
@@ -21,7 +21,7 @@ import { useNewThreadHandler } from "../hooks/useHandleNewThread";
 import { newProjectId } from "../lib/utils";
 import {
   buildSandboxProjectCreateInput,
-  findConnectedSandboxMissingProject,
+  isSandboxEnvironment,
   findLegacySandboxProject,
   SANDBOX_PROJECT_WORKSPACE_ROOT,
   selectProjectsForActiveEnvironment,
@@ -44,14 +44,27 @@ import {
   shouldRedirectSandboxWebChatIndex,
 } from "~/sandboxWebRouting";
 import { isSandboxOnlyWeb, webSurface } from "~/webSurface";
+import {
+  environmentIdForSandbox,
+  sandboxIdForEnvironment,
+} from "../features/isodo/sandboxEnvironmentMap";
+import { getActiveWorkspaceEntryTrace } from "../features/isodo/workspaceEntryTrace";
+
+function isIsodoSandboxEnvironment(environment: {
+  readonly environmentId: EnvironmentId;
+  readonly displayUrl: string | null;
+}): boolean {
+  return isSandboxEnvironment(
+    environment,
+    sandboxIdForEnvironment(environment.environmentId) !== null,
+  );
+}
 
 export function ChatIndexRouteView() {
   const { authGateState } = useRouteContext({ from: "__root__" });
   const { environments, isReady } = useEnvironments();
   if (isSandboxOnlyWeb) {
-    const sandboxCount = environments.filter(
-      (environment) => environment.displayUrl && isSandboxUrl(environment.displayUrl),
-    ).length;
+    const sandboxCount = environments.filter(isIsodoSandboxEnvironment).length;
     if (shouldRedirectSandboxWebChatIndex({ catalogReady: isReady, sandboxCount })) {
       return <Navigate to="/sandboxes" replace />;
     }
@@ -82,12 +95,14 @@ function IndexDraftLanding() {
   const startingRef = useRef(false);
   const creatingSandboxProjectsRef = useRef(new Set<string>());
   const migratedLegacySandboxProjectIdsRef = useRef(new Set<string>());
+  const [sandboxProjectRetryRequest, setSandboxProjectRetryRequest] = useState(0);
+  const [sandboxProjectFailure, setSandboxProjectFailure] = useState<string | null>(null);
   const [startState, setStartState] = useState({ failed: false, retryRequest: 0 });
   const sandboxEnvironmentIds = useMemo(
     () =>
       new Set(
         environments
-          .filter((environment) => environment.displayUrl && isSandboxUrl(environment.displayUrl))
+          .filter(isIsodoSandboxEnvironment)
           .map((environment) => environment.environmentId),
       ),
     [environments],
@@ -109,6 +124,25 @@ function IndexDraftLanding() {
     () => findLegacySandboxProject(allProjects, sandboxEnvironmentIds),
     [allProjects, sandboxEnvironmentIds],
   );
+  const entrySandboxId = getActiveWorkspaceEntryTrace()?.sandboxId;
+  const entryEnvironmentId = entrySandboxId
+    ? environmentIdForSandbox(
+        entrySandboxId,
+        environments.map((environment) => environment.environmentId),
+      )
+    : null;
+  const activeSandboxEnvironment =
+    environments.find((environment) => environment.environmentId === entryEnvironmentId) ??
+    (activeEnvironmentId === null
+      ? environments.find(isIsodoSandboxEnvironment)
+      : environments.find(
+          (environment) =>
+            environment.environmentId === activeEnvironmentId &&
+            isIsodoSandboxEnvironment(environment),
+        ));
+  const activeSandboxHasProject =
+    activeSandboxEnvironment !== undefined &&
+    allProjects.some((project) => project.environmentId === activeSandboxEnvironment.environmentId);
 
   const mostRecentProject = useMemo(
     () =>
@@ -119,18 +153,49 @@ function IndexDraftLanding() {
   );
 
   useEffect(() => {
-    const environment = findConnectedSandboxMissingProject(environments, allProjects);
-    if (environment === null || creatingSandboxProjectsRef.current.has(environment.environmentId)) {
+    const environment = environments.find(
+      (candidate) =>
+        candidate.connection.phase === "connected" &&
+        isIsodoSandboxEnvironment(candidate) &&
+        !allProjects.some((project) => project.environmentId === candidate.environmentId),
+    );
+    if (
+      environment === undefined ||
+      creatingSandboxProjectsRef.current.has(environment.environmentId)
+    ) {
       return;
     }
     creatingSandboxProjectsRef.current.add(environment.environmentId);
+    setSandboxProjectFailure(null);
     void createProject({
       environmentId: environment.environmentId,
       input: buildSandboxProjectCreateInput(newProjectId()),
-    }).finally(() => {
-      creatingSandboxProjectsRef.current.delete(environment.environmentId);
-    });
-  }, [allProjects, createProject, environments]);
+    })
+      .then((result) => {
+        if (result._tag === "Failure") {
+          creatingSandboxProjectsRef.current.delete(environment.environmentId);
+          setSandboxProjectFailure(environment.environmentId);
+        }
+      })
+      .catch(() => {
+        creatingSandboxProjectsRef.current.delete(environment.environmentId);
+        setSandboxProjectFailure(environment.environmentId);
+      });
+  }, [allProjects, createProject, environments, sandboxProjectRetryRequest]);
+
+  useEffect(() => {
+    if (
+      sandboxProjectFailure &&
+      allProjects.some((project) => project.environmentId === sandboxProjectFailure)
+    ) {
+      setSandboxProjectFailure(null);
+    }
+    for (const environmentId of creatingSandboxProjectsRef.current) {
+      if (allProjects.some((project) => project.environmentId === environmentId)) {
+        creatingSandboxProjectsRef.current.delete(environmentId);
+      }
+    }
+  }, [allProjects, sandboxProjectFailure]);
 
   useEffect(() => {
     // Isodo sandboxes always keep the workspace at /workspace, so an upstream
@@ -173,6 +238,42 @@ function IndexDraftLanding() {
 
   if (!bootstrapped) {
     return <WorkspaceLoading />;
+  }
+  if (activeSandboxEnvironment && !activeSandboxHasProject) {
+    if (sandboxProjectFailure === activeSandboxEnvironment.environmentId) {
+      return (
+        <SidebarInset className="h-dvh min-h-0 overflow-hidden bg-background text-foreground">
+          <Empty className="flex-1">
+            <EmptyHeader className="max-w-md">
+              <EmptyTitle className="text-foreground text-xl">无法初始化沙箱工作区</EmptyTitle>
+              <EmptyDescription className="mt-2 text-sm text-muted-foreground/78">
+                沙箱已连接，但默认项目创建失败。请重试连接工作区。
+              </EmptyDescription>
+              <div className="mt-5 flex justify-center">
+                <Button
+                  size="sm"
+                  onClick={() => {
+                    setSandboxProjectFailure(null);
+                    setSandboxProjectRetryRequest((request) => request + 1);
+                  }}
+                >
+                  重试
+                </Button>
+              </div>
+            </EmptyHeader>
+          </Empty>
+        </SidebarInset>
+      );
+    }
+    return (
+      <WorkspaceLoading
+        message={
+          activeSandboxEnvironment.connection.phase === "connected"
+            ? "正在初始化沙箱工作区…"
+            : "正在连接沙箱…"
+        }
+      />
+    );
   }
   if (mostRecentProject !== null) {
     return startState.failed ? (

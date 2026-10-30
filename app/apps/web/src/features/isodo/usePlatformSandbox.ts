@@ -1,5 +1,6 @@
 import { sandboxClientFor } from "./sandboxTransports";
 import { bootstrapSandboxPreview } from "../../api/preview";
+import { measureWorkspaceEntry, type WorkspaceEntryTrace } from "./workspaceEntryTrace";
 import { useMemo } from "react";
 import { useLocalSandboxes, usePlatformSandboxes } from "./sandboxQueries";
 
@@ -77,10 +78,17 @@ export function usePlatformSandbox(sandboxId: string): {
  */
 export async function resolvePairingUrl(
   sandboxId: string,
-  options: { readonly local: boolean },
+  options: { readonly local: boolean; readonly trace?: WorkspaceEntryTrace },
 ): Promise<string> {
-  const link = await sandboxClientFor(options.local ? "local" : "cloud").createAppLink(sandboxId);
-  await bootstrapSandboxPreview(link.pairing_url);
+  const createLink = () =>
+    sandboxClientFor(options.local ? "local" : "cloud").createAppLink(sandboxId);
+  const link = options.trace
+    ? await measureWorkspaceEntry(options.trace, "app_link_http", createLink)
+    : await createLink();
+  const bootstrap = () => bootstrapSandboxPreview(link.pairing_url, options.trace);
+  if (options.trace)
+    await measureWorkspaceEntry(options.trace, "preview_cookie_bootstrap", bootstrap);
+  else await bootstrap();
   return link.pairing_url;
 }
 
