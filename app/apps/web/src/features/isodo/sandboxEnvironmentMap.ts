@@ -35,6 +35,19 @@ export function sandboxIdForEnvironment(environmentId: EnvironmentId | null): st
   return read()[String(environmentId)] ?? null;
 }
 
+/** Forget the local pairing metadata after its owning sandbox is deleted. */
+export function forgetSandboxEnvironment(environmentId: EnvironmentId): void {
+  const map = read();
+  delete map[String(environmentId)];
+  try {
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(map));
+  } catch {
+    // Storage is best effort; the registry entry is still removed.
+  }
+  workspaceTargets.delete(environmentId);
+  setSandboxEnvironmentDisconnected(environmentId, false);
+}
+
 /** Resolve only registered environments, so a stale mapping cannot reconnect by itself. */
 export function environmentIdsForSandbox(
   sandboxId: string,

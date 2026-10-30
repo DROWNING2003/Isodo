@@ -26,6 +26,7 @@ import {
 import { type InjectionRule, type Sandbox as PlatformSandbox } from "../../api/public.generated";
 import { Button } from "../../components/ui/button";
 import { Card, CardHeader, CardTitle, CardPanel, CardFooter } from "../../components/ui/card";
+import { toastManager } from "../../components/ui/toast";
 import { Input } from "../../components/ui/input";
 import {
   Dialog,
@@ -394,33 +395,82 @@ export function CloudOverview() {
                           return;
                         }
                         setDeleting(sandbox.id);
+                        const localSandbox =
+                          sandbox.runtime === "local-runtime"
+                            ? (localSandboxes?.find((item) => item.id === sandbox.id) ?? null)
+                            : null;
+                        const localIndex = localSandbox
+                          ? (localSandboxes?.findIndex((item) => item.id === sandbox.id) ?? -1)
+                          : -1;
+                        const platformSandbox =
+                          sandbox.runtime === "platform"
+                            ? (platformSandboxes?.find((item) => item.id === sandbox.id) ?? null)
+                            : null;
+                        const platformIndex = platformSandbox
+                          ? (platformSandboxes?.findIndex((item) => item.id === sandbox.id) ?? -1)
+                          : -1;
                         const client = sandboxClientFor(
                           sandbox.runtime === "local-runtime" ? "local" : "cloud",
                         );
-                        void client
-                          .delete(sandbox.id)
-                          .then((accepted) =>
-                            accepted
-                              ? waitForSandboxAction(client, accepted, { timeoutMs: 120_000 })
-                              : undefined,
-                          )
-                          .then(async () => {
-                            await connections.disconnect(sandbox.id);
-                            if (sandbox.runtime === "local-runtime") {
-                              setLocalSandboxes((current) =>
-                                current
-                                  ? current.filter((item) => item.id !== sandbox.id)
-                                  : current,
-                              );
-                              return;
+                        if (sandbox.runtime === "local-runtime") {
+                          setLocalSandboxes(
+                            (current) =>
+                              current?.filter((item) => item.id !== sandbox.id) ?? current,
+                          );
+                        } else {
+                          setPlatformSandboxes(
+                            (current) =>
+                              current?.filter((item) => item.id !== sandbox.id) ?? current,
+                          );
+                        }
+                        void (async () => {
+                          try {
+                            const accepted = await client.delete(sandbox.id);
+                            if (accepted) {
+                              await waitForSandboxAction(client, accepted, { timeoutMs: 120_000 });
                             }
-                            setPlatformSandboxes((current) =>
-                              current ? current.filter((item) => item.id !== sandbox.id) : current,
-                            );
-                            setPlatformError(null);
-                          })
-                          .catch(() => setPlatformError("删除沙箱失败，请稍后重试"))
-                          .finally(() => setDeleting(null));
+                            await connections.removeForSandbox(sandbox.id);
+                            if (sandbox.runtime !== "local-runtime") setPlatformError(null);
+                          } catch (cause) {
+                            if (localSandbox) {
+                              setLocalSandboxes((current) => {
+                                const items = current ?? [];
+                                if (items.some((item) => item.id === sandbox.id)) return items;
+                                const restored = [...items];
+                                restored.splice(
+                                  localIndex < 0
+                                    ? restored.length
+                                    : Math.min(localIndex, restored.length),
+                                  0,
+                                  localSandbox,
+                                );
+                                return restored;
+                              });
+                            }
+                            if (platformSandbox) {
+                              setPlatformSandboxes((current) => {
+                                const items = current ?? [];
+                                if (items.some((item) => item.id === sandbox.id)) return items;
+                                const restored = [...items];
+                                restored.splice(
+                                  platformIndex < 0
+                                    ? restored.length
+                                    : Math.min(platformIndex, restored.length),
+                                  0,
+                                  platformSandbox,
+                                );
+                                return restored;
+                              });
+                            }
+                            toastManager.add({
+                              type: "error",
+                              title: "删除沙箱失败",
+                              description: cause instanceof Error ? cause.message : "请稍后重试。",
+                            });
+                          } finally {
+                            setDeleting(null);
+                          }
+                        })();
                       }}
                     >
                       <Trash2Icon className="size-4" />

@@ -5,9 +5,11 @@ import { setSandboxEnvironmentConnected } from "./sandboxConnectionCommands";
 import { setActiveEnvironmentId, useActiveEnvironmentId } from "../../state/entities";
 import { useEnvironments } from "../../state/environments";
 import { useAtomCommand } from "../../state/use-atom-command";
+import { environmentCatalog } from "../../connection/catalog";
 import {
   environmentIdForSandbox,
   environmentIdsForSandbox,
+  forgetSandboxEnvironment,
   isSandboxEnvironmentDisconnected,
   setSandboxEnvironmentDisconnected,
   useSandboxConnectionVersion,
@@ -19,6 +21,7 @@ export function useSandboxConnections() {
   const { environments } = useEnvironments();
   const activeId = useActiveEnvironmentId();
   const setConnected = useAtomCommand(setSandboxEnvironmentConnected, { reportFailure: false });
+  const removeEnvironment = useAtomCommand(environmentCatalog.remove, { reportFailure: false });
   const [disconnecting, setDisconnecting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const pending = useRef(false);
@@ -73,6 +76,33 @@ export function useSandboxConnections() {
     return disconnected;
   };
 
+  const removeForSandbox = async (sandboxId: string): Promise<boolean> => {
+    if (pending.current) {
+      setError("连接正在处理中，请稍后在设置中移除。");
+      return false;
+    }
+    pending.current = true;
+    setDisconnecting(sandboxId);
+    setError(null);
+    let allRemoved = true;
+    try {
+      for (const environmentId of environmentIdsForSandbox(sandboxId, registeredIds)) {
+        const result = await removeEnvironment(environmentId);
+        if (result._tag !== "Success") {
+          allRemoved = false;
+          continue;
+        }
+        forgetSandboxEnvironment(environmentId);
+        if (environmentId === activeId) setActiveEnvironmentId(null);
+      }
+      if (!allRemoved) setError("沙箱已删除，但部分本机连接未能移除，请在设置中重试。");
+      return allRemoved;
+    } finally {
+      pending.current = false;
+      setDisconnecting(null);
+    }
+  };
+
   return {
     environmentForSandbox: (sandboxId: string) =>
       environmentIdForSandbox(
@@ -98,6 +128,7 @@ export function useSandboxConnections() {
       ).length > 0,
     disconnect,
     pauseAndDisconnect,
+    removeForSandbox,
     disconnecting,
     error,
   };

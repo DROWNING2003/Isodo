@@ -2,6 +2,7 @@
 set -euo pipefail
 
 output_dir="${1:?usage: build-sandbox-node-pty.sh <output-directory>}"
+node_pty_build_image="${NODE_PTY_BUILD_IMAGE:-public.ecr.aws/docker/library/node:22-bookworm}"
 mkdir -p "$output_dir"
 output_dir="$(cd "$output_dir" && pwd)"
 case "${TARGET_ARCH:-$(uname -m)}" in
@@ -12,7 +13,7 @@ esac
 
 docker run --rm --platform="linux/$target_arch" \
   -v "$output_dir:/out" \
-  node:22-bookworm \
+  "$node_pty_build_image" \
   bash -lc '
     set -eu
     install_root=/out/.node-pty-install

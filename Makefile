@@ -1,6 +1,6 @@
 SHELL := /bin/sh
 
-.PHONY: help init infra-up infra-down infra-ps infra-logs casdoor-ready db-migrate dev-certs api node node-local node-local-agent-workspace web electron mobile agent-workspace-bundle docs docs-build test test-integration
+.PHONY: help init infra-up infra-down infra-ps infra-logs casdoor-ready db-migrate dev-certs api node node-local node-local-agent-workspace isodo-guest web electron mobile agent-workspace-bundle docs docs-build test test-integration
 
 COMPOSE := docker compose -f compose.yaml
 IOS_SIMULATOR ?= iPhone 17
@@ -15,6 +15,7 @@ APP_PREVIEW_DOMAIN ?= $(shell . ./.env 2>/dev/null; printf '%s' "$${VITE_ISODO_P
 ISODO_CONTROL_CLIENT_URI ?= spiffe://isodo/control-worker
 GOARCH ?= $(shell go env GOARCH)
 ISODO_GUEST_AGENT_BINARY ?= $(CURDIR)/.tools/isodo-guest-linux-$(GOARCH)
+NODE_PTY_BUILD_IMAGE ?= public.ecr.aws/docker/library/node:22-bookworm
 MOBILE_DEV_ENV := APP_VARIANT=development T3CODE_IOS_PERSONAL_TEAM=1 T3CODE_IOS_PERSONAL_TEAM_BUNDLE_ID=com.isodo.app.dev EXPO_NO_GIT_STATUS=1
 
 help:
@@ -146,7 +147,9 @@ node-local: dev-certs $(ISODO_GUEST_AGENT_BINARY)
 	$(MAKE) node NODE_BACKEND=lima
 
 node-local-agent-workspace: dev-certs $(ISODO_GUEST_AGENT_BINARY) agent-workspace-bundle
-	$(MAKE) node NODE_BACKEND=lima ISODO_T3_SERVER_BUNDLE="$(CURDIR)/app/artifacts/sandbox/agent-workspace-server-dist.bundle"
+	$(MAKE) node NODE_BACKEND=lima ISODO_T3_SERVER_BUNDLE="$(CURDIR)/app/artifacts/sandbox/t3-server-dist.bundle"
+
+isodo-guest: $(ISODO_GUEST_AGENT_BINARY)
 
 $(ISODO_GUEST_AGENT_BINARY):
 	mkdir -p "$(dir $@)"
@@ -158,21 +161,15 @@ test:
 web:
 	cd app && HOST=127.0.0.1 PORT=5734 VITE_BOUNDLY_WEB_SURFACE=full VITE_ISODO_PREVIEW_DOMAIN="$(APP_PREVIEW_DOMAIN)" pnpm --filter @t3tools/web dev
 
-electron:
+electron: isodo-guest agent-workspace-bundle
 	cd app && pnpm build:desktop && ISODO_WEB_URL="$(APP_WEB_ORIGIN)" pnpm --filter @t3tools/desktop start
 
 mobile:
 	cd app && $(MOBILE_DEV_ENV) pnpm --filter @t3tools/mobile exec expo run:ios --device "$(IOS_SIMULATOR)"
 
-# The Agent workspace server bundle normally omits dist/client. The Isodo Guest runs headless,
-# so ship the built web application beside the server entrypoint for static file serving.
+# Build the server bundle with its web application and Linux-native PTY dependency.
 agent-workspace-bundle:
-	cd app && corepack pnpm@11.10.0 --filter @t3tools/web build
-	cd app && corepack pnpm@11.10.0 --filter t3 build:bundle
-	mkdir -p app/apps/server/dist/client
-	cp -R app/apps/web/dist/. app/apps/server/dist/client/
-	mkdir -p app/artifacts/sandbox
-	tar -czf app/artifacts/sandbox/agent-workspace-server-dist.bundle --exclude='*.map' -C app/apps/server dist
+	cd app && NODE_PTY_BUILD_IMAGE="$(NODE_PTY_BUILD_IMAGE)" corepack pnpm@11.10.0 --filter t3 build:bundle
 
 docs:
 	npm --prefix docs-site run dev -- --hostname 127.0.0.1
