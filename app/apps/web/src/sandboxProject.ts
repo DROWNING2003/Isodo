@@ -7,6 +7,15 @@ import { isSandboxUrl } from "@t3tools/shared/sandbox";
 export const LEGACY_SANDBOX_PROJECT_WORKSPACE_ROOT = "/home/user";
 export const SANDBOX_PROJECT_WORKSPACE_ROOT = "/workspace/project";
 
+export function isSandboxEnvironment<T extends { readonly displayUrl: string | null }>(
+  environment: T,
+  isMappedSandbox = false,
+): boolean {
+  return (
+    isMappedSandbox || (environment.displayUrl !== null && isSandboxUrl(environment.displayUrl))
+  );
+}
+
 /** Roots that must be migrated to SANDBOX_PROJECT_WORKSPACE_ROOT. */
 export function isLegacySandboxWorkspaceRoot(workspaceRoot: string): boolean {
   return (

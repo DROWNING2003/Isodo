@@ -6,12 +6,19 @@ import {
   findLegacySandboxProject,
   findSandboxProject,
   findConnectedSandboxMissingProject,
+  isSandboxEnvironment,
   selectProjectsForActiveEnvironment,
   LEGACY_SANDBOX_PROJECT_WORKSPACE_ROOT,
   SANDBOX_PROJECT_WORKSPACE_ROOT,
 } from "./sandboxProject";
 
 describe("sandbox projects", () => {
+  it("recognizes mapped Isodo environments when transport rewrites the display URL", () => {
+    expect(isSandboxEnvironment({ displayUrl: null }, true)).toBe(true);
+    expect(isSandboxEnvironment({ displayUrl: "https://8080-sandboxid.preview.test" })).toBe(true);
+    expect(isSandboxEnvironment({ displayUrl: "https://example.test" })).toBe(false);
+  });
+
   it("finds legacy sandbox projects only when the repository project is absent", () => {
     const environmentId = EnvironmentId.make("sandbox-environment");
     const legacyProject = {

@@ -6,7 +6,7 @@
     "prepare": "effect-tsgo patch && vp config --no-agent",
     "dev": "pnpm --filter @t3tools/web dev",
     "dev:web": "pnpm --filter @t3tools/web dev",
-    "dev:desktop": "pnpm --filter @t3tools/desktop build && (cd .. && go build -o isodo-node ./cmd/isodo-node) && VITE_DEV_SERVER_URL=${ISODO_WEB_URL:-http://127.0.0.1:5734} pnpm --filter @t3tools/desktop start",
+    "dev:desktop": "pnpm --filter @t3tools/desktop build && (cd .. && go build -o isodo-node ./cmd/isodo-node && make isodo-guest agent-workspace-bundle) && VITE_DEV_SERVER_URL=${ISODO_WEB_URL:-http://127.0.0.1:5734} pnpm --filter @t3tools/desktop start",
     "start:mock-update-server": "node scripts/mock-update-server.ts",
     "screenshots:mobile": "node scripts/mobile-showcase.ts",
     "icons:export": "node scripts/export-brand-icons.ts",

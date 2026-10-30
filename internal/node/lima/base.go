@@ -27,7 +27,13 @@ func (m *Manager) BaseInstanceName() (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("read Isodo Guest Agent binary: %w", err)
 	}
-	digest := sha256.Sum256(append([]byte(m.config.Template+"\x00"+baseProvisionerVersion+"\x00"), binary...))
+	provisioner := m.config.Template + "\x00" + baseProvisionerVersion
+	if m.config.EnableT3Runtime {
+		// A Guest-only Base cannot be reused for T3: its stopped status alone
+		// does not prove Node.js and the Agent CLIs were installed.
+		provisioner += "\x00t3"
+	}
+	digest := sha256.Sum256(append([]byte(provisioner+"\x00"), binary...))
 	return m.config.InstancePrefix + "base-" + hex.EncodeToString(digest[:6]), nil
 }
 
