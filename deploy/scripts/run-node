@@ -1,0 +1,8 @@
+#!/usr/bin/env bash
+set -euo pipefail
+version="${1:?missing version}"
+[[ "$version" =~ ^[A-Za-z0-9._-]+$ ]] || exit 2
+set -a
+source /etc/isodo/node.env
+set +a
+exec "/opt/isodo/releases/$version/isodo-node"

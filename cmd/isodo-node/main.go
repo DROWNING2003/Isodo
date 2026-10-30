@@ -152,7 +152,7 @@ func run(logger *slog.Logger) error {
 	}
 	localErrors := make(chan error, 1)
 	go func() { localErrors <- localServer.Serve(localListener) }()
-	logger.Info("isodo-node local API listening", "address", localListener.Addr().String(), "token", localToken)
+	logger.Info("isodo-node local API listening", "address", localListener.Addr().String())
 	serveErrors := make(chan error, 1)
 	if !localOnly {
 		go func() { serveErrors <- server.Serve(listener) }()

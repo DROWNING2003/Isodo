@@ -1,6 +1,9 @@
 import { contextBridge, ipcRenderer } from "electron";
 
-contextBridge.exposeInMainWorld("isodoDesktop", {
+const trustedDesktopOrigin =
+  location.protocol === "file:" ||
+  ["http://127.0.0.1:5734", "http://app.isodo.localhost:5734"].includes(location.origin);
+if (trustedDesktopOrigin) contextBridge.exposeInMainWorld("isodoDesktop", {
   sandboxRequest: (path: string, method: string, body?: string, idempotencyKey?: string) =>
     ipcRenderer.invoke("isodo:sandbox-request", path, method, body, idempotencyKey),
   localRuntimeStatus: () => ipcRenderer.invoke("isodo:local-runtime-status"),
