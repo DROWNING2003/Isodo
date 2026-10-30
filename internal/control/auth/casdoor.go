@@ -7,7 +7,9 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/netip"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -24,6 +26,37 @@ type Identity struct {
 	TenantID    string
 	Credential  string
 	Scopes      []string
+}
+
+// ProviderEndpointPolicy can opt one private-IP HTTP authority into test-only
+// OIDC deployments. HTTPS and loopback HTTP remain the defaults.
+type ProviderEndpointPolicy struct {
+	// AllowInsecureHTTPHost is an exact private-IP host:port accepted over HTTP.
+	AllowInsecureHTTPHost string
+}
+
+func (p ProviderEndpointPolicy) validate() error {
+	if p.AllowInsecureHTTPHost == "" {
+		return nil
+	}
+
+	endpoint, err := url.Parse("http://" + p.AllowInsecureHTTPHost)
+	if err != nil || endpoint.Host != p.AllowInsecureHTTPHost || endpoint.User != nil || endpoint.Path != "" || endpoint.RawQuery != "" || endpoint.Fragment != "" || endpoint.Port() == "" {
+		return errors.New("ISODO_CASDOOR_INSECURE_HTTP_HOST must be an exact private IP:port")
+	}
+	address, err := netip.ParseAddr(endpoint.Hostname())
+	if err != nil || !address.IsPrivate() || address.IsLoopback() || address.IsLinkLocalUnicast() || address.IsUnspecified() || address.IsMulticast() {
+		return errors.New("ISODO_CASDOOR_INSECURE_HTTP_HOST must be a private unicast IP:port")
+	}
+	port, err := strconv.Atoi(endpoint.Port())
+	if err != nil || port < 1 || port > 65535 {
+		return errors.New("ISODO_CASDOOR_INSECURE_HTTP_HOST must contain a valid port")
+	}
+	return nil
+}
+
+func (p ProviderEndpointPolicy) allowsInsecureHTTP(endpoint *url.URL) bool {
+	return p.AllowInsecureHTTPHost != "" && strings.EqualFold(endpoint.Host, p.AllowInsecureHTTPHost) && p.validate() == nil
 }
 
 type IdentityStore interface {
@@ -68,9 +101,17 @@ type Casdoor struct {
 }
 
 func NewCasdoor(ctx context.Context, issuer, clientID string, identityStore IdentityStore, client *http.Client) (*Casdoor, error) {
+	return NewCasdoorWithPolicy(ctx, issuer, clientID, identityStore, client, ProviderEndpointPolicy{})
+}
+
+// NewCasdoorWithPolicy configures Casdoor using the supplied endpoint policy.
+func NewCasdoorWithPolicy(ctx context.Context, issuer, clientID string, identityStore IdentityStore, client *http.Client, policy ProviderEndpointPolicy) (*Casdoor, error) {
+	if err := policy.validate(); err != nil {
+		return nil, err
+	}
 	issuerURL, err := url.Parse(issuer)
-	if err != nil || issuerURL.Host == "" || issuerURL.User != nil || issuerURL.RawQuery != "" || issuerURL.Fragment != "" || (issuerURL.Scheme != "https" && !(issuerURL.Scheme == "http" && isLoopbackHost(issuerURL.Hostname()))) {
-		return nil, errors.New("Casdoor issuer must be an HTTPS URL (HTTP is allowed only on loopback)")
+	if err != nil || issuerURL.Host == "" || issuerURL.User != nil || issuerURL.RawQuery != "" || issuerURL.Fragment != "" || !validProviderEndpoint(issuer, policy) {
+		return nil, errors.New("Casdoor issuer must use HTTPS, loopback HTTP, or the explicitly allowlisted private HTTP authority")
 	}
 	if clientID == "" || identityStore == nil {
 		return nil, errors.New("Casdoor client ID and identity store are required")
@@ -101,7 +142,7 @@ func NewCasdoor(ctx context.Context, issuer, clientID string, identityStore Iden
 	if err := json.Unmarshal(discoveryBody, &document); err != nil {
 		return nil, fmt.Errorf("decode OIDC discovery: %w", ErrUnavailable)
 	}
-	if document.Issuer != issuer || !validProviderEndpoint(document.UserInfoURL) {
+	if document.Issuer != issuer || !validProviderEndpoint(document.UserInfoURL, policy) {
 		return nil, errors.New("OIDC discovery issuer mismatch or invalid userinfo endpoint")
 	}
 	return &Casdoor{
@@ -176,12 +217,15 @@ func contains(values []string, expected string) bool {
 	return false
 }
 
-func validProviderEndpoint(raw string) bool {
+func validProviderEndpoint(raw string, policy ProviderEndpointPolicy) bool {
 	endpoint, err := url.Parse(raw)
 	if err != nil || endpoint.Host == "" || endpoint.User != nil || endpoint.Fragment != "" {
 		return false
 	}
-	return endpoint.Scheme == "https" || (endpoint.Scheme == "http" && isLoopbackHost(endpoint.Hostname()))
+	if endpoint.Scheme == "https" || (endpoint.Scheme == "http" && isLoopbackHost(endpoint.Hostname())) {
+		return true
+	}
+	return endpoint.Scheme == "http" && policy.allowsInsecureHTTP(endpoint)
 }
 
 func isLoopbackHost(host string) bool {

@@ -49,11 +49,17 @@ func run(logger *slog.Logger) error {
 		return err
 	}
 	defer store.Close()
-	casdoor, err := auth.NewCasdoor(initCtx, issuer, clientID, store, nil)
+	providerPolicy := auth.ProviderEndpointPolicy{
+		AllowInsecureHTTPHost: os.Getenv("ISODO_CASDOOR_INSECURE_HTTP_HOST"),
+	}
+	casdoor, err := auth.NewCasdoorWithPolicy(initCtx, issuer, clientID, store, nil, providerPolicy)
 	if err != nil {
 		return err
 	}
-	web, err := auth.NewWeb(initCtx, store, issuer, clientID, os.Getenv("ISODO_CASDOOR_CLIENT_SECRET"), os.Getenv("ISODO_WEB_ORIGIN"))
+	if providerPolicy.AllowInsecureHTTPHost != "" {
+		logger.Warn("insecure HTTP OIDC is enabled for one private test authority", "authority", providerPolicy.AllowInsecureHTTPHost)
+	}
+	web, err := auth.NewWebWithPolicy(initCtx, store, issuer, clientID, os.Getenv("ISODO_CASDOOR_CLIENT_SECRET"), os.Getenv("ISODO_WEB_ORIGIN"), providerPolicy)
 	if err != nil {
 		return err
 	}

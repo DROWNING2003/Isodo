@@ -52,6 +52,14 @@ type loginWindow struct {
 }
 
 func NewWeb(ctx context.Context, store WebStore, issuer, clientID, secret, siteOrigin string) (*Web, error) {
+	return NewWebWithPolicy(ctx, store, issuer, clientID, secret, siteOrigin, ProviderEndpointPolicy{})
+}
+
+// NewWebWithPolicy configures web login using the supplied endpoint policy.
+func NewWebWithPolicy(ctx context.Context, store WebStore, issuer, clientID, secret, siteOrigin string, policy ProviderEndpointPolicy) (*Web, error) {
+	if err := policy.validate(); err != nil {
+		return nil, err
+	}
 	site, err := url.Parse(siteOrigin)
 	if err != nil || site.Host == "" || site.User != nil || site.RawQuery != "" || site.Fragment != "" || (site.Path != "" && site.Path != "/") || (site.Scheme != "https" && !(site.Scheme == "http" && isLoopbackHost(site.Hostname()))) {
 		return nil, errors.New("ISODO_WEB_ORIGIN must be HTTPS or loopback HTTP with no path")
@@ -59,7 +67,7 @@ func NewWeb(ctx context.Context, store WebStore, issuer, clientID, secret, siteO
 	if secret == "" {
 		return nil, errors.New("ISODO_CASDOOR_CLIENT_SECRET is required for web login")
 	}
-	if !validProviderEndpoint(issuer) {
+	if !validProviderEndpoint(issuer, policy) {
 		return nil, errors.New("invalid Casdoor issuer")
 	}
 	client := &http.Client{Timeout: 10 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return http.ErrUseLastResponse }}
@@ -69,7 +77,7 @@ func NewWeb(ctx context.Context, store WebStore, issuer, clientID, secret, siteO
 		return nil, errors.New("Casdoor OIDC discovery failed")
 	}
 	endpoint := provider.Endpoint()
-	if !validProviderEndpoint(endpoint.AuthURL) || !validProviderEndpoint(endpoint.TokenURL) {
+	if !validProviderEndpoint(endpoint.AuthURL, policy) || !validProviderEndpoint(endpoint.TokenURL, policy) {
 		return nil, errors.New("invalid OAuth endpoint")
 	}
 	endpoint.AuthStyle = oauth2.AuthStyleInParams

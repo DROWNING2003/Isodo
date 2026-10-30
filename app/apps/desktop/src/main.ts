@@ -35,12 +35,15 @@ function configuredRemoteAPI(): string {
   const file = NodePath.join(app.getPath("userData"), "desktop.json");
   if (!NodeFSSync.existsSync(file)) return "";
   const value: unknown = JSON.parse(NodeFSSync.readFileSync(file, "utf8"));
-  if (!value || typeof value !== "object" || typeof (value as { remoteApiUrl?: unknown }).remoteApiUrl !== "string") {
+  if (
+    !value ||
+    typeof value !== "object" ||
+    typeof (value as { remoteApiUrl?: unknown }).remoteApiUrl !== "string"
+  ) {
     throw new Error("Invalid desktop.json: remoteApiUrl must be an HTTPS/loopback URL");
   }
   return (value as { remoteApiUrl: string }).remoteApiUrl;
 }
-
 
 function resolveIcon() {
   return app.isPackaged
@@ -267,6 +270,10 @@ async function createWindow() {
       staticDir: NodePath.join(__dirname, "../../web/dist"),
       apiURL: configuredRemoteAPI(),
       port: 5734,
+      ...(process.env.ISODO_DESKTOP_ORIGIN ? { origin: process.env.ISODO_DESKTOP_ORIGIN } : {}),
+      ...(process.env.ISODO_REMOTE_API_INSECURE_HOST
+        ? { insecurePrivateHost: process.env.ISODO_REMOTE_API_INSECURE_HOST }
+        : {}),
     });
     devUrl = desktopServer.url;
   }
