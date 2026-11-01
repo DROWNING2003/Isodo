@@ -7,8 +7,10 @@ import (
 	"log/slog"
 	"net"
 	"net/http"
+	"net/url"
 	"os"
 	"os/signal"
+	"strings"
 	"syscall"
 	"time"
 
@@ -52,14 +54,15 @@ func run(logger *slog.Logger) error {
 	providerPolicy := auth.ProviderEndpointPolicy{
 		AllowInsecureHTTPHost: os.Getenv("ISODO_CASDOOR_INSECURE_HTTP_HOST"),
 	}
-	casdoor, err := auth.NewCasdoorWithPolicy(initCtx, issuer, clientID, store, nil, providerPolicy)
+	identityStore := auth.WithIdentityNamespace(store, issuer, os.Getenv("ISODO_IDENTITY_NAMESPACE"))
+	casdoor, err := auth.NewCasdoorWithPolicy(initCtx, issuer, clientID, identityStore, nil, providerPolicy)
 	if err != nil {
 		return err
 	}
 	if providerPolicy.AllowInsecureHTTPHost != "" {
 		logger.Warn("insecure HTTP OIDC is enabled for one private test authority", "authority", providerPolicy.AllowInsecureHTTPHost)
 	}
-	web, err := auth.NewWebWithPolicy(initCtx, store, issuer, clientID, os.Getenv("ISODO_CASDOOR_CLIENT_SECRET"), os.Getenv("ISODO_WEB_ORIGIN"), providerPolicy)
+	web, err := auth.NewWebWithPolicy(initCtx, identityStore, issuer, clientID, os.Getenv("ISODO_CASDOOR_CLIENT_SECRET"), os.Getenv("ISODO_WEB_ORIGIN"), providerPolicy)
 	if err != nil {
 		return err
 	}
@@ -89,13 +92,17 @@ func run(logger *slog.Logger) error {
 	if nodeClient != nil && os.Getenv("ISODO_NODE_BACKEND") != "lima" {
 		relay = nodeClient
 	}
+	additionalOrigins := strings.Fields(os.Getenv("ISODO_ADDITIONAL_WEB_ORIGINS"))
 	publisher, err := preview.New(preview.Config{
-		Secret:    os.Getenv("ISODO_PREVIEW_SECRET"),
-		Domain:    os.Getenv("ISODO_PREVIEW_DOMAIN"),
-		Scheme:    os.Getenv("ISODO_PREVIEW_SCHEME"),
-		APIPort:   listenPort(listenAddr),
-		AppOrigin: os.Getenv("ISODO_WEB_ORIGIN"),
-		Relay:     relay,
+		Secret:               os.Getenv("ISODO_PREVIEW_SECRET"),
+		Domain:               os.Getenv("ISODO_PREVIEW_DOMAIN"),
+		Scheme:               os.Getenv("ISODO_PREVIEW_SCHEME"),
+		APIPort:              listenPort(listenAddr),
+		PublicPort:           os.Getenv("ISODO_PREVIEW_PUBLIC_PORT"),
+		CrossSiteCookie:      os.Getenv("ISODO_PREVIEW_CROSS_SITE_COOKIE") == "true",
+		AppOrigin:            os.Getenv("ISODO_WEB_ORIGIN"),
+		AdditionalAppOrigins: additionalOrigins,
+		Relay:                relay,
 	})
 	if err != nil {
 		return fmt.Errorf("configure sandbox preview gateway: %w", err)
@@ -116,6 +123,20 @@ func run(logger *slog.Logger) error {
 		injectionHandler.SetRuntimeRevoker(nodeClient)
 	}
 	publicHandler := httpapi.NewHandlerWithInjections(web, auth.NewAPIKeyHandler(store), sandboxHandler, access, injectionHandler, template.NewHandler(store))
+	additionalHandlers := make(map[string]http.Handler)
+	for _, origin := range additionalOrigins {
+		site, err := url.Parse(origin)
+		if err != nil || site.Host == "" {
+			return errors.New("invalid additional web origin")
+		}
+		extraWeb, err := auth.NewWebWithPolicy(initCtx, identityStore, issuer, clientID, os.Getenv("ISODO_CASDOOR_CLIENT_SECRET"), origin, providerPolicy)
+		if err != nil {
+			return fmt.Errorf("configure additional web origin: %w", err)
+		}
+		extraAccess := &auth.Access{Bearer: casdoor, Keys: store, Web: extraWeb}
+		additionalHandlers[site.Host] = httpapi.NewHandlerWithInjections(extraWeb, auth.NewAPIKeyHandler(store), sandboxHandler, extraAccess, injectionHandler, template.NewHandler(store))
+	}
+	publicHandler = routeWebHosts(publicHandler, additionalHandlers)
 	if publisher != nil {
 		publicHandler = publisher.Wrap(publicHandler)
 	}
@@ -184,5 +205,17 @@ func securityHeaders(next http.Handler) http.Handler {
 		w.Header().Set("X-Frame-Options", "DENY")
 		w.Header().Set("Cache-Control", "no-store")
 		next.ServeHTTP(w, r)
+	})
+}
+
+// Only explicitly configured hosts select an alternate login/CSRF policy.
+// Forwarded-Host is deliberately ignored; proxies must preserve original Host.
+func routeWebHosts(fallback http.Handler, hosts map[string]http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if h, ok := hosts[r.Host]; ok {
+			h.ServeHTTP(w, r)
+			return
+		}
+		fallback.ServeHTTP(w, r)
 	})
 }

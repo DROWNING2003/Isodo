@@ -1,0 +1,17 @@
+[Unit]
+Description=Isodo isolated HTTPS Nginx
+Requires=docker.service
+After=docker.service network-online.target
+ConditionPathExists=/etc/ssl/drowning.top/fullchain.pem
+ConditionPathExists=/etc/ssl/drowning.top/privkey.pem
+[Service]
+Type=simple
+ExecStartPre=/opt/isodo/nginx/check-config.sh
+ExecStart=/usr/bin/docker run --rm --name isodo-nginx --network host --read-only --security-opt no-new-privileges --cap-drop ALL --cap-add SETUID --cap-add SETGID --cap-add CHOWN --tmpfs /tmp:rw,nosuid,noexec,size=256m -v /opt/isodo/nginx:/opt/isodo/nginx -v /opt/isodo/web:/opt/isodo/web:ro -v /etc/ssl/drowning.top:/etc/ssl/drowning.top:ro --entrypoint /usr/sbin/nginx aslan-spock-register.qiniu.io/las/nginx@sha256:e6b408afd0fcc6786c31e80825f4d2c6ca76934aa3e9280152addb23202ffd5d -p /opt/isodo/nginx/ -c /opt/isodo/nginx/nginx.conf -g "daemon off;"
+ExecReload=/opt/isodo/nginx/reload.sh
+ExecStop=/usr/bin/docker stop --time 20 isodo-nginx
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=30
+[Install]
+WantedBy=multi-user.target

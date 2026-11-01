@@ -1,3 +1,4 @@
+import { remoteSandboxesOnly } from "./sandboxCapabilities";
 import { setSandboxInjections } from "../../api/public.generated";
 import type { EnvironmentId } from "@t3tools/contracts";
 import { useNavigate } from "@tanstack/react-router";
@@ -84,7 +85,8 @@ export function CreateSandboxDialog() {
   );
   const [credentialStage, setCredentialStage] = useState("");
   const acceptedSandbox = useRef<Sandbox | null>(null);
-  const [runtime, setRuntime] = useState<Runtime>(isElectron ? "local" : "cloud");
+  const allowLocal = isElectron && !remoteSandboxesOnly();
+  const [runtime, setRuntime] = useState<Runtime>(allowLocal ? "local" : "cloud");
   const [templateID, setTemplateID] = useState(BASE_TEMPLATE.id);
   const [templates, setTemplates] = useState<readonly TemplateOption[]>([BASE_TEMPLATE]);
   const [templatesLoaded, setTemplatesLoaded] = useState(false);
@@ -93,7 +95,7 @@ export function CreateSandboxDialog() {
   const [error, setError] = useState<string | null>(null);
 
   const close = () => void navigate({ to: "/sandboxes" });
-  const local = runtime === "local";
+  const local = allowLocal && runtime === "local";
 
   useEffect(() => {
     setTemplateID(local ? LOCAL_BASE_TEMPLATE.id : BASE_TEMPLATE.id);
@@ -225,7 +227,7 @@ export function CreateSandboxDialog() {
   };
 
   const createCloud = async (): Promise<void> => {
-    if (authState.status === "unauthenticated") {
+    if (authState.status === "unauthenticated" && !remoteSandboxesOnly()) {
       // Signed-out visitors keep the demo cloud path; it never calls the API.
       const sandbox = await import("./cloud").then(({ cloud }) =>
         cloud.createSandbox({ name: name.trim(), template: "dev" }),
@@ -287,7 +289,11 @@ export function CreateSandboxDialog() {
       <DialogPopup className="max-w-lg">
         <DialogHeader>
           <DialogTitle>创建沙箱</DialogTitle>
-          <DialogDescription>选择运行位置和模板，Agent 会在沙箱内准备。</DialogDescription>
+          <DialogDescription>
+            {allowLocal
+              ? "选择运行位置和模板，Agent 会在沙箱内准备。"
+              : "选择云端沙箱模板，Agent 会在沙箱内准备。"}
+          </DialogDescription>
         </DialogHeader>
         <DialogPanel>
           <form
@@ -297,34 +303,36 @@ export function CreateSandboxDialog() {
               void submit();
             }}
           >
-            <div className="grid gap-1.5">
-              <span className="text-sm font-medium">运行位置</span>
-              <div className="grid grid-cols-2 gap-2">
-                <Button
-                  type="button"
-                  variant={local ? "default" : "outline"}
-                  disabled={!isElectron || creating || Boolean(acceptedSandbox.current)}
-                  aria-pressed={local}
-                  onClick={() => setRuntime("local")}
-                >
-                  本地沙箱
-                </Button>
-                <Button
-                  type="button"
-                  variant={local ? "outline" : "default"}
-                  disabled={creating || Boolean(acceptedSandbox.current)}
-                  aria-pressed={!local}
-                  onClick={() => setRuntime("cloud")}
-                >
-                  云端沙箱
-                </Button>
+            {allowLocal && (
+              <div className="grid gap-1.5">
+                <span className="text-sm font-medium">运行位置</span>
+                <div className="grid grid-cols-2 gap-2">
+                  <Button
+                    type="button"
+                    variant={local ? "default" : "outline"}
+                    disabled={!isElectron || creating || Boolean(acceptedSandbox.current)}
+                    aria-pressed={local}
+                    onClick={() => setRuntime("local")}
+                  >
+                    本地沙箱
+                  </Button>
+                  <Button
+                    type="button"
+                    variant={local ? "outline" : "default"}
+                    disabled={creating || Boolean(acceptedSandbox.current)}
+                    aria-pressed={!local}
+                    onClick={() => setRuntime("cloud")}
+                  >
+                    云端沙箱
+                  </Button>
+                </div>
+                <p className="text-xs text-muted-foreground">
+                  {isElectron
+                    ? "本地沙箱在你的电脑上运行，云端沙箱在服务端运行。"
+                    : "本地沙箱需要在桌面应用中使用。"}
+                </p>
               </div>
-              <p className="text-xs text-muted-foreground">
-                {isElectron
-                  ? "本地沙箱在你的电脑上运行，云端沙箱在服务端运行。"
-                  : "本地沙箱需要在桌面应用中使用。"}
-              </p>
-            </div>
+            )}
 
             <div className="grid gap-1.5">
               <label className="text-sm font-medium" htmlFor="sandbox-template">
@@ -406,6 +414,9 @@ export function CreateSandboxDialog() {
               {credentialStage || (local ? "正在创建本地沙箱…" : "正在创建云端沙箱…")}
             </span>
           ) : null}
+          {remoteSandboxesOnly() && authState.status === "unauthenticated" ? (
+            <p className="mr-auto text-sm text-muted-foreground">请先登录后创建云端沙箱。</p>
+          ) : null}
           {authState.status === "error" && !local ? (
             <p className="mr-auto text-sm text-destructive">登录服务暂时不可用。</p>
           ) : null}
@@ -416,6 +427,7 @@ export function CreateSandboxDialog() {
             onClick={() => void submit()}
             disabled={
               creating ||
+              (remoteSandboxesOnly() && authState.status !== "authenticated") ||
               (!local &&
                 authState.status === "authenticated" &&
                 (!templatesLoaded || !selectedTemplate?.ready))

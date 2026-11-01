@@ -1,3 +1,4 @@
+import { localSandboxAvailable, remoteSandboxesOnly } from "./sandboxCapabilities";
 import { sandboxClientFor } from "./sandboxTransports";
 import { beginWorkspaceEntry } from "./workspaceEntryTrace";
 import { waitForSandboxAction } from "./sandboxClient";
@@ -150,7 +151,7 @@ export function CloudOverview() {
         taskCount: 0,
         snapshotCount: 0,
       }))
-    : state.sandboxes.map((sandbox) => ({
+    : (remoteSandboxesOnly() ? [] : state.sandboxes).map((sandbox) => ({
         id: sandbox.id,
         name: sandbox.name,
         template: sandbox.template,
@@ -207,18 +208,20 @@ export function CloudOverview() {
               ["local", "本地"],
               ["cloud", "云端"],
             ] as const
-          ).map(([value, label]) => (
-            <button
-              key={value}
-              type="button"
-              role="tab"
-              aria-selected={scope === value}
-              className={scope === value ? "isodo-overview-tab is-active" : "isodo-overview-tab"}
-              onClick={() => setScope(value)}
-            >
-              {label}
-            </button>
-          ))}
+          )
+            .filter(([value]) => value !== "local" || localSandboxAvailable())
+            .map(([value, label]) => (
+              <button
+                key={value}
+                type="button"
+                role="tab"
+                aria-selected={scope === value}
+                className={scope === value ? "isodo-overview-tab is-active" : "isodo-overview-tab"}
+                onClick={() => setScope(value)}
+              >
+                {label}
+              </button>
+            ))}
         </div>
         <label className="isodo-overview-search">
           <SearchIcon className="size-4 shrink-0" />

@@ -79,11 +79,25 @@ afterEach(async () => {
 it("offers a start retry after a runtime action failed", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   vi.stubGlobal("window", {});
-  sandboxQueryClient.setQueryData([...platformSandboxesPrefix, 0, "test", "test-user"], [
-    { id: "cloud-failed", name: "Retryable sandbox", desired_state: "running", observed_state: "error" },
-  ]);
-  await act(async () => { renderer = create(<CloudOverview />); });
-  expect(renderer.root.findAllByType("button").filter((button) => button.props["aria-label"] === "启动沙箱 Retryable sandbox")).toHaveLength(1);
+  sandboxQueryClient.setQueryData(
+    [...platformSandboxesPrefix, 0, "test", "test-user"],
+    [
+      {
+        id: "cloud-failed",
+        name: "Retryable sandbox",
+        desired_state: "running",
+        observed_state: "error",
+      },
+    ],
+  );
+  await act(async () => {
+    renderer = create(<CloudOverview />);
+  });
+  expect(
+    renderer.root
+      .findAllByType("button")
+      .filter((button) => button.props["aria-label"] === "启动沙箱 Retryable sandbox"),
+  ).toHaveLength(1);
 });
 it("renders cached local cards while the independent cloud request is still pending", async () => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
@@ -148,4 +162,26 @@ it("uses icon add buttons and confirms and persists Agent config deletion", asyn
   expect(storage.setItem).not.toHaveBeenCalled();
   expect(JSON.stringify(renderer.toJSON())).toContain("还没有 Agent 配置");
   expect(renderer.root.findAllByProps({ "aria-label": "删除 Test Codex" })).toHaveLength(0);
+});
+
+it("remote-only web hides cached local sandboxes and never probes the desktop bridge", async () => {
+  vi.stubEnv("VITE_ISODO_REMOTE_ONLY", "true");
+  vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  const probe = vi.fn();
+  vi.stubGlobal("window", { isodoDesktop: { sandboxRequest: probe } });
+  sandboxQueryClient.setQueryData(localSandboxesKey, [
+    { id: "local", name: "Hidden local sandbox", state: "running" },
+  ]);
+  try {
+    await act(async () => {
+      renderer = create(<CloudOverview />);
+    });
+    expect(JSON.stringify(renderer.toJSON())).not.toContain("Hidden local sandbox");
+    expect(
+      renderer.root.findAllByProps({ role: "tab" }).map((n) => n.children.join("")),
+    ).not.toContain("本地");
+    expect(probe).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });

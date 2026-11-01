@@ -220,3 +220,82 @@ func TestPreviewRelaySurvivesPublisherRestartForExistingPairing(t *testing.T) {
 		t.Fatalf("relay proxy after restart status=%d body=%q", response.Code, response.Body.String())
 	}
 }
+
+func TestHTTPSPublicPortAndCrossSiteCookie(t *testing.T) {
+	p, err := New(Config{Secret: "test", Domain: "drowning.top", Scheme: "https", APIPort: "5004", PublicPort: "18443", AppOrigin: "http://app.isodo.localhost:5734", CrossSiteCookie: true})
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, pairing, err := p.Publish("f323e70d-cd11-4a02-a245-6b4ed2ce1e31", 8080, "http://127.0.0.1:12345/pair#token=secret")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if base != "https://8080-f323e70d-cd11-4a02-a245-6b4ed2ce1e31.drowning.top:18443/" {
+		t.Fatalf("base=%s", base)
+	}
+	u, _ := url.Parse(pairing)
+	h := p.Wrap(http.NotFoundHandler())
+	req := httptest.NewRequest("GET", pairing, nil)
+	req.Header.Set("Origin", "http://app.isodo.localhost:5734")
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	cookies := rr.Result().Cookies()
+	if len(cookies) != 1 || !cookies[0].Secure || !cookies[0].HttpOnly || cookies[0].SameSite != http.SameSiteNoneMode || cookies[0].Domain != "" {
+		t.Fatalf("invalid cookie policy")
+	}
+	for _, origin := range []string{"", "https://evil.example", "https://other.drowning.top"} {
+		req = httptest.NewRequest("POST", base+"api/write", nil)
+		req.AddCookie(cookies[0])
+		req.Header.Set("Origin", origin)
+		rr = httptest.NewRecorder()
+		h.ServeHTTP(rr, req)
+		if rr.Code != http.StatusForbidden {
+			t.Fatalf("origin=%q status=%d", origin, rr.Code)
+		}
+	}
+	req = httptest.NewRequest("GET", base+"__isodo/ready", nil)
+	req.AddCookie(cookies[0])
+	req.Header.Set("Origin", "http://app.isodo.localhost:5734")
+	rr = httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+	if rr.Code != 204 {
+		t.Fatalf("ready=%d host=%s", rr.Code, u.Host)
+	}
+}
+
+func TestInvalidPublicPortAndCookiePolicy(t *testing.T) {
+	for _, port := range []string{"0", "65536", "443/evil", "-1"} {
+		if _, err := New(Config{Secret: "test", Domain: "drowning.top", PublicPort: port}); err == nil {
+			t.Fatalf("accepted port %q", port)
+		}
+	}
+	for _, cfg := range []Config{
+		{Secret: "test", Domain: "drowning.top", Scheme: "http", AppOrigin: "http://app.isodo.localhost:5734", CrossSiteCookie: true},
+		{Secret: "test", Domain: "drowning.top", Scheme: "https", CrossSiteCookie: true},
+	} {
+		if _, err := New(cfg); err == nil {
+			t.Fatal("accepted unsafe cross-site policy")
+		}
+	}
+}
+
+func TestAdditionalWebOrigin(t *testing.T) {
+	p, err := New(Config{Secret: "test", Domain: "drowning.top", Scheme: "https", AppOrigin: "http://app.isodo.localhost:5734", AdditionalAppOrigins: []string{"https://web.drowning.top:18443"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	h := p.Wrap(http.NotFoundHandler())
+	for _, origin := range []string{"https://web.drowning.top:18443", "https://evil.drowning.top:18443"} {
+		r := httptest.NewRequest("OPTIONS", "https://8080-f323e70d-cd11-4a02-a245-6b4ed2ce1e31.drowning.top:18443/", nil)
+		r.Header.Set("Origin", origin)
+		r.Header.Set("Access-Control-Request-Method", "POST")
+		w := httptest.NewRecorder()
+		h.ServeHTTP(w, r)
+		if origin == "https://web.drowning.top:18443" && w.Code != 204 {
+			t.Fatalf("allowed origin status=%d", w.Code)
+		}
+		if origin != "https://web.drowning.top:18443" && w.Code != 403 {
+			t.Fatalf("foreign origin status=%d", w.Code)
+		}
+	}
+}
