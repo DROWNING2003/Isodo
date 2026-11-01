@@ -156,7 +156,8 @@ const allowedHosts = [".ts.net", ...configuredAllowedHosts];
 
 export default defineConfig(() => {
   return {
-    base: "./",
+    // Hosted SPA deep links must load assets from the origin root.
+    base: process.env.VITE_ISODO_REMOTE_ONLY === "true" ? "/" : "./",
     assetsInclude: ["**/*.wasm"],
     plugins: [
       devCompressionPlugin(),

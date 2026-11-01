@@ -1,0 +1,8 @@
+[Unit]
+Description=Daily Isodo certificate renewal check
+[Timer]
+OnCalendar=*-*-* 03:15:00
+RandomizedDelaySec=3600
+Persistent=true
+[Install]
+WantedBy=timers.target

@@ -1,3 +1,4 @@
+import { localSandboxAvailable } from "./sandboxCapabilities";
 import { localSandboxClient, remoteSandboxClient } from "./sandboxTransports";
 import { QueryClient, queryOptions, useQuery } from "@tanstack/react-query";
 import { type Sandbox } from "../../api/public.generated";
@@ -15,7 +16,12 @@ export interface LocalSandboxItem {
 }
 
 export function toLocalSandboxItem(item: Sandbox): LocalSandboxItem {
-  return { id: item.id, name: item.name, state: item.observed_state, ...(item.resources ? { resources: item.resources } : {}) };
+  return {
+    id: item.id,
+    name: item.name,
+    state: item.observed_state,
+    ...(item.resources ? { resources: item.resources } : {}),
+  };
 }
 
 // One cache for the list, workspace and sidebar, retained across route changes.
@@ -34,19 +40,23 @@ export const platformSandboxesPrefix = ["isodo", "sandboxes", "cloud"] as const;
 export const localSandboxesOptions = queryOptions({
   queryKey: localSandboxesKey,
   queryFn: async (): Promise<LocalSandboxItem[]> => {
-    if (!window.isodoDesktop) return [];
+    if (!localSandboxAvailable()) return [];
     return (await localSandboxClient.list()).items.map(toLocalSandboxItem);
   },
   refetchInterval: (query) =>
-    query.state.data?.some((item) => ["requested", "preparing", "starting", "stopping"].includes(item.state ?? ""))
+    query.state.data?.some((item) =>
+      ["requested", "preparing", "starting", "stopping"].includes(item.state ?? ""),
+    )
       ? 2_000
       : false,
 });
 export function useLocalSandboxes(enabled = true) {
-  return useQuery(
-    { ...localSandboxesOptions, enabled: enabled && Boolean(window.isodoDesktop) },
+  const available = localSandboxAvailable();
+  const result = useQuery(
+    { ...localSandboxesOptions, enabled: enabled && available },
     sandboxQueryClient,
   );
+  return available ? result : { ...result, data: undefined, isError: false, isFetching: false };
 }
 export function platformSandboxRefetchInterval(
   items: readonly Pick<Sandbox, "desired_state" | "observed_state">[] | undefined,
@@ -74,7 +84,8 @@ export function usePlatformSandboxes(enabled = true) {
     {
       queryKey,
       enabled: enabled && auth.status === "authenticated",
-      queryFn: async (): Promise<Sandbox[]> => (await remoteSandboxClient.list({ limit: 100 })).items,
+      queryFn: async (): Promise<Sandbox[]> =>
+        (await remoteSandboxClient.list({ limit: 100 })).items,
       refetchInterval: (query) => platformSandboxRefetchInterval(query.state.data),
     },
     sandboxQueryClient,

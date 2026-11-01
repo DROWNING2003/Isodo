@@ -2,6 +2,7 @@ import { act, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 const fixture = vi.hoisted(() => ({
+  authStatus: "authenticated",
   apply: vi.fn(),
   create: vi.fn(),
   navigate: vi.fn(),
@@ -11,7 +12,7 @@ const fixture = vi.hoisted(() => ({
 vi.mock("./cloudAppTemplates", () => ({ loadCloudAppTemplates: fixture.templates }));
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => fixture.navigate }));
 vi.mock("../../env", () => ({ isElectron: true }));
-vi.mock("./auth", () => ({ useAuth: () => ({ status: "authenticated" }) }));
+vi.mock("./auth", () => ({ useAuth: () => ({ status: fixture.authStatus }) }));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => fixture.pairing }));
 vi.mock("../../connection/onboarding", () => ({ connectPairing: Symbol("pairing") }));
 vi.mock("../../state/entities", () => ({ setActiveEnvironmentId: vi.fn() }));
@@ -83,21 +84,30 @@ vi.mock("../../components/ui/select", () => {
   const Slot = ({ children }: { children?: ReactNode }) => <div>{children}</div>;
   return {
     ...Object.fromEntries(
-    ["Select", "SelectItem", "SelectPopup", "SelectTrigger"].map((name) => [
-      name,
-      Slot,
-    ]),
+      ["Select", "SelectItem", "SelectPopup", "SelectTrigger"].map((name) => [name, Slot]),
     ),
-    SelectValue: ({ children }: { children?: ReactNode }) => <span data-testid="selected-template">{children}</span>,
+    SelectValue: ({ children }: { children?: ReactNode }) => (
+      <span data-testid="selected-template">{children}</span>
+    ),
   };
 });
 import { CreateSandboxDialog } from "./CreateSandboxDialog";
 let renderer: ReactTestRenderer;
 beforeEach(() => {
+  fixture.authStatus = "authenticated";
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
   fixture.create.mockReset().mockResolvedValue({
-    id: "local-sandbox", name: "Local", desired_state: "running", observed_state: "running",
-    revision: "1", last_action: { revision: "1", type: "create", status: "succeeded", updated_at: "2026-10-25T00:00:00Z" },
+    id: "local-sandbox",
+    name: "Local",
+    desired_state: "running",
+    observed_state: "running",
+    revision: "1",
+    last_action: {
+      revision: "1",
+      type: "create",
+      status: "succeeded",
+      updated_at: "2026-10-25T00:00:00Z",
+    },
   });
   fixture.apply.mockReset().mockResolvedValue(undefined);
   fixture.navigate.mockReset();
@@ -106,7 +116,12 @@ beforeEach(() => {
     isodoDesktop: {
       listLocalTemplates: async () => ({ items: [{ id: "base", ready: true }] }),
       sandboxRequest: async (path: string, method: string, body?: string) => {
-        if (path.endsWith("/app-link")) return { sandbox_id: "local-sandbox", url: "http://localhost/pair", pairing_url: "http://localhost/pair" };
+        if (path.endsWith("/app-link"))
+          return {
+            sandbox_id: "local-sandbox",
+            url: "http://localhost/pair",
+            pairing_url: "http://localhost/pair",
+          };
         if (method === "POST") return fixture.create(JSON.parse(body ?? "{}"));
         throw new Error(`Unexpected request: ${method} ${path}`);
       },
@@ -127,9 +142,13 @@ async function click(text: string) {
   await act(async () => button.props.onClick());
 }
 it("shows the template label instead of its UUID before opening the dropdown", async () => {
-  await act(async () => { renderer = create(<CreateSandboxDialog />); });
+  await act(async () => {
+    renderer = create(<CreateSandboxDialog />);
+  });
   await click("云端沙箱");
-  expect(renderer.root.findByProps({ "data-testid": "selected-template" }).children.join("")).toBe("Agent workspace");
+  expect(renderer.root.findByProps({ "data-testid": "selected-template" }).children.join("")).toBe(
+    "Agent workspace",
+  );
 });
 it("offers collapsed options and applies selected credentials before pairing", async () => {
   await act(async () => {
@@ -171,4 +190,38 @@ it("creates normally when no credentials were selected", async () => {
   await click("创建本地沙箱");
   expect(fixture.apply).not.toHaveBeenCalled();
   expect(fixture.pairing).toHaveBeenCalledTimes(1);
+});
+
+it("remote-only web offers only cloud creation even when a desktop bridge exists", async () => {
+  vi.stubEnv("VITE_ISODO_REMOTE_ONLY", "true");
+  const templates = vi.spyOn(window.isodoDesktop!, "listLocalTemplates");
+  try {
+    await act(async () => {
+      renderer = create(<CreateSandboxDialog />);
+    });
+    const text = JSON.stringify(renderer.toJSON());
+    expect(text).not.toContain("本地沙箱");
+    expect(templates).not.toHaveBeenCalled();
+    expect(text).toContain("创建云端沙箱");
+  } finally {
+    vi.unstubAllEnvs();
+  }
+});
+
+it("remote-only web requires login instead of creating a demo sandbox", async () => {
+  vi.stubEnv("VITE_ISODO_REMOTE_ONLY", "true");
+  fixture.authStatus = "unauthenticated";
+  try {
+    await act(async () => {
+      renderer = create(<CreateSandboxDialog />);
+    });
+    const button = renderer.root
+      .findAllByType("button")
+      .find((n) => n.children.join("") === "创建云端沙箱")!;
+    expect(button.props.disabled).toBe(true);
+    expect(JSON.stringify(renderer.toJSON())).toContain("请先登录后创建云端沙箱");
+    expect(fixture.create).not.toHaveBeenCalled();
+  } finally {
+    vi.unstubAllEnvs();
+  }
 });

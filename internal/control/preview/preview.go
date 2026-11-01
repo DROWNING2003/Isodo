@@ -16,6 +16,7 @@ import (
 	"net/http/httputil"
 	"net/url"
 	"regexp"
+	"slices"
 	"strconv"
 	"strings"
 	"sync"
@@ -30,12 +31,17 @@ const (
 var uuidPattern = regexp.MustCompile(`^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$`)
 
 type Config struct {
-	Secret    string
-	Domain    string
-	Scheme    string
-	APIPort   string
-	AppOrigin string
-	TTL       time.Duration
+	Secret  string
+	Domain  string
+	Scheme  string
+	APIPort string
+	// PublicPort overrides the external listener port, including HTTPS.
+	PublicPort string
+	// CrossSiteCookie enables HTTPS credentialed access from AppOrigin.
+	CrossSiteCookie      bool
+	AppOrigin            string
+	AdditionalAppOrigins []string
+	TTL                  time.Duration
 	// Relay, when set, dials the Guest port through the Node gRPC stream
 	// instead of assuming the API and Node share a loopback address.
 	Relay RelayDialer
@@ -48,12 +54,15 @@ type RelayDialer interface {
 }
 
 type Publisher struct {
-	secret    []byte
-	domain    string
-	scheme    string
-	apiPort   string
-	appOrigin string
-	ttl       time.Duration
+	secret               []byte
+	domain               string
+	scheme               string
+	apiPort              string
+	publicPort           string
+	crossSiteCookie      bool
+	appOrigin            string
+	additionalAppOrigins []string
+	ttl                  time.Duration
 
 	relay   RelayDialer
 	mu      sync.RWMutex
@@ -77,25 +86,42 @@ func New(config Config) (*Publisher, error) {
 	if scheme != "http" && scheme != "https" {
 		return nil, errors.New("preview scheme must be http or https")
 	}
-	if config.AppOrigin != "" {
-		origin, err := url.Parse(config.AppOrigin)
+	for _, value := range append([]string{config.AppOrigin}, config.AdditionalAppOrigins...) {
+		if value == "" {
+			continue
+		}
+		origin, err := url.Parse(value)
 		if err != nil || origin.Host == "" || origin.User != nil || (origin.Scheme != "http" && origin.Scheme != "https") || origin.Path != "" || origin.RawQuery != "" || origin.Fragment != "" {
 			return nil, errors.New("preview AppOrigin must be an HTTP origin")
 		}
+	}
+	publicPort := strings.TrimSpace(config.PublicPort)
+	if publicPort != "" {
+		port, err := strconv.ParseUint(publicPort, 10, 16)
+		if err != nil || port == 0 {
+			return nil, errors.New("preview public port must be between 1 and 65535")
+		}
+		publicPort = strconv.FormatUint(port, 10)
+	}
+	if config.CrossSiteCookie && (scheme != "https" || config.AppOrigin == "") {
+		return nil, errors.New("cross-site preview cookies require HTTPS and an explicit AppOrigin")
 	}
 	ttl := config.TTL
 	if ttl <= 0 {
 		ttl = time.Hour
 	}
 	return &Publisher{
-		secret:    []byte(config.Secret),
-		domain:    strings.Trim(strings.ToLower(config.Domain), "."),
-		scheme:    scheme,
-		apiPort:   strings.TrimSpace(config.APIPort),
-		appOrigin: config.AppOrigin,
-		ttl:       ttl,
-		relay:     config.Relay,
-		targets:   make(map[string]*url.URL),
+		secret:               []byte(config.Secret),
+		domain:               strings.Trim(strings.ToLower(config.Domain), "."),
+		scheme:               scheme,
+		apiPort:              strings.TrimSpace(config.APIPort),
+		publicPort:           publicPort,
+		crossSiteCookie:      config.CrossSiteCookie,
+		appOrigin:            config.AppOrigin,
+		additionalAppOrigins: append([]string(nil), config.AdditionalAppOrigins...),
+		ttl:                  ttl,
+		relay:                config.Relay,
+		targets:              make(map[string]*url.URL),
 	}, nil
 }
 
@@ -127,7 +153,9 @@ func (p *Publisher) Publish(sandboxID string, port uint16, nodeURL string) (stri
 	target.Scheme = "http"
 
 	publicHost := fmt.Sprintf("%d-%s.%s", port, sandboxID, p.domain)
-	if p.domain == "localhost" && p.apiPort != "" {
+	if p.publicPort != "" {
+		publicHost = net.JoinHostPort(publicHost, p.publicPort)
+	} else if p.domain == "localhost" && p.apiPort != "" {
 		publicHost = net.JoinHostPort(publicHost, p.apiPort)
 	} else if p.scheme == "http" && p.apiPort != "" {
 		publicHost = net.JoinHostPort(publicHost, p.apiPort)
@@ -188,9 +216,15 @@ func (p *Publisher) Wrap(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		// SameSite=None removes the browser's CSRF barrier. Unsafe methods
+		// must carry an allowed Origin; CORS alone does not prevent writes.
+		if p.crossSiteCookie && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions && r.Header.Get("Origin") == "" {
+			http.Error(w, "preview origin is required", http.StatusForbidden)
+			return
+		}
 		if origin := r.Header.Get("Origin"); origin != "" {
 			w.Header().Add("Vary", "Origin")
-			if origin != p.appOrigin && origin != p.scheme+"://"+r.Host {
+			if origin != p.appOrigin && !slices.Contains(p.additionalAppOrigins, origin) && origin != p.scheme+"://"+r.Host {
 				http.Error(w, "preview origin is not allowed", http.StatusForbidden)
 				return
 			}
@@ -245,13 +279,19 @@ func (p *Publisher) authenticate(w http.ResponseWriter, r *http.Request, sandbox
 	if next == "" || !strings.HasPrefix(next, "/") || strings.HasPrefix(next, "//") {
 		next = "/"
 	}
+	sameSite := http.SameSiteLaxMode
+	if p.crossSiteCookie {
+		sameSite = http.SameSiteNoneMode
+	}
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Referrer-Policy", "no-referrer")
 	http.SetCookie(w, &http.Cookie{
 		Name:     cookieName,
 		Value:    token,
 		Path:     "/",
 		HttpOnly: true,
 		Secure:   p.scheme == "https",
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sameSite,
 		Expires:  time.Unix(current.Expires, 0),
 	})
 	http.Redirect(w, r, next, http.StatusFound)

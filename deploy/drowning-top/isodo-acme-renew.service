@@ -1,0 +1,6 @@
+[Unit]
+Description=Renew Isodo DNS-01 certificate
+[Service]
+Type=oneshot
+UMask=0077
+ExecStart=/opt/isodo/acme/acme.sh --cron --home /opt/isodo/acme
