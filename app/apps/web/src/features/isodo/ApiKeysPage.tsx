@@ -23,6 +23,7 @@ import { CloudPage } from "./CloudPages";
 const SCOPE_LABELS: Record<ApiKeyScope, string> = {
   "sandboxes:read": "沙箱读取",
   "sandboxes:write": "沙箱管理",
+  "sandboxes:execute": "命令执行",
   "templates:read": "模板读取",
   "templates:write": "模板管理",
 };
