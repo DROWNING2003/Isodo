@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"net/url"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -37,7 +38,9 @@ func (testAuthenticator) Authenticate(_ context.Context, authorization string) (
 }
 
 type memoryStore struct {
-	items map[string]sandbox.Sandbox
+	policyMu sync.Mutex
+	policies map[string]preview.PortPolicy
+	items    map[string]sandbox.Sandbox
 }
 
 func newMemoryStore() *memoryStore {
@@ -143,7 +146,7 @@ func (f fakeAppLink) CreateSandboxAppLink(context.Context, string) (string, time
 func TestSandboxAppLinkReturnsJSON(t *testing.T) {
 	store := newMemoryStore()
 	expires := time.Now().Add(5 * time.Minute)
-	appURL := "http://8080-" + otherSandboxID + ".localhost:43123/pair#token=secret"
+	appURL := "http://38080-" + otherSandboxID + ".localhost:43123/pair#token=secret"
 	mux := httpapi.NewHandler(nil, nil, sandbox.NewHandler(store, fakeAppLink{url: appURL, expires: expires}), &auth.Access{Bearer: testAuthenticator{}})
 
 	req := httptest.NewRequest(http.MethodPost, "/v1/sandboxes/"+otherSandboxID+"/app-link", nil)
@@ -161,7 +164,7 @@ func TestSandboxAppLinkReturnsJSON(t *testing.T) {
 	if link.SandboxId != otherSandboxID || link.Service != publicapi.SandboxAppLinkService("t3") || link.Status != publicapi.SandboxAppLinkStatusReady {
 		t.Fatalf("unexpected app link: %#v", link)
 	}
-	if link.Url != "http://8080-"+otherSandboxID+".localhost:43123/" {
+	if link.Url != "http://38080-"+otherSandboxID+".localhost:43123/" {
 		t.Fatalf("base URL = %q", link.Url)
 	}
 	if link.PairingUrl != appURL {
@@ -189,9 +192,9 @@ func (f fakePublisher) Publish(string, uint16, string) (string, string, error) {
 
 func TestSandboxAppLinkUsesPublicPreviewHost(t *testing.T) {
 	store := newMemoryStore()
-	appURL := "http://8080-" + otherSandboxID + ".localhost:43123/pair#token=secret"
-	baseURL := "http://8080-" + otherSandboxID + ".localhost:43123/"
-	pairingURL := "http://8080-" + otherSandboxID + ".localhost:43123/__isodo/auth/token?next=/pair#token=secret"
+	appURL := "http://38080-" + otherSandboxID + ".localhost:43123/pair#token=secret"
+	baseURL := "http://38080-" + otherSandboxID + ".localhost:43123/"
+	pairingURL := "http://38080-" + otherSandboxID + ".localhost:43123/__isodo/auth/token?next=/pair#token=secret"
 	handler := sandbox.NewHandler(store, fakeAppLink{url: appURL, expires: time.Now().Add(5 * time.Minute)})
 	handler.SetAppLinkPublisher(fakePublisher{base: baseURL, pairing: pairingURL})
 	mux := httpapi.NewHandler(nil, nil, handler, &auth.Access{Bearer: testAuthenticator{}})
@@ -222,7 +225,7 @@ func TestSandboxAppLinkUsesPublicPreviewHost(t *testing.T) {
 
 func TestSandboxAppLinkAndPreviewGatewayEndToEnd(t *testing.T) {
 	backend := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Host != "8080-"+otherSandboxID+".localhost:43123" {
+		if r.Host != "38080-"+otherSandboxID+".localhost:43123" {
 			t.Errorf("upstream host = %q", r.Host)
 		}
 		_, _ = w.Write([]byte("t3-terminal-files"))
@@ -237,7 +240,7 @@ func TestSandboxAppLinkAndPreviewGatewayEndToEnd(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	nodeURL := "http://8080-" + otherSandboxID + ".localhost:" + backendURL.Port() + "/pair#token=pair-token"
+	nodeURL := "http://38080-" + otherSandboxID + ".localhost:" + backendURL.Port() + "/pair#token=pair-token"
 	handler := sandbox.NewHandler(newMemoryStore(), fakeAppLink{url: nodeURL, expires: time.Now().Add(5 * time.Minute)})
 	handler.SetAppLinkPublisher(publisher)
 	mux := httpapi.NewHandler(nil, nil, handler, &auth.Access{Bearer: testAuthenticator{}})
@@ -255,7 +258,7 @@ func TestSandboxAppLinkAndPreviewGatewayEndToEnd(t *testing.T) {
 		t.Fatal(err)
 	}
 	parsed, err := url.Parse(link.PairingUrl)
-	if err != nil || parsed.Host != "8080-"+otherSandboxID+".localhost:43123" || parsed.Fragment != "token=pair-token" {
+	if err != nil || parsed.Host != "38080-"+otherSandboxID+".localhost:43123" || parsed.Fragment != "token=pair-token" {
 		t.Fatalf("pairing_url = %q (%v)", link.PairingUrl, err)
 	}
 

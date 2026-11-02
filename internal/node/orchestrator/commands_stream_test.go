@@ -84,10 +84,10 @@ func commandGuestRelay(t *testing.T, guest guestv1.GuestServiceServer) string {
 				defer conn.Close()
 				_ = conn.SetDeadline(time.Now().Add(5 * time.Second))
 				line, err := bufio.NewReader(conn).ReadString('\n')
-				if err != nil || line != "CONNECT 1024\n" {
+				if err != nil || line != "CONNECT 31024\n" {
 					return
 				}
-				if _, err = io.WriteString(conn, "OK 1024\n"); err != nil {
+				if _, err = io.WriteString(conn, "OK 31024\n"); err != nil {
 					return
 				}
 				_ = conn.SetDeadline(time.Time{})

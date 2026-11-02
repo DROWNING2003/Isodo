@@ -6,10 +6,15 @@
 package publicapi
 
 import (
+	"bytes"
+	"context"
 	"encoding/json"
 	"errors"
 	"fmt"
+	"io"
 	"net/http"
+	"net/url"
+	"strings"
 	"time"
 
 	"github.com/oapi-codegen/runtime"
@@ -97,6 +102,24 @@ func (e PatchTemplateVisibility) Valid() bool {
 	case PatchTemplateVisibilityPrivate:
 		return true
 	case PatchTemplateVisibilityPublic:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PortPreviewPolicyVisibility.
+const (
+	PortPreviewPolicyVisibilityPrivate PortPreviewPolicyVisibility = "private"
+	PortPreviewPolicyVisibilityPublic  PortPreviewPolicyVisibility = "public"
+)
+
+// Valid indicates whether the value is a known member of the PortPreviewPolicyVisibility enum.
+func (e PortPreviewPolicyVisibility) Valid() bool {
+	switch e {
+	case PortPreviewPolicyVisibilityPrivate:
+		return true
+	case PortPreviewPolicyVisibilityPublic:
 		return true
 	default:
 		return false
@@ -331,6 +354,24 @@ func (e TemplateBuildStatus) Valid() bool {
 	}
 }
 
+// Defines values for CreateSandboxPreview201JSONResponseBodyVisibility.
+const (
+	CreateSandboxPreview201JSONResponseBodyVisibilityPrivate CreateSandboxPreview201JSONResponseBodyVisibility = "private"
+	CreateSandboxPreview201JSONResponseBodyVisibilityPublic  CreateSandboxPreview201JSONResponseBodyVisibility = "public"
+)
+
+// Valid indicates whether the value is a known member of the CreateSandboxPreview201JSONResponseBodyVisibility enum.
+func (e CreateSandboxPreview201JSONResponseBodyVisibility) Valid() bool {
+	switch e {
+	case CreateSandboxPreview201JSONResponseBodyVisibilityPrivate:
+		return true
+	case CreateSandboxPreview201JSONResponseBodyVisibilityPublic:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListTemplatesParamsScope.
 const (
 	ListTemplatesParamsScopeAvailable ListTemplatesParamsScope = "available"
@@ -513,6 +554,14 @@ type PatchTemplate struct {
 
 // PatchTemplateVisibility defines model for PatchTemplate.Visibility.
 type PatchTemplateVisibility string
+
+// PortPreviewPolicy defines model for PortPreviewPolicy.
+type PortPreviewPolicy struct {
+	Visibility PortPreviewPolicyVisibility `json:"visibility"`
+}
+
+// PortPreviewPolicyVisibility defines model for PortPreviewPolicy.Visibility.
+type PortPreviewPolicyVisibility string
 
 // Sandbox defines model for Sandbox.
 type Sandbox struct {
@@ -747,6 +796,9 @@ type CreateSandboxPreviewJSONBody struct {
 	Port int `json:"port"`
 }
 
+// CreateSandboxPreview201JSONResponseBodyVisibility defines parameters for CreateSandboxPreview.
+type CreateSandboxPreview201JSONResponseBodyVisibility string
+
 // ListSystemTemplatesParams defines parameters for ListSystemTemplates.
 type ListSystemTemplatesParams struct {
 	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
@@ -793,6 +845,9 @@ type SetSandboxInjectionsJSONRequestBody SetSandboxInjectionsJSONBody
 // CreateSandboxPreviewJSONRequestBody defines body for CreateSandboxPreview for application/json ContentType.
 type CreateSandboxPreviewJSONRequestBody CreateSandboxPreviewJSONBody
 
+// SetSandboxPortPreviewJSONRequestBody defines body for SetSandboxPortPreview for application/json ContentType.
+type SetSandboxPortPreviewJSONRequestBody = PortPreviewPolicy
+
 // CreateTemplateJSONRequestBody defines body for CreateTemplate for application/json ContentType.
 type CreateTemplateJSONRequestBody = CreateTemplate
 
@@ -807,6 +862,7553 @@ type ForkTemplateJSONRequestBody = ForkTemplate
 
 // SetTemplateTagJSONRequestBody defines body for SetTemplateTag for application/json ContentType.
 type SetTemplateTagJSONRequestBody = SetTemplateTag
+
+// RequestEditorFn is the function signature for the RequestEditor callback function
+type RequestEditorFn func(ctx context.Context, req *http.Request) error
+
+// Doer performs HTTP requests.
+//
+// The standard http.Client implements this interface.
+type HttpRequestDoer interface {
+	Do(req *http.Request) (*http.Response, error)
+}
+
+// Client which conforms to the OpenAPI3 specification for this service.
+type Client struct {
+	// The endpoint of the server conforming to this interface, with scheme,
+	// https://api.deepmap.com for example. This can contain a path relative
+	// to the server, such as https://api.deepmap.com/dev-test, and all the
+	// paths in the swagger spec will be appended to the server.
+	Server string
+
+	// Doer for performing requests, typically a *http.Client with any
+	// customized settings, such as certificate chains.
+	Client HttpRequestDoer
+
+	// A list of callbacks for modifying requests which are generated before sending over
+	// the network.
+	RequestEditors []RequestEditorFn
+}
+
+// ClientOption allows setting custom parameters during construction
+type ClientOption func(*Client) error
+
+// Creates a new Client, with reasonable defaults
+func NewClient(server string, opts ...ClientOption) (*Client, error) {
+	// create a client with sane default values
+	client := Client{
+		Server: server,
+	}
+	// mutate client and add all optional params
+	for _, o := range opts {
+		if err := o(&client); err != nil {
+			return nil, err
+		}
+	}
+	// ensure the server URL always has a trailing slash
+	if !strings.HasSuffix(client.Server, "/") {
+		client.Server += "/"
+	}
+	// create httpClient, if not already present
+	if client.Client == nil {
+		client.Client = &http.Client{}
+	}
+	return &client, nil
+}
+
+// WithHTTPClient allows overriding the default Doer, which is
+// automatically created using http.Client. This is useful for tests.
+func WithHTTPClient(doer HttpRequestDoer) ClientOption {
+	return func(c *Client) error {
+		c.Client = doer
+		return nil
+	}
+}
+
+// WithRequestEditorFn allows setting up a callback function, which will be
+// called right before sending the request. This can be used to mutate the request.
+func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
+	return func(c *Client) error {
+		c.RequestEditors = append(c.RequestEditors, fn)
+		return nil
+	}
+}
+
+// The interface specification for the client above.
+type ClientInterface interface {
+
+	// ListCredentialDocuments List encrypted account credential configurations
+	//
+	// Interactive login required. Kind is agents or sandboxes. Values are decrypted only for the owning account.
+	//
+	// Corresponds with GET /v1/credential-documents/{kind} (the `ListCredentialDocuments` operationId).
+	ListCredentialDocuments(ctx context.Context, kind string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteCredentialDocument Delete one configuration owned by the current account
+	//
+	// Corresponds with DELETE /v1/credential-documents/{kind}/{id} (the `DeleteCredentialDocument` operationId).
+	DeleteCredentialDocument(ctx context.Context, kind string, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutCredentialDocumentWithBody Save an account Agent configuration or sandbox credential selection
+	//
+	// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /v1/credential-documents/{kind}/{id} (the `PutCredentialDocument` operationId).
+	PutCredentialDocumentWithBody(ctx context.Context, kind string, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// PutCredentialDocument Save an account Agent configuration or sandbox credential selection
+	//
+	// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /v1/credential-documents/{kind}/{id} (the `PutCredentialDocument` operationId).
+	PutCredentialDocument(ctx context.Context, kind string, id string, body PutCredentialDocumentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListInjectionRules List account injection rules
+	//
+	// Returns the authenticated account's persistent injection rules. Secrets are never returned; only a short masked hint is exposed.
+	//
+	// Corresponds with GET /v1/injection-rules (the `ListInjectionRules` operationId).
+	ListInjectionRules(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateInjectionRuleWithBody Create an account injection rule
+	//
+	// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/injection-rules (the `CreateInjectionRule` operationId).
+	CreateInjectionRuleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateInjectionRule Create an account injection rule
+	//
+	// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/injection-rules (the `CreateInjectionRule` operationId).
+	CreateInjectionRule(ctx context.Context, body CreateInjectionRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteInjectionRule Delete an account injection rule
+	//
+	// Corresponds with DELETE /v1/injection-rules/{ruleID} (the `DeleteInjectionRule` operationId).
+	DeleteInjectionRule(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetInjectionRule Get an account injection rule
+	//
+	// Corresponds with GET /v1/injection-rules/{ruleID} (the `GetInjectionRule` operationId).
+	GetInjectionRule(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateInjectionRuleWithBody Update an account injection rule
+	//
+	// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /v1/injection-rules/{ruleID} (the `UpdateInjectionRule` operationId).
+	UpdateInjectionRuleWithBody(ctx context.Context, ruleID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateInjectionRule Update an account injection rule
+	//
+	// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /v1/injection-rules/{ruleID} (the `UpdateInjectionRule` operationId).
+	UpdateInjectionRule(ctx context.Context, ruleID string, body UpdateInjectionRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetInjectionRuleMaterial Read injection material
+	//
+	// Returns the plaintext header/key for the authenticated owner so a trusted local runtime can apply it. The response is never cached; secrets are never logged.
+	//
+	// Corresponds with GET /v1/injection-rules/{ruleID}/material (the `GetInjectionRuleMaterial` operationId).
+	GetInjectionRuleMaterial(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSandboxes List sandboxes
+	//
+	// Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
+	//
+	// Corresponds with GET /v1/sandboxes (the `ListSandboxes` operationId).
+	ListSandboxes(ctx context.Context, params *ListSandboxesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSandboxWithBody Create a sandbox
+	//
+	// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/sandboxes (the `CreateSandbox` operationId).
+	CreateSandboxWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSandbox Create a sandbox
+	//
+	// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/sandboxes (the `CreateSandbox` operationId).
+	CreateSandbox(ctx context.Context, body CreateSandboxJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteSandbox Delete a sandbox
+	//
+	// Requests Node cleanup. The resource remains readable until cleanup completes; repeated deletion returns the same action while pending or completed. Missing resources return 204.
+	//
+	// Corresponds with DELETE /v1/sandboxes/{sandboxID} (the `DeleteSandbox` operationId).
+	DeleteSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSandbox Get a sandbox
+	//
+	// Returns one sandbox owned by the authenticated user. A sandbox owned by another user is reported as not found.
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID} (the `GetSandbox` operationId).
+	GetSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSandboxWithBody Update a sandbox
+	//
+	// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /v1/sandboxes/{sandboxID} (the `UpdateSandbox` operationId).
+	UpdateSandboxWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateSandbox Update a sandbox
+	//
+	// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /v1/sandboxes/{sandboxID} (the `UpdateSandbox` operationId).
+	UpdateSandbox(ctx context.Context, sandboxID string, body UpdateSandboxJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSandboxApp Open a sandbox application
+	//
+	// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and redirects the browser to the sandbox application.
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/app (the `GetSandboxApp` operationId).
+	GetSandboxApp(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSandboxAppLink Create a sandbox application link
+	//
+	// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and returns it as JSON. Desktop clients and SDKs use this endpoint; browsers can use `GET /v1/sandboxes/{sandboxID}/app` instead. The pairing credential is carried in the `pairing_url` fragment and is never sent to the Isodo API.
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/app-link (the `CreateSandboxAppLink` operationId).
+	CreateSandboxAppLink(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RunSandboxCommandWithBody Run a bounded non-interactive command inside a sandbox Guest
+	//
+	// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/commands/run (the `RunSandboxCommand` operationId).
+	RunSandboxCommandWithBody(ctx context.Context, sandboxID string, params *RunSandboxCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RunSandboxCommand Run a bounded non-interactive command inside a sandbox Guest
+	//
+	// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/commands/run (the `RunSandboxCommand` operationId).
+	RunSandboxCommand(ctx context.Context, sandboxID string, params *RunSandboxCommandParams, body RunSandboxCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MakeSandboxDirectoryWithBody Create a workspace directory
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
+	MakeSandboxDirectoryWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MakeSandboxDirectory Create a workspace directory
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
+	MakeSandboxDirectory(ctx context.Context, sandboxID string, body MakeSandboxDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DownloadSandboxFile Download a verified binary file
+	//
+	// Stages at most 256 MiB in private temporary storage and verifies the Guest completion digest before responding. X-Content-SHA256 describes the complete response body.
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/files (the `DownloadSandboxFile` operationId).
+	DownloadSandboxFile(ctx context.Context, sandboxID string, params *DownloadSandboxFileParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UploadSandboxFileWithBody Upload and atomically commit one file
+	//
+	// Defaults to overwrite=true. One multipart part named file, up to 256 MiB. Upload bytes are staged in bounded private temporary storage before forwarding through Node and Guest. Success means Guest confirmed the SHA256 and atomic commit. COMMIT_UNKNOWN must be verified by reading the target before retrying.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/files (the `UploadSandboxFile` operationId).
+	UploadSandboxFileWithBody(ctx context.Context, sandboxID string, params *UploadSandboxFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSandboxInjections Read masked host-side injection configuration
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/injections (the `GetSandboxInjections` operationId).
+	GetSandboxInjections(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetSandboxInjectionsWithBody Replace sandbox host-side injection rules
+	//
+	// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
+	SetSandboxInjectionsWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetSandboxInjections Replace sandbox host-side injection rules
+	//
+	// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
+	SetSandboxInjections(ctx context.Context, sandboxID string, body SetSandboxInjectionsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSandboxPreviewWithBody Authorize a sandbox HTTP port preview
+	//
+	// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/previews (the `CreateSandboxPreview` operationId).
+	CreateSandboxPreviewWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSandboxPreview Authorize a sandbox HTTP port preview
+	//
+	// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/previews (the `CreateSandboxPreview` operationId).
+	CreateSandboxPreview(ctx context.Context, sandboxID string, body CreateSandboxPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetSandboxPortPreview Get a sandbox HTTP port visibility
+	//
+	// Requires ownership and sandboxes:read. Unconfigured ports default to public. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited.
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/previews/{port} (the `GetSandboxPortPreview` operationId).
+	GetSandboxPortPreview(ctx context.Context, sandboxID string, port int, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetSandboxPortPreviewWithBody Change a sandbox HTTP port visibility
+	//
+	// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /v1/sandboxes/{sandboxID}/previews/{port} (the `SetSandboxPortPreview` operationId).
+	SetSandboxPortPreviewWithBody(ctx context.Context, sandboxID string, port int, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetSandboxPortPreview Change a sandbox HTTP port visibility
+	//
+	// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /v1/sandboxes/{sandboxID}/previews/{port} (the `SetSandboxPortPreview` operationId).
+	SetSandboxPortPreview(ctx context.Context, sandboxID string, port int, body SetSandboxPortPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StartSandbox Start a stopped sandbox
+	//
+	// Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/start (the `StartSandbox` operationId).
+	StartSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StopSandbox Stop a running sandbox
+	//
+	// Requests a graceful stop for a cloud sandbox owned by the authenticated user while preserving its instance disks. The operation is asynchronous; poll the sandbox until observed_state becomes stopped.
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/stop (the `StopSandbox` operationId).
+	StopSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSystemTemplates List platform default templates
+	//
+	// Corresponds with GET /v1/system-templates (the `ListSystemTemplates` operationId).
+	ListSystemTemplates(ctx context.Context, params *ListSystemTemplatesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListTemplates List templates visible to the authenticated user
+	//
+	// Corresponds with GET /v1/templates (the `ListTemplates` operationId).
+	ListTemplates(ctx context.Context, params *ListTemplatesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateTemplateWithBody Create a personal template
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/templates (the `CreateTemplate` operationId).
+	CreateTemplateWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateTemplate Create a personal template
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/templates (the `CreateTemplate` operationId).
+	CreateTemplate(ctx context.Context, body CreateTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteTemplate Delete an owned template
+	//
+	// Corresponds with DELETE /v1/templates/{templateID} (the `DeleteTemplate` operationId).
+	DeleteTemplate(ctx context.Context, templateID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTemplate Get a template
+	//
+	// Corresponds with GET /v1/templates/{templateID} (the `GetTemplate` operationId).
+	GetTemplate(ctx context.Context, templateID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateTemplateWithBody Update an owned template
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PATCH /v1/templates/{templateID} (the `UpdateTemplate` operationId).
+	UpdateTemplateWithBody(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UpdateTemplate Update an owned template
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PATCH /v1/templates/{templateID} (the `UpdateTemplate` operationId).
+	UpdateTemplate(ctx context.Context, templateID string, body UpdateTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateTemplateBuildWithBody Queue an immutable template build
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/templates/{templateID}/builds (the `CreateTemplateBuild` operationId).
+	CreateTemplateBuildWithBody(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateTemplateBuild Queue an immutable template build
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/templates/{templateID}/builds (the `CreateTemplateBuild` operationId).
+	CreateTemplateBuild(ctx context.Context, templateID string, body CreateTemplateBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTemplateBuild Get template build status
+	//
+	// Corresponds with GET /v1/templates/{templateID}/builds/{buildID} (the `GetTemplateBuild` operationId).
+	GetTemplateBuild(ctx context.Context, templateID string, buildID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ForkTemplateWithBody Fork an accessible Ready build into a personal template
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/templates/{templateID}/fork (the `ForkTemplate` operationId).
+	ForkTemplateWithBody(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ForkTemplate Fork an accessible Ready build into a personal template
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/templates/{templateID}/fork (the `ForkTemplate` operationId).
+	ForkTemplate(ctx context.Context, templateID string, body ForkTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteTemplateTag Remove a template build tag
+	//
+	// Corresponds with DELETE /v1/templates/{templateID}/tags/{tag} (the `DeleteTemplateTag` operationId).
+	DeleteTemplateTag(ctx context.Context, templateID string, tag string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetTemplateTag Resolve a Ready build tag
+	//
+	// Corresponds with GET /v1/templates/{templateID}/tags/{tag} (the `GetTemplateTag` operationId).
+	GetTemplateTag(ctx context.Context, templateID string, tag string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetTemplateTagWithBody Atomically publish a Ready build under a tag
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /v1/templates/{templateID}/tags/{tag} (the `SetTemplateTag` operationId).
+	SetTemplateTagWithBody(ctx context.Context, templateID string, tag string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetTemplateTag Atomically publish a Ready build under a tag
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /v1/templates/{templateID}/tags/{tag} (the `SetTemplateTag` operationId).
+	SetTemplateTag(ctx context.Context, templateID string, tag string, body SetTemplateTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+}
+
+// ListCredentialDocuments List encrypted account credential configurations
+//
+// Interactive login required. Kind is agents or sandboxes. Values are decrypted only for the owning account.
+//
+// Corresponds with GET /v1/credential-documents/{kind} (the `ListCredentialDocuments` operationId).
+func (c *Client) ListCredentialDocuments(ctx context.Context, kind string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListCredentialDocumentsRequest(c.Server, kind)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteCredentialDocument Delete one configuration owned by the current account
+//
+// Corresponds with DELETE /v1/credential-documents/{kind}/{id} (the `DeleteCredentialDocument` operationId).
+func (c *Client) DeleteCredentialDocument(ctx context.Context, kind string, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteCredentialDocumentRequest(c.Server, kind, id)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutCredentialDocumentWithBody Save an account Agent configuration or sandbox credential selection
+//
+// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /v1/credential-documents/{kind}/{id} (the `PutCredentialDocument` operationId).
+func (c *Client) PutCredentialDocumentWithBody(ctx context.Context, kind string, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutCredentialDocumentRequestWithBody(c.Server, kind, id, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// PutCredentialDocument Save an account Agent configuration or sandbox credential selection
+//
+// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /v1/credential-documents/{kind}/{id} (the `PutCredentialDocument` operationId).
+func (c *Client) PutCredentialDocument(ctx context.Context, kind string, id string, body PutCredentialDocumentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewPutCredentialDocumentRequest(c.Server, kind, id, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListInjectionRules List account injection rules
+//
+// Returns the authenticated account's persistent injection rules. Secrets are never returned; only a short masked hint is exposed.
+//
+// Corresponds with GET /v1/injection-rules (the `ListInjectionRules` operationId).
+func (c *Client) ListInjectionRules(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListInjectionRulesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateInjectionRuleWithBody Create an account injection rule
+//
+// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/injection-rules (the `CreateInjectionRule` operationId).
+func (c *Client) CreateInjectionRuleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateInjectionRuleRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateInjectionRule Create an account injection rule
+//
+// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/injection-rules (the `CreateInjectionRule` operationId).
+func (c *Client) CreateInjectionRule(ctx context.Context, body CreateInjectionRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateInjectionRuleRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteInjectionRule Delete an account injection rule
+//
+// Corresponds with DELETE /v1/injection-rules/{ruleID} (the `DeleteInjectionRule` operationId).
+func (c *Client) DeleteInjectionRule(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteInjectionRuleRequest(c.Server, ruleID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetInjectionRule Get an account injection rule
+//
+// Corresponds with GET /v1/injection-rules/{ruleID} (the `GetInjectionRule` operationId).
+func (c *Client) GetInjectionRule(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetInjectionRuleRequest(c.Server, ruleID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateInjectionRuleWithBody Update an account injection rule
+//
+// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /v1/injection-rules/{ruleID} (the `UpdateInjectionRule` operationId).
+func (c *Client) UpdateInjectionRuleWithBody(ctx context.Context, ruleID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateInjectionRuleRequestWithBody(c.Server, ruleID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateInjectionRule Update an account injection rule
+//
+// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /v1/injection-rules/{ruleID} (the `UpdateInjectionRule` operationId).
+func (c *Client) UpdateInjectionRule(ctx context.Context, ruleID string, body UpdateInjectionRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateInjectionRuleRequest(c.Server, ruleID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetInjectionRuleMaterial Read injection material
+//
+// Returns the plaintext header/key for the authenticated owner so a trusted local runtime can apply it. The response is never cached; secrets are never logged.
+//
+// Corresponds with GET /v1/injection-rules/{ruleID}/material (the `GetInjectionRuleMaterial` operationId).
+func (c *Client) GetInjectionRuleMaterial(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetInjectionRuleMaterialRequest(c.Server, ruleID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListSandboxes List sandboxes
+//
+// Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
+//
+// Corresponds with GET /v1/sandboxes (the `ListSandboxes` operationId).
+func (c *Client) ListSandboxes(ctx context.Context, params *ListSandboxesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSandboxesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSandboxWithBody Create a sandbox
+//
+// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/sandboxes (the `CreateSandbox` operationId).
+func (c *Client) CreateSandboxWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSandboxRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSandbox Create a sandbox
+//
+// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/sandboxes (the `CreateSandbox` operationId).
+func (c *Client) CreateSandbox(ctx context.Context, body CreateSandboxJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSandboxRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteSandbox Delete a sandbox
+//
+// Requests Node cleanup. The resource remains readable until cleanup completes; repeated deletion returns the same action while pending or completed. Missing resources return 204.
+//
+// Corresponds with DELETE /v1/sandboxes/{sandboxID} (the `DeleteSandbox` operationId).
+func (c *Client) DeleteSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteSandboxRequest(c.Server, sandboxID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSandbox Get a sandbox
+//
+// Returns one sandbox owned by the authenticated user. A sandbox owned by another user is reported as not found.
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID} (the `GetSandbox` operationId).
+func (c *Client) GetSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSandboxRequest(c.Server, sandboxID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateSandboxWithBody Update a sandbox
+//
+// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /v1/sandboxes/{sandboxID} (the `UpdateSandbox` operationId).
+func (c *Client) UpdateSandboxWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSandboxRequestWithBody(c.Server, sandboxID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateSandbox Update a sandbox
+//
+// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /v1/sandboxes/{sandboxID} (the `UpdateSandbox` operationId).
+func (c *Client) UpdateSandbox(ctx context.Context, sandboxID string, body UpdateSandboxJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateSandboxRequest(c.Server, sandboxID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSandboxApp Open a sandbox application
+//
+// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and redirects the browser to the sandbox application.
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/app (the `GetSandboxApp` operationId).
+func (c *Client) GetSandboxApp(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSandboxAppRequest(c.Server, sandboxID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSandboxAppLink Create a sandbox application link
+//
+// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and returns it as JSON. Desktop clients and SDKs use this endpoint; browsers can use `GET /v1/sandboxes/{sandboxID}/app` instead. The pairing credential is carried in the `pairing_url` fragment and is never sent to the Isodo API.
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/app-link (the `CreateSandboxAppLink` operationId).
+func (c *Client) CreateSandboxAppLink(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSandboxAppLinkRequest(c.Server, sandboxID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RunSandboxCommandWithBody Run a bounded non-interactive command inside a sandbox Guest
+//
+// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/commands/run (the `RunSandboxCommand` operationId).
+func (c *Client) RunSandboxCommandWithBody(ctx context.Context, sandboxID string, params *RunSandboxCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRunSandboxCommandRequestWithBody(c.Server, sandboxID, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RunSandboxCommand Run a bounded non-interactive command inside a sandbox Guest
+//
+// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/commands/run (the `RunSandboxCommand` operationId).
+func (c *Client) RunSandboxCommand(ctx context.Context, sandboxID string, params *RunSandboxCommandParams, body RunSandboxCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRunSandboxCommandRequest(c.Server, sandboxID, params, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// MakeSandboxDirectoryWithBody Create a workspace directory
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
+func (c *Client) MakeSandboxDirectoryWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMakeSandboxDirectoryRequestWithBody(c.Server, sandboxID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// MakeSandboxDirectory Create a workspace directory
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
+func (c *Client) MakeSandboxDirectory(ctx context.Context, sandboxID string, body MakeSandboxDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMakeSandboxDirectoryRequest(c.Server, sandboxID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DownloadSandboxFile Download a verified binary file
+//
+// Stages at most 256 MiB in private temporary storage and verifies the Guest completion digest before responding. X-Content-SHA256 describes the complete response body.
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/files (the `DownloadSandboxFile` operationId).
+func (c *Client) DownloadSandboxFile(ctx context.Context, sandboxID string, params *DownloadSandboxFileParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDownloadSandboxFileRequest(c.Server, sandboxID, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UploadSandboxFileWithBody Upload and atomically commit one file
+//
+// Defaults to overwrite=true. One multipart part named file, up to 256 MiB. Upload bytes are staged in bounded private temporary storage before forwarding through Node and Guest. Success means Guest confirmed the SHA256 and atomic commit. COMMIT_UNKNOWN must be verified by reading the target before retrying.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/files (the `UploadSandboxFile` operationId).
+func (c *Client) UploadSandboxFileWithBody(ctx context.Context, sandboxID string, params *UploadSandboxFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUploadSandboxFileRequestWithBody(c.Server, sandboxID, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSandboxInjections Read masked host-side injection configuration
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/injections (the `GetSandboxInjections` operationId).
+func (c *Client) GetSandboxInjections(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSandboxInjectionsRequest(c.Server, sandboxID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetSandboxInjectionsWithBody Replace sandbox host-side injection rules
+//
+// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
+func (c *Client) SetSandboxInjectionsWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetSandboxInjectionsRequestWithBody(c.Server, sandboxID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetSandboxInjections Replace sandbox host-side injection rules
+//
+// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
+func (c *Client) SetSandboxInjections(ctx context.Context, sandboxID string, body SetSandboxInjectionsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetSandboxInjectionsRequest(c.Server, sandboxID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSandboxPreviewWithBody Authorize a sandbox HTTP port preview
+//
+// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/previews (the `CreateSandboxPreview` operationId).
+func (c *Client) CreateSandboxPreviewWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSandboxPreviewRequestWithBody(c.Server, sandboxID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSandboxPreview Authorize a sandbox HTTP port preview
+//
+// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/previews (the `CreateSandboxPreview` operationId).
+func (c *Client) CreateSandboxPreview(ctx context.Context, sandboxID string, body CreateSandboxPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSandboxPreviewRequest(c.Server, sandboxID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetSandboxPortPreview Get a sandbox HTTP port visibility
+//
+// Requires ownership and sandboxes:read. Unconfigured ports default to public. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited.
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/previews/{port} (the `GetSandboxPortPreview` operationId).
+func (c *Client) GetSandboxPortPreview(ctx context.Context, sandboxID string, port int, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSandboxPortPreviewRequest(c.Server, sandboxID, port)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetSandboxPortPreviewWithBody Change a sandbox HTTP port visibility
+//
+// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /v1/sandboxes/{sandboxID}/previews/{port} (the `SetSandboxPortPreview` operationId).
+func (c *Client) SetSandboxPortPreviewWithBody(ctx context.Context, sandboxID string, port int, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetSandboxPortPreviewRequestWithBody(c.Server, sandboxID, port, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetSandboxPortPreview Change a sandbox HTTP port visibility
+//
+// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /v1/sandboxes/{sandboxID}/previews/{port} (the `SetSandboxPortPreview` operationId).
+func (c *Client) SetSandboxPortPreview(ctx context.Context, sandboxID string, port int, body SetSandboxPortPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetSandboxPortPreviewRequest(c.Server, sandboxID, port, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StartSandbox Start a stopped sandbox
+//
+// Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/start (the `StartSandbox` operationId).
+func (c *Client) StartSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStartSandboxRequest(c.Server, sandboxID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StopSandbox Stop a running sandbox
+//
+// Requests a graceful stop for a cloud sandbox owned by the authenticated user while preserving its instance disks. The operation is asynchronous; poll the sandbox until observed_state becomes stopped.
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/stop (the `StopSandbox` operationId).
+func (c *Client) StopSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStopSandboxRequest(c.Server, sandboxID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListSystemTemplates List platform default templates
+//
+// Corresponds with GET /v1/system-templates (the `ListSystemTemplates` operationId).
+func (c *Client) ListSystemTemplates(ctx context.Context, params *ListSystemTemplatesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSystemTemplatesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListTemplates List templates visible to the authenticated user
+//
+// Corresponds with GET /v1/templates (the `ListTemplates` operationId).
+func (c *Client) ListTemplates(ctx context.Context, params *ListTemplatesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListTemplatesRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateTemplateWithBody Create a personal template
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/templates (the `CreateTemplate` operationId).
+func (c *Client) CreateTemplateWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateTemplateRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateTemplate Create a personal template
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/templates (the `CreateTemplate` operationId).
+func (c *Client) CreateTemplate(ctx context.Context, body CreateTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateTemplateRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteTemplate Delete an owned template
+//
+// Corresponds with DELETE /v1/templates/{templateID} (the `DeleteTemplate` operationId).
+func (c *Client) DeleteTemplate(ctx context.Context, templateID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteTemplateRequest(c.Server, templateID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetTemplate Get a template
+//
+// Corresponds with GET /v1/templates/{templateID} (the `GetTemplate` operationId).
+func (c *Client) GetTemplate(ctx context.Context, templateID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTemplateRequest(c.Server, templateID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateTemplateWithBody Update an owned template
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PATCH /v1/templates/{templateID} (the `UpdateTemplate` operationId).
+func (c *Client) UpdateTemplateWithBody(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTemplateRequestWithBody(c.Server, templateID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UpdateTemplate Update an owned template
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PATCH /v1/templates/{templateID} (the `UpdateTemplate` operationId).
+func (c *Client) UpdateTemplate(ctx context.Context, templateID string, body UpdateTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUpdateTemplateRequest(c.Server, templateID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateTemplateBuildWithBody Queue an immutable template build
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/templates/{templateID}/builds (the `CreateTemplateBuild` operationId).
+func (c *Client) CreateTemplateBuildWithBody(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateTemplateBuildRequestWithBody(c.Server, templateID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateTemplateBuild Queue an immutable template build
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/templates/{templateID}/builds (the `CreateTemplateBuild` operationId).
+func (c *Client) CreateTemplateBuild(ctx context.Context, templateID string, body CreateTemplateBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateTemplateBuildRequest(c.Server, templateID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetTemplateBuild Get template build status
+//
+// Corresponds with GET /v1/templates/{templateID}/builds/{buildID} (the `GetTemplateBuild` operationId).
+func (c *Client) GetTemplateBuild(ctx context.Context, templateID string, buildID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTemplateBuildRequest(c.Server, templateID, buildID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ForkTemplateWithBody Fork an accessible Ready build into a personal template
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/templates/{templateID}/fork (the `ForkTemplate` operationId).
+func (c *Client) ForkTemplateWithBody(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewForkTemplateRequestWithBody(c.Server, templateID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ForkTemplate Fork an accessible Ready build into a personal template
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/templates/{templateID}/fork (the `ForkTemplate` operationId).
+func (c *Client) ForkTemplate(ctx context.Context, templateID string, body ForkTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewForkTemplateRequest(c.Server, templateID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteTemplateTag Remove a template build tag
+//
+// Corresponds with DELETE /v1/templates/{templateID}/tags/{tag} (the `DeleteTemplateTag` operationId).
+func (c *Client) DeleteTemplateTag(ctx context.Context, templateID string, tag string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteTemplateTagRequest(c.Server, templateID, tag)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetTemplateTag Resolve a Ready build tag
+//
+// Corresponds with GET /v1/templates/{templateID}/tags/{tag} (the `GetTemplateTag` operationId).
+func (c *Client) GetTemplateTag(ctx context.Context, templateID string, tag string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetTemplateTagRequest(c.Server, templateID, tag)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetTemplateTagWithBody Atomically publish a Ready build under a tag
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /v1/templates/{templateID}/tags/{tag} (the `SetTemplateTag` operationId).
+func (c *Client) SetTemplateTagWithBody(ctx context.Context, templateID string, tag string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetTemplateTagRequestWithBody(c.Server, templateID, tag, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetTemplateTag Atomically publish a Ready build under a tag
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /v1/templates/{templateID}/tags/{tag} (the `SetTemplateTag` operationId).
+func (c *Client) SetTemplateTag(ctx context.Context, templateID string, tag string, body SetTemplateTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetTemplateTagRequest(c.Server, templateID, tag, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// NewListCredentialDocumentsRequest constructs an http.Request for the ListCredentialDocuments method
+func NewListCredentialDocumentsRequest(server string, kind string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "kind", kind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/credential-documents/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDeleteCredentialDocumentRequest constructs an http.Request for the DeleteCredentialDocument method
+func NewDeleteCredentialDocumentRequest(server string, kind string, id string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "kind", kind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/credential-documents/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewPutCredentialDocumentRequest calls the generic PutCredentialDocument builder with application/json body
+func NewPutCredentialDocumentRequest(server string, kind string, id string, body PutCredentialDocumentJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewPutCredentialDocumentRequestWithBody(server, kind, id, "application/json", bodyReader)
+}
+
+// NewPutCredentialDocumentRequestWithBody constructs an http.Request for the PutCredentialDocument method, with any body, and a specified content type
+func NewPutCredentialDocumentRequestWithBody(server string, kind string, id string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "kind", kind, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "id", id, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/credential-documents/%s/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListInjectionRulesRequest constructs an http.Request for the ListInjectionRules method
+func NewListInjectionRulesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/injection-rules")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateInjectionRuleRequest calls the generic CreateInjectionRule builder with application/json body
+func NewCreateInjectionRuleRequest(server string, body CreateInjectionRuleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateInjectionRuleRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateInjectionRuleRequestWithBody constructs an http.Request for the CreateInjectionRule method, with any body, and a specified content type
+func NewCreateInjectionRuleRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/injection-rules")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteInjectionRuleRequest constructs an http.Request for the DeleteInjectionRule method
+func NewDeleteInjectionRuleRequest(server string, ruleID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ruleID", ruleID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/injection-rules/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetInjectionRuleRequest constructs an http.Request for the GetInjectionRule method
+func NewGetInjectionRuleRequest(server string, ruleID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ruleID", ruleID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/injection-rules/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateInjectionRuleRequest calls the generic UpdateInjectionRule builder with application/json body
+func NewUpdateInjectionRuleRequest(server string, ruleID string, body UpdateInjectionRuleJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateInjectionRuleRequestWithBody(server, ruleID, "application/json", bodyReader)
+}
+
+// NewUpdateInjectionRuleRequestWithBody constructs an http.Request for the UpdateInjectionRule method, with any body, and a specified content type
+func NewUpdateInjectionRuleRequestWithBody(server string, ruleID string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ruleID", ruleID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/injection-rules/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetInjectionRuleMaterialRequest constructs an http.Request for the GetInjectionRuleMaterial method
+func NewGetInjectionRuleMaterialRequest(server string, ruleID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "ruleID", ruleID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/injection-rules/%s/material", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListSandboxesRequest constructs an http.Request for the ListSandboxes method
+func NewListSandboxesRequest(server string, params *ListSandboxesParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateSandboxRequest calls the generic CreateSandbox builder with application/json body
+func NewCreateSandboxRequest(server string, body CreateSandboxJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateSandboxRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateSandboxRequestWithBody constructs an http.Request for the CreateSandbox method, with any body, and a specified content type
+func NewCreateSandboxRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteSandboxRequest constructs an http.Request for the DeleteSandbox method
+func NewDeleteSandboxRequest(server string, sandboxID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetSandboxRequest constructs an http.Request for the GetSandbox method
+func NewGetSandboxRequest(server string, sandboxID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateSandboxRequest calls the generic UpdateSandbox builder with application/json body
+func NewUpdateSandboxRequest(server string, sandboxID string, body UpdateSandboxJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateSandboxRequestWithBody(server, sandboxID, "application/json", bodyReader)
+}
+
+// NewUpdateSandboxRequestWithBody constructs an http.Request for the UpdateSandbox method, with any body, and a specified content type
+func NewUpdateSandboxRequestWithBody(server string, sandboxID string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetSandboxAppRequest constructs an http.Request for the GetSandboxApp method
+func NewGetSandboxAppRequest(server string, sandboxID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/app", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateSandboxAppLinkRequest constructs an http.Request for the CreateSandboxAppLink method
+func NewCreateSandboxAppLinkRequest(server string, sandboxID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/app-link", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewRunSandboxCommandRequest calls the generic RunSandboxCommand builder with application/json body
+func NewRunSandboxCommandRequest(server string, sandboxID string, params *RunSandboxCommandParams, body RunSandboxCommandJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewRunSandboxCommandRequestWithBody(server, sandboxID, params, "application/json", bodyReader)
+}
+
+// NewRunSandboxCommandRequestWithBody constructs an http.Request for the RunSandboxCommand method, with any body, and a specified content type
+func NewRunSandboxCommandRequestWithBody(server string, sandboxID string, params *RunSandboxCommandParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/commands/run", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	if params != nil {
+
+		var headerParam0 string
+
+		headerParam0, err = runtime.StyleParamWithOptions("simple", false, "Idempotency-Key", params.IdempotencyKey, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationHeader, Type: "string", Format: ""})
+		if err != nil {
+			return nil, err
+		}
+
+		req.Header.Set("Idempotency-Key", headerParam0)
+
+	}
+
+	return req, nil
+}
+
+// NewMakeSandboxDirectoryRequest calls the generic MakeSandboxDirectory builder with application/json body
+func NewMakeSandboxDirectoryRequest(server string, sandboxID string, body MakeSandboxDirectoryJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMakeSandboxDirectoryRequestWithBody(server, sandboxID, "application/json", bodyReader)
+}
+
+// NewMakeSandboxDirectoryRequestWithBody constructs an http.Request for the MakeSandboxDirectory method, with any body, and a specified content type
+func NewMakeSandboxDirectoryRequestWithBody(server string, sandboxID string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/directories", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDownloadSandboxFileRequest constructs an http.Request for the DownloadSandboxFile method
+func NewDownloadSandboxFileRequest(server string, sandboxID string, params *DownloadSandboxFileParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/files", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUploadSandboxFileRequestWithBody constructs an http.Request for the UploadSandboxFile method, with any body, and a specified content type
+func NewUploadSandboxFileRequestWithBody(server string, sandboxID string, params *UploadSandboxFileParams, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/files", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Overwrite != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "overwrite", *params.Overwrite, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetSandboxInjectionsRequest constructs an http.Request for the GetSandboxInjections method
+func NewGetSandboxInjectionsRequest(server string, sandboxID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/injections", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetSandboxInjectionsRequest calls the generic SetSandboxInjections builder with application/json body
+func NewSetSandboxInjectionsRequest(server string, sandboxID string, body SetSandboxInjectionsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetSandboxInjectionsRequestWithBody(server, sandboxID, "application/json", bodyReader)
+}
+
+// NewSetSandboxInjectionsRequestWithBody constructs an http.Request for the SetSandboxInjections method, with any body, and a specified content type
+func NewSetSandboxInjectionsRequestWithBody(server string, sandboxID string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/injections", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewCreateSandboxPreviewRequest calls the generic CreateSandboxPreview builder with application/json body
+func NewCreateSandboxPreviewRequest(server string, sandboxID string, body CreateSandboxPreviewJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateSandboxPreviewRequestWithBody(server, sandboxID, "application/json", bodyReader)
+}
+
+// NewCreateSandboxPreviewRequestWithBody constructs an http.Request for the CreateSandboxPreview method, with any body, and a specified content type
+func NewCreateSandboxPreviewRequestWithBody(server string, sandboxID string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/previews", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetSandboxPortPreviewRequest constructs an http.Request for the GetSandboxPortPreview method
+func NewGetSandboxPortPreviewRequest(server string, sandboxID string, port int) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "port", port, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/previews/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetSandboxPortPreviewRequest calls the generic SetSandboxPortPreview builder with application/json body
+func NewSetSandboxPortPreviewRequest(server string, sandboxID string, port int, body SetSandboxPortPreviewJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetSandboxPortPreviewRequestWithBody(server, sandboxID, port, "application/json", bodyReader)
+}
+
+// NewSetSandboxPortPreviewRequestWithBody constructs an http.Request for the SetSandboxPortPreview method, with any body, and a specified content type
+func NewSetSandboxPortPreviewRequestWithBody(server string, sandboxID string, port int, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "port", port, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "integer", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/previews/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewStartSandboxRequest constructs an http.Request for the StartSandbox method
+func NewStartSandboxRequest(server string, sandboxID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/start", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewStopSandboxRequest constructs an http.Request for the StopSandbox method
+func NewStopSandboxRequest(server string, sandboxID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/stop", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListSystemTemplatesRequest constructs an http.Request for the ListSystemTemplates method
+func NewListSystemTemplatesRequest(server string, params *ListSystemTemplatesParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/system-templates")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListTemplatesRequest constructs an http.Request for the ListTemplates method
+func NewListTemplatesRequest(server string, params *ListTemplatesParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/templates")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Limit != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "limit", *params.Limit, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Offset != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "offset", *params.Offset, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Scope != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "scope", *params.Scope, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateTemplateRequest calls the generic CreateTemplate builder with application/json body
+func NewCreateTemplateRequest(server string, body CreateTemplateJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateTemplateRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateTemplateRequestWithBody constructs an http.Request for the CreateTemplate method, with any body, and a specified content type
+func NewCreateTemplateRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/templates")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteTemplateRequest constructs an http.Request for the DeleteTemplate method
+func NewDeleteTemplateRequest(server string, templateID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "templateID", templateID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/templates/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetTemplateRequest constructs an http.Request for the GetTemplate method
+func NewGetTemplateRequest(server string, templateID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "templateID", templateID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/templates/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUpdateTemplateRequest calls the generic UpdateTemplate builder with application/json body
+func NewUpdateTemplateRequest(server string, templateID string, body UpdateTemplateJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewUpdateTemplateRequestWithBody(server, templateID, "application/json", bodyReader)
+}
+
+// NewUpdateTemplateRequestWithBody constructs an http.Request for the UpdateTemplate method, with any body, and a specified content type
+func NewUpdateTemplateRequestWithBody(server string, templateID string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "templateID", templateID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/templates/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPatch, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewCreateTemplateBuildRequest calls the generic CreateTemplateBuild builder with application/json body
+func NewCreateTemplateBuildRequest(server string, templateID string, body CreateTemplateBuildJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateTemplateBuildRequestWithBody(server, templateID, "application/json", bodyReader)
+}
+
+// NewCreateTemplateBuildRequestWithBody constructs an http.Request for the CreateTemplateBuild method, with any body, and a specified content type
+func NewCreateTemplateBuildRequestWithBody(server string, templateID string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "templateID", templateID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/templates/%s/builds", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewGetTemplateBuildRequest constructs an http.Request for the GetTemplateBuild method
+func NewGetTemplateBuildRequest(server string, templateID string, buildID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "templateID", templateID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "buildID", buildID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/templates/%s/builds/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewForkTemplateRequest calls the generic ForkTemplate builder with application/json body
+func NewForkTemplateRequest(server string, templateID string, body ForkTemplateJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewForkTemplateRequestWithBody(server, templateID, "application/json", bodyReader)
+}
+
+// NewForkTemplateRequestWithBody constructs an http.Request for the ForkTemplate method, with any body, and a specified content type
+func NewForkTemplateRequestWithBody(server string, templateID string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "templateID", templateID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/templates/%s/fork", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteTemplateTagRequest constructs an http.Request for the DeleteTemplateTag method
+func NewDeleteTemplateTagRequest(server string, templateID string, tag string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "templateID", templateID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "tag", tag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/templates/%s/tags/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetTemplateTagRequest constructs an http.Request for the GetTemplateTag method
+func NewGetTemplateTagRequest(server string, templateID string, tag string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "templateID", templateID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "tag", tag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/templates/%s/tags/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetTemplateTagRequest calls the generic SetTemplateTag builder with application/json body
+func NewSetTemplateTagRequest(server string, templateID string, tag string, body SetTemplateTagJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetTemplateTagRequestWithBody(server, templateID, tag, "application/json", bodyReader)
+}
+
+// NewSetTemplateTagRequestWithBody constructs an http.Request for the SetTemplateTag method, with any body, and a specified content type
+func NewSetTemplateTagRequestWithBody(server string, templateID string, tag string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "templateID", templateID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "tag", tag, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/templates/%s/tags/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+func (c *Client) applyEditors(ctx context.Context, req *http.Request, additionalEditors []RequestEditorFn) error {
+	for _, r := range c.RequestEditors {
+		if err := r(ctx, req); err != nil {
+			return err
+		}
+	}
+	for _, r := range additionalEditors {
+		if err := r(ctx, req); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+// ClientWithResponses builds on ClientInterface to offer response payloads
+type ClientWithResponses struct {
+	ClientInterface
+}
+
+// NewClientWithResponses creates a new ClientWithResponses, which wraps
+// Client with return type handling
+func NewClientWithResponses(server string, opts ...ClientOption) (*ClientWithResponses, error) {
+	client, err := NewClient(server, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return &ClientWithResponses{client}, nil
+}
+
+// WithBaseURL overrides the baseURL.
+func WithBaseURL(baseURL string) ClientOption {
+	return func(c *Client) error {
+		newBaseURL, err := url.Parse(baseURL)
+		if err != nil {
+			return err
+		}
+		c.Server = newBaseURL.String()
+		return nil
+	}
+}
+
+// ClientWithResponsesInterface is the interface specification for the client with responses above.
+type ClientWithResponsesInterface interface {
+
+	// ListCredentialDocumentsWithResponse List encrypted account credential configurations
+	//
+	// Interactive login required. Kind is agents or sandboxes. Values are decrypted only for the owning account.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/credential-documents/{kind} (the `ListCredentialDocuments` operationId).
+	ListCredentialDocumentsWithResponse(ctx context.Context, kind string, reqEditors ...RequestEditorFn) (*ListCredentialDocumentsResponse, error)
+
+	// DeleteCredentialDocumentWithResponse Delete one configuration owned by the current account
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/credential-documents/{kind}/{id} (the `DeleteCredentialDocument` operationId).
+	DeleteCredentialDocumentWithResponse(ctx context.Context, kind string, id string, reqEditors ...RequestEditorFn) (*DeleteCredentialDocumentResponse, error)
+
+	// PutCredentialDocumentWithBodyWithResponse Save an account Agent configuration or sandbox credential selection
+	//
+	// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/credential-documents/{kind}/{id} (the `PutCredentialDocument` operationId).
+	PutCredentialDocumentWithBodyWithResponse(ctx context.Context, kind string, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutCredentialDocumentResponse, error)
+
+	// PutCredentialDocumentWithResponse Save an account Agent configuration or sandbox credential selection
+	//
+	// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/credential-documents/{kind}/{id} (the `PutCredentialDocument` operationId).
+	PutCredentialDocumentWithResponse(ctx context.Context, kind string, id string, body PutCredentialDocumentJSONRequestBody, reqEditors ...RequestEditorFn) (*PutCredentialDocumentResponse, error)
+
+	// ListInjectionRulesWithResponse List account injection rules
+	//
+	// Returns the authenticated account's persistent injection rules. Secrets are never returned; only a short masked hint is exposed.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/injection-rules (the `ListInjectionRules` operationId).
+	ListInjectionRulesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListInjectionRulesResponse, error)
+
+	// CreateInjectionRuleWithBodyWithResponse Create an account injection rule
+	//
+	// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/injection-rules (the `CreateInjectionRule` operationId).
+	CreateInjectionRuleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateInjectionRuleResponse, error)
+
+	// CreateInjectionRuleWithResponse Create an account injection rule
+	//
+	// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/injection-rules (the `CreateInjectionRule` operationId).
+	CreateInjectionRuleWithResponse(ctx context.Context, body CreateInjectionRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateInjectionRuleResponse, error)
+
+	// DeleteInjectionRuleWithResponse Delete an account injection rule
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/injection-rules/{ruleID} (the `DeleteInjectionRule` operationId).
+	DeleteInjectionRuleWithResponse(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*DeleteInjectionRuleResponse, error)
+
+	// GetInjectionRuleWithResponse Get an account injection rule
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/injection-rules/{ruleID} (the `GetInjectionRule` operationId).
+	GetInjectionRuleWithResponse(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*GetInjectionRuleResponse, error)
+
+	// UpdateInjectionRuleWithBodyWithResponse Update an account injection rule
+	//
+	// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /v1/injection-rules/{ruleID} (the `UpdateInjectionRule` operationId).
+	UpdateInjectionRuleWithBodyWithResponse(ctx context.Context, ruleID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateInjectionRuleResponse, error)
+
+	// UpdateInjectionRuleWithResponse Update an account injection rule
+	//
+	// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /v1/injection-rules/{ruleID} (the `UpdateInjectionRule` operationId).
+	UpdateInjectionRuleWithResponse(ctx context.Context, ruleID string, body UpdateInjectionRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateInjectionRuleResponse, error)
+
+	// GetInjectionRuleMaterialWithResponse Read injection material
+	//
+	// Returns the plaintext header/key for the authenticated owner so a trusted local runtime can apply it. The response is never cached; secrets are never logged.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/injection-rules/{ruleID}/material (the `GetInjectionRuleMaterial` operationId).
+	GetInjectionRuleMaterialWithResponse(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*GetInjectionRuleMaterialResponse, error)
+
+	// ListSandboxesWithResponse List sandboxes
+	//
+	// Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/sandboxes (the `ListSandboxes` operationId).
+	ListSandboxesWithResponse(ctx context.Context, params *ListSandboxesParams, reqEditors ...RequestEditorFn) (*ListSandboxesResponse, error)
+
+	// CreateSandboxWithBodyWithResponse Create a sandbox
+	//
+	// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes (the `CreateSandbox` operationId).
+	CreateSandboxWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSandboxResponse, error)
+
+	// CreateSandboxWithResponse Create a sandbox
+	//
+	// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes (the `CreateSandbox` operationId).
+	CreateSandboxWithResponse(ctx context.Context, body CreateSandboxJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSandboxResponse, error)
+
+	// DeleteSandboxWithResponse Delete a sandbox
+	//
+	// Requests Node cleanup. The resource remains readable until cleanup completes; repeated deletion returns the same action while pending or completed. Missing resources return 204.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/sandboxes/{sandboxID} (the `DeleteSandbox` operationId).
+	DeleteSandboxWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*DeleteSandboxResponse, error)
+
+	// GetSandboxWithResponse Get a sandbox
+	//
+	// Returns one sandbox owned by the authenticated user. A sandbox owned by another user is reported as not found.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID} (the `GetSandbox` operationId).
+	GetSandboxWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*GetSandboxResponse, error)
+
+	// UpdateSandboxWithBodyWithResponse Update a sandbox
+	//
+	// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /v1/sandboxes/{sandboxID} (the `UpdateSandbox` operationId).
+	UpdateSandboxWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSandboxResponse, error)
+
+	// UpdateSandboxWithResponse Update a sandbox
+	//
+	// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /v1/sandboxes/{sandboxID} (the `UpdateSandbox` operationId).
+	UpdateSandboxWithResponse(ctx context.Context, sandboxID string, body UpdateSandboxJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSandboxResponse, error)
+
+	// GetSandboxAppWithResponse Open a sandbox application
+	//
+	// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and redirects the browser to the sandbox application.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/app (the `GetSandboxApp` operationId).
+	GetSandboxAppWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*GetSandboxAppResponse, error)
+
+	// CreateSandboxAppLinkWithResponse Create a sandbox application link
+	//
+	// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and returns it as JSON. Desktop clients and SDKs use this endpoint; browsers can use `GET /v1/sandboxes/{sandboxID}/app` instead. The pairing credential is carried in the `pairing_url` fragment and is never sent to the Isodo API.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/app-link (the `CreateSandboxAppLink` operationId).
+	CreateSandboxAppLinkWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*CreateSandboxAppLinkResponse, error)
+
+	// RunSandboxCommandWithBodyWithResponse Run a bounded non-interactive command inside a sandbox Guest
+	//
+	// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/commands/run (the `RunSandboxCommand` operationId).
+	RunSandboxCommandWithBodyWithResponse(ctx context.Context, sandboxID string, params *RunSandboxCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RunSandboxCommandResponse, error)
+
+	// RunSandboxCommandWithResponse Run a bounded non-interactive command inside a sandbox Guest
+	//
+	// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/commands/run (the `RunSandboxCommand` operationId).
+	RunSandboxCommandWithResponse(ctx context.Context, sandboxID string, params *RunSandboxCommandParams, body RunSandboxCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*RunSandboxCommandResponse, error)
+
+	// MakeSandboxDirectoryWithBodyWithResponse Create a workspace directory
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
+	MakeSandboxDirectoryWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MakeSandboxDirectoryResponse, error)
+
+	// MakeSandboxDirectoryWithResponse Create a workspace directory
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
+	MakeSandboxDirectoryWithResponse(ctx context.Context, sandboxID string, body MakeSandboxDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*MakeSandboxDirectoryResponse, error)
+
+	// DownloadSandboxFileWithResponse Download a verified binary file
+	//
+	// Stages at most 256 MiB in private temporary storage and verifies the Guest completion digest before responding. X-Content-SHA256 describes the complete response body.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/files (the `DownloadSandboxFile` operationId).
+	DownloadSandboxFileWithResponse(ctx context.Context, sandboxID string, params *DownloadSandboxFileParams, reqEditors ...RequestEditorFn) (*DownloadSandboxFileResponse, error)
+
+	// UploadSandboxFileWithBodyWithResponse Upload and atomically commit one file
+	//
+	// Defaults to overwrite=true. One multipart part named file, up to 256 MiB. Upload bytes are staged in bounded private temporary storage before forwarding through Node and Guest. Success means Guest confirmed the SHA256 and atomic commit. COMMIT_UNKNOWN must be verified by reading the target before retrying.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/files (the `UploadSandboxFile` operationId).
+	UploadSandboxFileWithBodyWithResponse(ctx context.Context, sandboxID string, params *UploadSandboxFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSandboxFileResponse, error)
+
+	// GetSandboxInjectionsWithResponse Read masked host-side injection configuration
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/injections (the `GetSandboxInjections` operationId).
+	GetSandboxInjectionsWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*GetSandboxInjectionsResponse, error)
+
+	// SetSandboxInjectionsWithBodyWithResponse Replace sandbox host-side injection rules
+	//
+	// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
+	SetSandboxInjectionsWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetSandboxInjectionsResponse, error)
+
+	// SetSandboxInjectionsWithResponse Replace sandbox host-side injection rules
+	//
+	// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
+	SetSandboxInjectionsWithResponse(ctx context.Context, sandboxID string, body SetSandboxInjectionsJSONRequestBody, reqEditors ...RequestEditorFn) (*SetSandboxInjectionsResponse, error)
+
+	// CreateSandboxPreviewWithBodyWithResponse Authorize a sandbox HTTP port preview
+	//
+	// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/previews (the `CreateSandboxPreview` operationId).
+	CreateSandboxPreviewWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSandboxPreviewResponse, error)
+
+	// CreateSandboxPreviewWithResponse Authorize a sandbox HTTP port preview
+	//
+	// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/previews (the `CreateSandboxPreview` operationId).
+	CreateSandboxPreviewWithResponse(ctx context.Context, sandboxID string, body CreateSandboxPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSandboxPreviewResponse, error)
+
+	// GetSandboxPortPreviewWithResponse Get a sandbox HTTP port visibility
+	//
+	// Requires ownership and sandboxes:read. Unconfigured ports default to public. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/previews/{port} (the `GetSandboxPortPreview` operationId).
+	GetSandboxPortPreviewWithResponse(ctx context.Context, sandboxID string, port int, reqEditors ...RequestEditorFn) (*GetSandboxPortPreviewResponse, error)
+
+	// SetSandboxPortPreviewWithBodyWithResponse Change a sandbox HTTP port visibility
+	//
+	// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/sandboxes/{sandboxID}/previews/{port} (the `SetSandboxPortPreview` operationId).
+	SetSandboxPortPreviewWithBodyWithResponse(ctx context.Context, sandboxID string, port int, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetSandboxPortPreviewResponse, error)
+
+	// SetSandboxPortPreviewWithResponse Change a sandbox HTTP port visibility
+	//
+	// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/sandboxes/{sandboxID}/previews/{port} (the `SetSandboxPortPreview` operationId).
+	SetSandboxPortPreviewWithResponse(ctx context.Context, sandboxID string, port int, body SetSandboxPortPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*SetSandboxPortPreviewResponse, error)
+
+	// StartSandboxWithResponse Start a stopped sandbox
+	//
+	// Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/start (the `StartSandbox` operationId).
+	StartSandboxWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*StartSandboxResponse, error)
+
+	// StopSandboxWithResponse Stop a running sandbox
+	//
+	// Requests a graceful stop for a cloud sandbox owned by the authenticated user while preserving its instance disks. The operation is asynchronous; poll the sandbox until observed_state becomes stopped.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/stop (the `StopSandbox` operationId).
+	StopSandboxWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*StopSandboxResponse, error)
+
+	// ListSystemTemplatesWithResponse List platform default templates
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/system-templates (the `ListSystemTemplates` operationId).
+	ListSystemTemplatesWithResponse(ctx context.Context, params *ListSystemTemplatesParams, reqEditors ...RequestEditorFn) (*ListSystemTemplatesResponse, error)
+
+	// ListTemplatesWithResponse List templates visible to the authenticated user
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/templates (the `ListTemplates` operationId).
+	ListTemplatesWithResponse(ctx context.Context, params *ListTemplatesParams, reqEditors ...RequestEditorFn) (*ListTemplatesResponse, error)
+
+	// CreateTemplateWithBodyWithResponse Create a personal template
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/templates (the `CreateTemplate` operationId).
+	CreateTemplateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTemplateResponse, error)
+
+	// CreateTemplateWithResponse Create a personal template
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/templates (the `CreateTemplate` operationId).
+	CreateTemplateWithResponse(ctx context.Context, body CreateTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTemplateResponse, error)
+
+	// DeleteTemplateWithResponse Delete an owned template
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/templates/{templateID} (the `DeleteTemplate` operationId).
+	DeleteTemplateWithResponse(ctx context.Context, templateID string, reqEditors ...RequestEditorFn) (*DeleteTemplateResponse, error)
+
+	// GetTemplateWithResponse Get a template
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/templates/{templateID} (the `GetTemplate` operationId).
+	GetTemplateWithResponse(ctx context.Context, templateID string, reqEditors ...RequestEditorFn) (*GetTemplateResponse, error)
+
+	// UpdateTemplateWithBodyWithResponse Update an owned template
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /v1/templates/{templateID} (the `UpdateTemplate` operationId).
+	UpdateTemplateWithBodyWithResponse(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTemplateResponse, error)
+
+	// UpdateTemplateWithResponse Update an owned template
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PATCH /v1/templates/{templateID} (the `UpdateTemplate` operationId).
+	UpdateTemplateWithResponse(ctx context.Context, templateID string, body UpdateTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTemplateResponse, error)
+
+	// CreateTemplateBuildWithBodyWithResponse Queue an immutable template build
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/templates/{templateID}/builds (the `CreateTemplateBuild` operationId).
+	CreateTemplateBuildWithBodyWithResponse(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTemplateBuildResponse, error)
+
+	// CreateTemplateBuildWithResponse Queue an immutable template build
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/templates/{templateID}/builds (the `CreateTemplateBuild` operationId).
+	CreateTemplateBuildWithResponse(ctx context.Context, templateID string, body CreateTemplateBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTemplateBuildResponse, error)
+
+	// GetTemplateBuildWithResponse Get template build status
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/templates/{templateID}/builds/{buildID} (the `GetTemplateBuild` operationId).
+	GetTemplateBuildWithResponse(ctx context.Context, templateID string, buildID string, reqEditors ...RequestEditorFn) (*GetTemplateBuildResponse, error)
+
+	// ForkTemplateWithBodyWithResponse Fork an accessible Ready build into a personal template
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/templates/{templateID}/fork (the `ForkTemplate` operationId).
+	ForkTemplateWithBodyWithResponse(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ForkTemplateResponse, error)
+
+	// ForkTemplateWithResponse Fork an accessible Ready build into a personal template
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/templates/{templateID}/fork (the `ForkTemplate` operationId).
+	ForkTemplateWithResponse(ctx context.Context, templateID string, body ForkTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*ForkTemplateResponse, error)
+
+	// DeleteTemplateTagWithResponse Remove a template build tag
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/templates/{templateID}/tags/{tag} (the `DeleteTemplateTag` operationId).
+	DeleteTemplateTagWithResponse(ctx context.Context, templateID string, tag string, reqEditors ...RequestEditorFn) (*DeleteTemplateTagResponse, error)
+
+	// GetTemplateTagWithResponse Resolve a Ready build tag
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/templates/{templateID}/tags/{tag} (the `GetTemplateTag` operationId).
+	GetTemplateTagWithResponse(ctx context.Context, templateID string, tag string, reqEditors ...RequestEditorFn) (*GetTemplateTagResponse, error)
+
+	// SetTemplateTagWithBodyWithResponse Atomically publish a Ready build under a tag
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/templates/{templateID}/tags/{tag} (the `SetTemplateTag` operationId).
+	SetTemplateTagWithBodyWithResponse(ctx context.Context, templateID string, tag string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetTemplateTagResponse, error)
+
+	// SetTemplateTagWithResponse Atomically publish a Ready build under a tag
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/templates/{templateID}/tags/{tag} (the `SetTemplateTag` operationId).
+	SetTemplateTagWithResponse(ctx context.Context, templateID string, tag string, body SetTemplateTagJSONRequestBody, reqEditors ...RequestEditorFn) (*SetTemplateTagResponse, error)
+}
+
+type ListCredentialDocumentsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *struct {
+		Items []struct {
+			Id    string                 `json:"id"`
+			Value map[string]interface{} `json:"value"`
+		} `json:"items"`
+	}
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListCredentialDocumentsResponse) GetJSON200() *struct {
+	Items []struct {
+		Id    string                 `json:"id"`
+		Value map[string]interface{} `json:"value"`
+	} `json:"items"`
+} {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListCredentialDocumentsResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListCredentialDocumentsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListCredentialDocumentsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListCredentialDocumentsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListCredentialDocumentsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteCredentialDocumentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r DeleteCredentialDocumentResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteCredentialDocumentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteCredentialDocumentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteCredentialDocumentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteCredentialDocumentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type PutCredentialDocumentResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *struct {
+		Id    string                 `json:"id"`
+		Value map[string]interface{} `json:"value"`
+	}
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r PutCredentialDocumentResponse) GetJSON200() *struct {
+	Id    string                 `json:"id"`
+	Value map[string]interface{} `json:"value"`
+} {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r PutCredentialDocumentResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r PutCredentialDocumentResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r PutCredentialDocumentResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r PutCredentialDocumentResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r PutCredentialDocumentResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListInjectionRulesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *InjectionRuleList
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListInjectionRulesResponse) GetJSON200() *InjectionRuleList {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListInjectionRulesResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListInjectionRulesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListInjectionRulesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListInjectionRulesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListInjectionRulesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateInjectionRuleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *InjectionRule
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateInjectionRuleResponse) GetJSON201() *InjectionRule {
+	return r.JSON201
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r CreateInjectionRuleResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateInjectionRuleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateInjectionRuleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateInjectionRuleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateInjectionRuleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteInjectionRuleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r DeleteInjectionRuleResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteInjectionRuleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteInjectionRuleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteInjectionRuleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteInjectionRuleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetInjectionRuleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *InjectionRule
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetInjectionRuleResponse) GetJSON200() *InjectionRule {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetInjectionRuleResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetInjectionRuleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetInjectionRuleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetInjectionRuleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetInjectionRuleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateInjectionRuleResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *InjectionRule
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateInjectionRuleResponse) GetJSON200() *InjectionRule {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r UpdateInjectionRuleResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateInjectionRuleResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateInjectionRuleResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateInjectionRuleResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateInjectionRuleResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetInjectionRuleMaterialResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *InjectionRuleMaterial
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetInjectionRuleMaterialResponse) GetJSON200() *InjectionRuleMaterial {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetInjectionRuleMaterialResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetInjectionRuleMaterialResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetInjectionRuleMaterialResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetInjectionRuleMaterialResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetInjectionRuleMaterialResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListSandboxesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SandboxList
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSandboxesResponse) GetJSON200() *SandboxList {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListSandboxesResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSandboxesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSandboxesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSandboxesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSandboxesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateSandboxResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *Sandbox
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r CreateSandboxResponse) GetJSON202() *Sandbox {
+	return r.JSON202
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r CreateSandboxResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateSandboxResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateSandboxResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateSandboxResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateSandboxResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteSandboxResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *Sandbox
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r DeleteSandboxResponse) GetJSON202() *Sandbox {
+	return r.JSON202
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r DeleteSandboxResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteSandboxResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteSandboxResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteSandboxResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteSandboxResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetSandboxResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Sandbox
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSandboxResponse) GetJSON200() *Sandbox {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetSandboxResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSandboxResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSandboxResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSandboxResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSandboxResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateSandboxResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Sandbox
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateSandboxResponse) GetJSON200() *Sandbox {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r UpdateSandboxResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateSandboxResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateSandboxResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateSandboxResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateSandboxResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// GetSandboxAppResponse303Headers the declared response headers of an HTTP 303 response for GetSandboxApp
+type GetSandboxAppResponse303Headers struct {
+	Location *string
+}
+
+type GetSandboxAppResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// Headers303 the parsed response headers for an HTTP 303 response
+	Headers303 *GetSandboxAppResponse303Headers
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSandboxAppResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSandboxAppResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSandboxAppResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSandboxAppResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateSandboxAppLinkResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SandboxAppLink
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r CreateSandboxAppLinkResponse) GetJSON200() *SandboxAppLink {
+	return r.JSON200
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateSandboxAppLinkResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateSandboxAppLinkResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateSandboxAppLinkResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateSandboxAppLinkResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RunSandboxCommandResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *CommandRunResult
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r RunSandboxCommandResponse) GetJSON200() *CommandRunResult {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r RunSandboxCommandResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r RunSandboxCommandResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RunSandboxCommandResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RunSandboxCommandResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RunSandboxCommandResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type MakeSandboxDirectoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *struct {
+		Path string `json:"path"`
+	}
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r MakeSandboxDirectoryResponse) GetJSON200() *struct {
+	Path string `json:"path"`
+} {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r MakeSandboxDirectoryResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r MakeSandboxDirectoryResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r MakeSandboxDirectoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MakeSandboxDirectoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r MakeSandboxDirectoryResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// DownloadSandboxFileResponse200Headers the declared response headers of an HTTP 200 response for DownloadSandboxFile
+type DownloadSandboxFileResponse200Headers struct {
+	XContentSHA256 *string
+}
+
+type DownloadSandboxFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+	// Headers200 the parsed response headers for an HTTP 200 response
+	Headers200 *DownloadSandboxFileResponse200Headers
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r DownloadSandboxFileResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DownloadSandboxFileResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DownloadSandboxFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DownloadSandboxFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DownloadSandboxFileResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UploadSandboxFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FileWriteResult
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UploadSandboxFileResponse) GetJSON200() *FileWriteResult {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r UploadSandboxFileResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UploadSandboxFileResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UploadSandboxFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UploadSandboxFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UploadSandboxFileResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetSandboxInjectionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SandboxInjectionState
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSandboxInjectionsResponse) GetJSON200() *SandboxInjectionState {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetSandboxInjectionsResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSandboxInjectionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSandboxInjectionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSandboxInjectionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSandboxInjectionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetSandboxInjectionsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SandboxInjectionState
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetSandboxInjectionsResponse) GetJSON200() *SandboxInjectionState {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r SetSandboxInjectionsResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetSandboxInjectionsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetSandboxInjectionsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetSandboxInjectionsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetSandboxInjectionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateSandboxPreviewResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *struct {
+		AuthorizationUrl *string                                           `json:"authorization_url,omitempty"`
+		ExpiresAt        *time.Time                                        `json:"expires_at,omitempty"`
+		Url              string                                            `json:"url"`
+		Visibility       CreateSandboxPreview201JSONResponseBodyVisibility `json:"visibility"`
+	}
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateSandboxPreviewResponse) GetJSON201() *struct {
+	AuthorizationUrl *string                                           `json:"authorization_url,omitempty"`
+	ExpiresAt        *time.Time                                        `json:"expires_at,omitempty"`
+	Url              string                                            `json:"url"`
+	Visibility       CreateSandboxPreview201JSONResponseBodyVisibility `json:"visibility"`
+} {
+	return r.JSON201
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r CreateSandboxPreviewResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateSandboxPreviewResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateSandboxPreviewResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateSandboxPreviewResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateSandboxPreviewResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetSandboxPortPreviewResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PortPreviewPolicy
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSandboxPortPreviewResponse) GetJSON200() *PortPreviewPolicy {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetSandboxPortPreviewResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSandboxPortPreviewResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSandboxPortPreviewResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSandboxPortPreviewResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSandboxPortPreviewResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetSandboxPortPreviewResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *PortPreviewPolicy
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetSandboxPortPreviewResponse) GetJSON200() *PortPreviewPolicy {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r SetSandboxPortPreviewResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetSandboxPortPreviewResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetSandboxPortPreviewResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetSandboxPortPreviewResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetSandboxPortPreviewResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type StartSandboxResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *Sandbox
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r StartSandboxResponse) GetJSON202() *Sandbox {
+	return r.JSON202
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r StartSandboxResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r StartSandboxResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StartSandboxResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StartSandboxResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StartSandboxResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type StopSandboxResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *Sandbox
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r StopSandboxResponse) GetJSON202() *Sandbox {
+	return r.JSON202
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r StopSandboxResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r StopSandboxResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StopSandboxResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StopSandboxResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StopSandboxResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListSystemTemplatesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TemplateList
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSystemTemplatesResponse) GetJSON200() *TemplateList {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListSystemTemplatesResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSystemTemplatesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSystemTemplatesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSystemTemplatesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSystemTemplatesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListTemplatesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TemplateList
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListTemplatesResponse) GetJSON200() *TemplateList {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListTemplatesResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListTemplatesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListTemplatesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListTemplatesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListTemplatesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateTemplateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *Template
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateTemplateResponse) GetJSON201() *Template {
+	return r.JSON201
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r CreateTemplateResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateTemplateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateTemplateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateTemplateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateTemplateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteTemplateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r DeleteTemplateResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteTemplateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteTemplateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteTemplateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteTemplateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetTemplateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Template
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetTemplateResponse) GetJSON200() *Template {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetTemplateResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetTemplateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTemplateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTemplateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetTemplateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UpdateTemplateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *Template
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UpdateTemplateResponse) GetJSON200() *Template {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r UpdateTemplateResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UpdateTemplateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UpdateTemplateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UpdateTemplateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UpdateTemplateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateTemplateBuildResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *TemplateBuild
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r CreateTemplateBuildResponse) GetJSON202() *TemplateBuild {
+	return r.JSON202
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r CreateTemplateBuildResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateTemplateBuildResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateTemplateBuildResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateTemplateBuildResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateTemplateBuildResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetTemplateBuildResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TemplateBuild
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetTemplateBuildResponse) GetJSON200() *TemplateBuild {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetTemplateBuildResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetTemplateBuildResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTemplateBuildResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTemplateBuildResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetTemplateBuildResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ForkTemplateResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *Template
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r ForkTemplateResponse) GetJSON201() *Template {
+	return r.JSON201
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ForkTemplateResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ForkTemplateResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ForkTemplateResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ForkTemplateResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ForkTemplateResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteTemplateTagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r DeleteTemplateTagResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteTemplateTagResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteTemplateTagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteTemplateTagResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteTemplateTagResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetTemplateTagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TemplateTag
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetTemplateTagResponse) GetJSON200() *TemplateTag {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetTemplateTagResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetTemplateTagResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetTemplateTagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetTemplateTagResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetTemplateTagResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetTemplateTagResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *TemplateTag
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetTemplateTagResponse) GetJSON200() *TemplateTag {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r SetTemplateTagResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetTemplateTagResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetTemplateTagResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetTemplateTagResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetTemplateTagResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+// ListCredentialDocumentsWithResponse List encrypted account credential configurations
+//
+// Interactive login required. Kind is agents or sandboxes. Values are decrypted only for the owning account.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/credential-documents/{kind} (the `ListCredentialDocuments` operationId).
+func (c *ClientWithResponses) ListCredentialDocumentsWithResponse(ctx context.Context, kind string, reqEditors ...RequestEditorFn) (*ListCredentialDocumentsResponse, error) {
+	rsp, err := c.ListCredentialDocuments(ctx, kind, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListCredentialDocumentsResponse(rsp)
+}
+
+// DeleteCredentialDocumentWithResponse Delete one configuration owned by the current account
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/credential-documents/{kind}/{id} (the `DeleteCredentialDocument` operationId).
+func (c *ClientWithResponses) DeleteCredentialDocumentWithResponse(ctx context.Context, kind string, id string, reqEditors ...RequestEditorFn) (*DeleteCredentialDocumentResponse, error) {
+	rsp, err := c.DeleteCredentialDocument(ctx, kind, id, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteCredentialDocumentResponse(rsp)
+}
+
+// PutCredentialDocumentWithBodyWithResponse Save an account Agent configuration or sandbox credential selection
+//
+// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/credential-documents/{kind}/{id} (the `PutCredentialDocument` operationId).
+func (c *ClientWithResponses) PutCredentialDocumentWithBodyWithResponse(ctx context.Context, kind string, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutCredentialDocumentResponse, error) {
+	rsp, err := c.PutCredentialDocumentWithBody(ctx, kind, id, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutCredentialDocumentResponse(rsp)
+}
+
+// PutCredentialDocumentWithResponse Save an account Agent configuration or sandbox credential selection
+//
+// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/credential-documents/{kind}/{id} (the `PutCredentialDocument` operationId).
+func (c *ClientWithResponses) PutCredentialDocumentWithResponse(ctx context.Context, kind string, id string, body PutCredentialDocumentJSONRequestBody, reqEditors ...RequestEditorFn) (*PutCredentialDocumentResponse, error) {
+	rsp, err := c.PutCredentialDocument(ctx, kind, id, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParsePutCredentialDocumentResponse(rsp)
+}
+
+// ListInjectionRulesWithResponse List account injection rules
+//
+// Returns the authenticated account's persistent injection rules. Secrets are never returned; only a short masked hint is exposed.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/injection-rules (the `ListInjectionRules` operationId).
+func (c *ClientWithResponses) ListInjectionRulesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListInjectionRulesResponse, error) {
+	rsp, err := c.ListInjectionRules(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListInjectionRulesResponse(rsp)
+}
+
+// CreateInjectionRuleWithBodyWithResponse Create an account injection rule
+//
+// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/injection-rules (the `CreateInjectionRule` operationId).
+func (c *ClientWithResponses) CreateInjectionRuleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateInjectionRuleResponse, error) {
+	rsp, err := c.CreateInjectionRuleWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateInjectionRuleResponse(rsp)
+}
+
+// CreateInjectionRuleWithResponse Create an account injection rule
+//
+// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/injection-rules (the `CreateInjectionRule` operationId).
+func (c *ClientWithResponses) CreateInjectionRuleWithResponse(ctx context.Context, body CreateInjectionRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateInjectionRuleResponse, error) {
+	rsp, err := c.CreateInjectionRule(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateInjectionRuleResponse(rsp)
+}
+
+// DeleteInjectionRuleWithResponse Delete an account injection rule
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/injection-rules/{ruleID} (the `DeleteInjectionRule` operationId).
+func (c *ClientWithResponses) DeleteInjectionRuleWithResponse(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*DeleteInjectionRuleResponse, error) {
+	rsp, err := c.DeleteInjectionRule(ctx, ruleID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteInjectionRuleResponse(rsp)
+}
+
+// GetInjectionRuleWithResponse Get an account injection rule
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/injection-rules/{ruleID} (the `GetInjectionRule` operationId).
+func (c *ClientWithResponses) GetInjectionRuleWithResponse(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*GetInjectionRuleResponse, error) {
+	rsp, err := c.GetInjectionRule(ctx, ruleID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetInjectionRuleResponse(rsp)
+}
+
+// UpdateInjectionRuleWithBodyWithResponse Update an account injection rule
+//
+// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /v1/injection-rules/{ruleID} (the `UpdateInjectionRule` operationId).
+func (c *ClientWithResponses) UpdateInjectionRuleWithBodyWithResponse(ctx context.Context, ruleID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateInjectionRuleResponse, error) {
+	rsp, err := c.UpdateInjectionRuleWithBody(ctx, ruleID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateInjectionRuleResponse(rsp)
+}
+
+// UpdateInjectionRuleWithResponse Update an account injection rule
+//
+// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /v1/injection-rules/{ruleID} (the `UpdateInjectionRule` operationId).
+func (c *ClientWithResponses) UpdateInjectionRuleWithResponse(ctx context.Context, ruleID string, body UpdateInjectionRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateInjectionRuleResponse, error) {
+	rsp, err := c.UpdateInjectionRule(ctx, ruleID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateInjectionRuleResponse(rsp)
+}
+
+// GetInjectionRuleMaterialWithResponse Read injection material
+//
+// Returns the plaintext header/key for the authenticated owner so a trusted local runtime can apply it. The response is never cached; secrets are never logged.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/injection-rules/{ruleID}/material (the `GetInjectionRuleMaterial` operationId).
+func (c *ClientWithResponses) GetInjectionRuleMaterialWithResponse(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*GetInjectionRuleMaterialResponse, error) {
+	rsp, err := c.GetInjectionRuleMaterial(ctx, ruleID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetInjectionRuleMaterialResponse(rsp)
+}
+
+// ListSandboxesWithResponse List sandboxes
+//
+// Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/sandboxes (the `ListSandboxes` operationId).
+func (c *ClientWithResponses) ListSandboxesWithResponse(ctx context.Context, params *ListSandboxesParams, reqEditors ...RequestEditorFn) (*ListSandboxesResponse, error) {
+	rsp, err := c.ListSandboxes(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSandboxesResponse(rsp)
+}
+
+// CreateSandboxWithBodyWithResponse Create a sandbox
+//
+// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes (the `CreateSandbox` operationId).
+func (c *ClientWithResponses) CreateSandboxWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSandboxResponse, error) {
+	rsp, err := c.CreateSandboxWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSandboxResponse(rsp)
+}
+
+// CreateSandboxWithResponse Create a sandbox
+//
+// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes (the `CreateSandbox` operationId).
+func (c *ClientWithResponses) CreateSandboxWithResponse(ctx context.Context, body CreateSandboxJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSandboxResponse, error) {
+	rsp, err := c.CreateSandbox(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSandboxResponse(rsp)
+}
+
+// DeleteSandboxWithResponse Delete a sandbox
+//
+// Requests Node cleanup. The resource remains readable until cleanup completes; repeated deletion returns the same action while pending or completed. Missing resources return 204.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/sandboxes/{sandboxID} (the `DeleteSandbox` operationId).
+func (c *ClientWithResponses) DeleteSandboxWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*DeleteSandboxResponse, error) {
+	rsp, err := c.DeleteSandbox(ctx, sandboxID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteSandboxResponse(rsp)
+}
+
+// GetSandboxWithResponse Get a sandbox
+//
+// Returns one sandbox owned by the authenticated user. A sandbox owned by another user is reported as not found.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID} (the `GetSandbox` operationId).
+func (c *ClientWithResponses) GetSandboxWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*GetSandboxResponse, error) {
+	rsp, err := c.GetSandbox(ctx, sandboxID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSandboxResponse(rsp)
+}
+
+// UpdateSandboxWithBodyWithResponse Update a sandbox
+//
+// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /v1/sandboxes/{sandboxID} (the `UpdateSandbox` operationId).
+func (c *ClientWithResponses) UpdateSandboxWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSandboxResponse, error) {
+	rsp, err := c.UpdateSandboxWithBody(ctx, sandboxID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSandboxResponse(rsp)
+}
+
+// UpdateSandboxWithResponse Update a sandbox
+//
+// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /v1/sandboxes/{sandboxID} (the `UpdateSandbox` operationId).
+func (c *ClientWithResponses) UpdateSandboxWithResponse(ctx context.Context, sandboxID string, body UpdateSandboxJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSandboxResponse, error) {
+	rsp, err := c.UpdateSandbox(ctx, sandboxID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateSandboxResponse(rsp)
+}
+
+// GetSandboxAppWithResponse Open a sandbox application
+//
+// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and redirects the browser to the sandbox application.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/app (the `GetSandboxApp` operationId).
+func (c *ClientWithResponses) GetSandboxAppWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*GetSandboxAppResponse, error) {
+	rsp, err := c.GetSandboxApp(ctx, sandboxID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSandboxAppResponse(rsp)
+}
+
+// CreateSandboxAppLinkWithResponse Create a sandbox application link
+//
+// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and returns it as JSON. Desktop clients and SDKs use this endpoint; browsers can use `GET /v1/sandboxes/{sandboxID}/app` instead. The pairing credential is carried in the `pairing_url` fragment and is never sent to the Isodo API.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/app-link (the `CreateSandboxAppLink` operationId).
+func (c *ClientWithResponses) CreateSandboxAppLinkWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*CreateSandboxAppLinkResponse, error) {
+	rsp, err := c.CreateSandboxAppLink(ctx, sandboxID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSandboxAppLinkResponse(rsp)
+}
+
+// RunSandboxCommandWithBodyWithResponse Run a bounded non-interactive command inside a sandbox Guest
+//
+// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/commands/run (the `RunSandboxCommand` operationId).
+func (c *ClientWithResponses) RunSandboxCommandWithBodyWithResponse(ctx context.Context, sandboxID string, params *RunSandboxCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RunSandboxCommandResponse, error) {
+	rsp, err := c.RunSandboxCommandWithBody(ctx, sandboxID, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRunSandboxCommandResponse(rsp)
+}
+
+// RunSandboxCommandWithResponse Run a bounded non-interactive command inside a sandbox Guest
+//
+// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/commands/run (the `RunSandboxCommand` operationId).
+func (c *ClientWithResponses) RunSandboxCommandWithResponse(ctx context.Context, sandboxID string, params *RunSandboxCommandParams, body RunSandboxCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*RunSandboxCommandResponse, error) {
+	rsp, err := c.RunSandboxCommand(ctx, sandboxID, params, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRunSandboxCommandResponse(rsp)
+}
+
+// MakeSandboxDirectoryWithBodyWithResponse Create a workspace directory
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
+func (c *ClientWithResponses) MakeSandboxDirectoryWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MakeSandboxDirectoryResponse, error) {
+	rsp, err := c.MakeSandboxDirectoryWithBody(ctx, sandboxID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMakeSandboxDirectoryResponse(rsp)
+}
+
+// MakeSandboxDirectoryWithResponse Create a workspace directory
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
+func (c *ClientWithResponses) MakeSandboxDirectoryWithResponse(ctx context.Context, sandboxID string, body MakeSandboxDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*MakeSandboxDirectoryResponse, error) {
+	rsp, err := c.MakeSandboxDirectory(ctx, sandboxID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMakeSandboxDirectoryResponse(rsp)
+}
+
+// DownloadSandboxFileWithResponse Download a verified binary file
+//
+// Stages at most 256 MiB in private temporary storage and verifies the Guest completion digest before responding. X-Content-SHA256 describes the complete response body.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/files (the `DownloadSandboxFile` operationId).
+func (c *ClientWithResponses) DownloadSandboxFileWithResponse(ctx context.Context, sandboxID string, params *DownloadSandboxFileParams, reqEditors ...RequestEditorFn) (*DownloadSandboxFileResponse, error) {
+	rsp, err := c.DownloadSandboxFile(ctx, sandboxID, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDownloadSandboxFileResponse(rsp)
+}
+
+// UploadSandboxFileWithBodyWithResponse Upload and atomically commit one file
+//
+// Defaults to overwrite=true. One multipart part named file, up to 256 MiB. Upload bytes are staged in bounded private temporary storage before forwarding through Node and Guest. Success means Guest confirmed the SHA256 and atomic commit. COMMIT_UNKNOWN must be verified by reading the target before retrying.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/files (the `UploadSandboxFile` operationId).
+func (c *ClientWithResponses) UploadSandboxFileWithBodyWithResponse(ctx context.Context, sandboxID string, params *UploadSandboxFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSandboxFileResponse, error) {
+	rsp, err := c.UploadSandboxFileWithBody(ctx, sandboxID, params, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUploadSandboxFileResponse(rsp)
+}
+
+// GetSandboxInjectionsWithResponse Read masked host-side injection configuration
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/injections (the `GetSandboxInjections` operationId).
+func (c *ClientWithResponses) GetSandboxInjectionsWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*GetSandboxInjectionsResponse, error) {
+	rsp, err := c.GetSandboxInjections(ctx, sandboxID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSandboxInjectionsResponse(rsp)
+}
+
+// SetSandboxInjectionsWithBodyWithResponse Replace sandbox host-side injection rules
+//
+// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
+func (c *ClientWithResponses) SetSandboxInjectionsWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetSandboxInjectionsResponse, error) {
+	rsp, err := c.SetSandboxInjectionsWithBody(ctx, sandboxID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetSandboxInjectionsResponse(rsp)
+}
+
+// SetSandboxInjectionsWithResponse Replace sandbox host-side injection rules
+//
+// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
+func (c *ClientWithResponses) SetSandboxInjectionsWithResponse(ctx context.Context, sandboxID string, body SetSandboxInjectionsJSONRequestBody, reqEditors ...RequestEditorFn) (*SetSandboxInjectionsResponse, error) {
+	rsp, err := c.SetSandboxInjections(ctx, sandboxID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetSandboxInjectionsResponse(rsp)
+}
+
+// CreateSandboxPreviewWithBodyWithResponse Authorize a sandbox HTTP port preview
+//
+// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/previews (the `CreateSandboxPreview` operationId).
+func (c *ClientWithResponses) CreateSandboxPreviewWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSandboxPreviewResponse, error) {
+	rsp, err := c.CreateSandboxPreviewWithBody(ctx, sandboxID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSandboxPreviewResponse(rsp)
+}
+
+// CreateSandboxPreviewWithResponse Authorize a sandbox HTTP port preview
+//
+// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/previews (the `CreateSandboxPreview` operationId).
+func (c *ClientWithResponses) CreateSandboxPreviewWithResponse(ctx context.Context, sandboxID string, body CreateSandboxPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSandboxPreviewResponse, error) {
+	rsp, err := c.CreateSandboxPreview(ctx, sandboxID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSandboxPreviewResponse(rsp)
+}
+
+// GetSandboxPortPreviewWithResponse Get a sandbox HTTP port visibility
+//
+// Requires ownership and sandboxes:read. Unconfigured ports default to public. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/previews/{port} (the `GetSandboxPortPreview` operationId).
+func (c *ClientWithResponses) GetSandboxPortPreviewWithResponse(ctx context.Context, sandboxID string, port int, reqEditors ...RequestEditorFn) (*GetSandboxPortPreviewResponse, error) {
+	rsp, err := c.GetSandboxPortPreview(ctx, sandboxID, port, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSandboxPortPreviewResponse(rsp)
+}
+
+// SetSandboxPortPreviewWithBodyWithResponse Change a sandbox HTTP port visibility
+//
+// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/sandboxes/{sandboxID}/previews/{port} (the `SetSandboxPortPreview` operationId).
+func (c *ClientWithResponses) SetSandboxPortPreviewWithBodyWithResponse(ctx context.Context, sandboxID string, port int, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetSandboxPortPreviewResponse, error) {
+	rsp, err := c.SetSandboxPortPreviewWithBody(ctx, sandboxID, port, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetSandboxPortPreviewResponse(rsp)
+}
+
+// SetSandboxPortPreviewWithResponse Change a sandbox HTTP port visibility
+//
+// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/sandboxes/{sandboxID}/previews/{port} (the `SetSandboxPortPreview` operationId).
+func (c *ClientWithResponses) SetSandboxPortPreviewWithResponse(ctx context.Context, sandboxID string, port int, body SetSandboxPortPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*SetSandboxPortPreviewResponse, error) {
+	rsp, err := c.SetSandboxPortPreview(ctx, sandboxID, port, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetSandboxPortPreviewResponse(rsp)
+}
+
+// StartSandboxWithResponse Start a stopped sandbox
+//
+// Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/start (the `StartSandbox` operationId).
+func (c *ClientWithResponses) StartSandboxWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*StartSandboxResponse, error) {
+	rsp, err := c.StartSandbox(ctx, sandboxID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStartSandboxResponse(rsp)
+}
+
+// StopSandboxWithResponse Stop a running sandbox
+//
+// Requests a graceful stop for a cloud sandbox owned by the authenticated user while preserving its instance disks. The operation is asynchronous; poll the sandbox until observed_state becomes stopped.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/stop (the `StopSandbox` operationId).
+func (c *ClientWithResponses) StopSandboxWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*StopSandboxResponse, error) {
+	rsp, err := c.StopSandbox(ctx, sandboxID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStopSandboxResponse(rsp)
+}
+
+// ListSystemTemplatesWithResponse List platform default templates
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/system-templates (the `ListSystemTemplates` operationId).
+func (c *ClientWithResponses) ListSystemTemplatesWithResponse(ctx context.Context, params *ListSystemTemplatesParams, reqEditors ...RequestEditorFn) (*ListSystemTemplatesResponse, error) {
+	rsp, err := c.ListSystemTemplates(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSystemTemplatesResponse(rsp)
+}
+
+// ListTemplatesWithResponse List templates visible to the authenticated user
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/templates (the `ListTemplates` operationId).
+func (c *ClientWithResponses) ListTemplatesWithResponse(ctx context.Context, params *ListTemplatesParams, reqEditors ...RequestEditorFn) (*ListTemplatesResponse, error) {
+	rsp, err := c.ListTemplates(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListTemplatesResponse(rsp)
+}
+
+// CreateTemplateWithBodyWithResponse Create a personal template
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/templates (the `CreateTemplate` operationId).
+func (c *ClientWithResponses) CreateTemplateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTemplateResponse, error) {
+	rsp, err := c.CreateTemplateWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateTemplateResponse(rsp)
+}
+
+// CreateTemplateWithResponse Create a personal template
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/templates (the `CreateTemplate` operationId).
+func (c *ClientWithResponses) CreateTemplateWithResponse(ctx context.Context, body CreateTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTemplateResponse, error) {
+	rsp, err := c.CreateTemplate(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateTemplateResponse(rsp)
+}
+
+// DeleteTemplateWithResponse Delete an owned template
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/templates/{templateID} (the `DeleteTemplate` operationId).
+func (c *ClientWithResponses) DeleteTemplateWithResponse(ctx context.Context, templateID string, reqEditors ...RequestEditorFn) (*DeleteTemplateResponse, error) {
+	rsp, err := c.DeleteTemplate(ctx, templateID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteTemplateResponse(rsp)
+}
+
+// GetTemplateWithResponse Get a template
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/templates/{templateID} (the `GetTemplate` operationId).
+func (c *ClientWithResponses) GetTemplateWithResponse(ctx context.Context, templateID string, reqEditors ...RequestEditorFn) (*GetTemplateResponse, error) {
+	rsp, err := c.GetTemplate(ctx, templateID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTemplateResponse(rsp)
+}
+
+// UpdateTemplateWithBodyWithResponse Update an owned template
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /v1/templates/{templateID} (the `UpdateTemplate` operationId).
+func (c *ClientWithResponses) UpdateTemplateWithBodyWithResponse(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTemplateResponse, error) {
+	rsp, err := c.UpdateTemplateWithBody(ctx, templateID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTemplateResponse(rsp)
+}
+
+// UpdateTemplateWithResponse Update an owned template
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PATCH /v1/templates/{templateID} (the `UpdateTemplate` operationId).
+func (c *ClientWithResponses) UpdateTemplateWithResponse(ctx context.Context, templateID string, body UpdateTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTemplateResponse, error) {
+	rsp, err := c.UpdateTemplate(ctx, templateID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUpdateTemplateResponse(rsp)
+}
+
+// CreateTemplateBuildWithBodyWithResponse Queue an immutable template build
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/templates/{templateID}/builds (the `CreateTemplateBuild` operationId).
+func (c *ClientWithResponses) CreateTemplateBuildWithBodyWithResponse(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTemplateBuildResponse, error) {
+	rsp, err := c.CreateTemplateBuildWithBody(ctx, templateID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateTemplateBuildResponse(rsp)
+}
+
+// CreateTemplateBuildWithResponse Queue an immutable template build
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/templates/{templateID}/builds (the `CreateTemplateBuild` operationId).
+func (c *ClientWithResponses) CreateTemplateBuildWithResponse(ctx context.Context, templateID string, body CreateTemplateBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTemplateBuildResponse, error) {
+	rsp, err := c.CreateTemplateBuild(ctx, templateID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateTemplateBuildResponse(rsp)
+}
+
+// GetTemplateBuildWithResponse Get template build status
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/templates/{templateID}/builds/{buildID} (the `GetTemplateBuild` operationId).
+func (c *ClientWithResponses) GetTemplateBuildWithResponse(ctx context.Context, templateID string, buildID string, reqEditors ...RequestEditorFn) (*GetTemplateBuildResponse, error) {
+	rsp, err := c.GetTemplateBuild(ctx, templateID, buildID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTemplateBuildResponse(rsp)
+}
+
+// ForkTemplateWithBodyWithResponse Fork an accessible Ready build into a personal template
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/templates/{templateID}/fork (the `ForkTemplate` operationId).
+func (c *ClientWithResponses) ForkTemplateWithBodyWithResponse(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ForkTemplateResponse, error) {
+	rsp, err := c.ForkTemplateWithBody(ctx, templateID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseForkTemplateResponse(rsp)
+}
+
+// ForkTemplateWithResponse Fork an accessible Ready build into a personal template
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/templates/{templateID}/fork (the `ForkTemplate` operationId).
+func (c *ClientWithResponses) ForkTemplateWithResponse(ctx context.Context, templateID string, body ForkTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*ForkTemplateResponse, error) {
+	rsp, err := c.ForkTemplate(ctx, templateID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseForkTemplateResponse(rsp)
+}
+
+// DeleteTemplateTagWithResponse Remove a template build tag
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/templates/{templateID}/tags/{tag} (the `DeleteTemplateTag` operationId).
+func (c *ClientWithResponses) DeleteTemplateTagWithResponse(ctx context.Context, templateID string, tag string, reqEditors ...RequestEditorFn) (*DeleteTemplateTagResponse, error) {
+	rsp, err := c.DeleteTemplateTag(ctx, templateID, tag, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteTemplateTagResponse(rsp)
+}
+
+// GetTemplateTagWithResponse Resolve a Ready build tag
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/templates/{templateID}/tags/{tag} (the `GetTemplateTag` operationId).
+func (c *ClientWithResponses) GetTemplateTagWithResponse(ctx context.Context, templateID string, tag string, reqEditors ...RequestEditorFn) (*GetTemplateTagResponse, error) {
+	rsp, err := c.GetTemplateTag(ctx, templateID, tag, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetTemplateTagResponse(rsp)
+}
+
+// SetTemplateTagWithBodyWithResponse Atomically publish a Ready build under a tag
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/templates/{templateID}/tags/{tag} (the `SetTemplateTag` operationId).
+func (c *ClientWithResponses) SetTemplateTagWithBodyWithResponse(ctx context.Context, templateID string, tag string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetTemplateTagResponse, error) {
+	rsp, err := c.SetTemplateTagWithBody(ctx, templateID, tag, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetTemplateTagResponse(rsp)
+}
+
+// SetTemplateTagWithResponse Atomically publish a Ready build under a tag
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/templates/{templateID}/tags/{tag} (the `SetTemplateTag` operationId).
+func (c *ClientWithResponses) SetTemplateTagWithResponse(ctx context.Context, templateID string, tag string, body SetTemplateTagJSONRequestBody, reqEditors ...RequestEditorFn) (*SetTemplateTagResponse, error) {
+	rsp, err := c.SetTemplateTag(ctx, templateID, tag, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetTemplateTagResponse(rsp)
+}
+
+// ParseListCredentialDocumentsResponse parses an HTTP response from a ListCredentialDocumentsWithResponse call
+func ParseListCredentialDocumentsResponse(rsp *http.Response) (*ListCredentialDocumentsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListCredentialDocumentsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Items []struct {
+				Id    string                 `json:"id"`
+				Value map[string]interface{} `json:"value"`
+			} `json:"items"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteCredentialDocumentResponse parses an HTTP response from a DeleteCredentialDocumentWithResponse call
+func ParseDeleteCredentialDocumentResponse(rsp *http.Response) (*DeleteCredentialDocumentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteCredentialDocumentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParsePutCredentialDocumentResponse parses an HTTP response from a PutCredentialDocumentWithResponse call
+func ParsePutCredentialDocumentResponse(rsp *http.Response) (*PutCredentialDocumentResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &PutCredentialDocumentResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Id    string                 `json:"id"`
+			Value map[string]interface{} `json:"value"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListInjectionRulesResponse parses an HTTP response from a ListInjectionRulesWithResponse call
+func ParseListInjectionRulesResponse(rsp *http.Response) (*ListInjectionRulesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListInjectionRulesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest InjectionRuleList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateInjectionRuleResponse parses an HTTP response from a CreateInjectionRuleWithResponse call
+func ParseCreateInjectionRuleResponse(rsp *http.Response) (*CreateInjectionRuleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateInjectionRuleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest InjectionRule
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteInjectionRuleResponse parses an HTTP response from a DeleteInjectionRuleWithResponse call
+func ParseDeleteInjectionRuleResponse(rsp *http.Response) (*DeleteInjectionRuleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteInjectionRuleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetInjectionRuleResponse parses an HTTP response from a GetInjectionRuleWithResponse call
+func ParseGetInjectionRuleResponse(rsp *http.Response) (*GetInjectionRuleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetInjectionRuleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest InjectionRule
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateInjectionRuleResponse parses an HTTP response from a UpdateInjectionRuleWithResponse call
+func ParseUpdateInjectionRuleResponse(rsp *http.Response) (*UpdateInjectionRuleResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateInjectionRuleResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest InjectionRule
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetInjectionRuleMaterialResponse parses an HTTP response from a GetInjectionRuleMaterialWithResponse call
+func ParseGetInjectionRuleMaterialResponse(rsp *http.Response) (*GetInjectionRuleMaterialResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetInjectionRuleMaterialResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest InjectionRuleMaterial
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListSandboxesResponse parses an HTTP response from a ListSandboxesWithResponse call
+func ParseListSandboxesResponse(rsp *http.Response) (*ListSandboxesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSandboxesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SandboxList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateSandboxResponse parses an HTTP response from a CreateSandboxWithResponse call
+func ParseCreateSandboxResponse(rsp *http.Response) (*CreateSandboxResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateSandboxResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest Sandbox
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteSandboxResponse parses an HTTP response from a DeleteSandboxWithResponse call
+func ParseDeleteSandboxResponse(rsp *http.Response) (*DeleteSandboxResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteSandboxResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest Sandbox
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSandboxResponse parses an HTTP response from a GetSandboxWithResponse call
+func ParseGetSandboxResponse(rsp *http.Response) (*GetSandboxResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSandboxResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Sandbox
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateSandboxResponse parses an HTTP response from a UpdateSandboxWithResponse call
+func ParseUpdateSandboxResponse(rsp *http.Response) (*UpdateSandboxResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateSandboxResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Sandbox
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSandboxAppResponse parses an HTTP response from a GetSandboxAppWithResponse call
+func ParseGetSandboxAppResponse(rsp *http.Response) (*GetSandboxAppResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSandboxAppResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 303:
+		var headers GetSandboxAppResponse303Headers
+		if values := rsp.Header.Values("Location"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "Location", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.Location = &value
+		}
+		response.Headers303 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseCreateSandboxAppLinkResponse parses an HTTP response from a CreateSandboxAppLinkWithResponse call
+func ParseCreateSandboxAppLinkResponse(rsp *http.Response) (*CreateSandboxAppLinkResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateSandboxAppLinkResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SandboxAppLink
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case rsp.StatusCode == 401:
+		break // No content-type
+
+	case rsp.StatusCode == 403:
+		break // No content-type
+
+	case rsp.StatusCode == 404:
+		break // No content-type
+
+	case rsp.StatusCode == 409:
+		break // No content-type
+
+	case rsp.StatusCode == 501:
+		break // No content-type
+
+	case rsp.StatusCode == 502:
+		break // No content-type
+
+	case rsp.StatusCode == 503:
+		break // No content-type
+
+	}
+
+	return response, nil
+}
+
+// ParseRunSandboxCommandResponse parses an HTTP response from a RunSandboxCommandWithResponse call
+func ParseRunSandboxCommandResponse(rsp *http.Response) (*RunSandboxCommandResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RunSandboxCommandResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest CommandRunResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseMakeSandboxDirectoryResponse parses an HTTP response from a MakeSandboxDirectoryWithResponse call
+func ParseMakeSandboxDirectoryResponse(rsp *http.Response) (*MakeSandboxDirectoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MakeSandboxDirectoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest struct {
+			Path string `json:"path"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDownloadSandboxFileResponse parses an HTTP response from a DownloadSandboxFileWithResponse call
+func ParseDownloadSandboxFileResponse(rsp *http.Response) (*DownloadSandboxFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DownloadSandboxFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	switch {
+	case rsp.StatusCode == 200:
+		var headers DownloadSandboxFileResponse200Headers
+		if values := rsp.Header.Values("X-Content-SHA256"); len(values) > 0 {
+			var value string
+			if err := runtime.BindStyledParameterWithOptions("simple", "X-Content-SHA256", values[0], &value, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: false, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			}
+			headers.XContentSHA256 = &value
+		}
+		response.Headers200 = &headers
+	}
+
+	return response, nil
+}
+
+// ParseUploadSandboxFileResponse parses an HTTP response from a UploadSandboxFileWithResponse call
+func ParseUploadSandboxFileResponse(rsp *http.Response) (*UploadSandboxFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UploadSandboxFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FileWriteResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSandboxInjectionsResponse parses an HTTP response from a GetSandboxInjectionsWithResponse call
+func ParseGetSandboxInjectionsResponse(rsp *http.Response) (*GetSandboxInjectionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSandboxInjectionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SandboxInjectionState
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetSandboxInjectionsResponse parses an HTTP response from a SetSandboxInjectionsWithResponse call
+func ParseSetSandboxInjectionsResponse(rsp *http.Response) (*SetSandboxInjectionsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetSandboxInjectionsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SandboxInjectionState
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateSandboxPreviewResponse parses an HTTP response from a CreateSandboxPreviewWithResponse call
+func ParseCreateSandboxPreviewResponse(rsp *http.Response) (*CreateSandboxPreviewResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateSandboxPreviewResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest struct {
+			AuthorizationUrl *string                                           `json:"authorization_url,omitempty"`
+			ExpiresAt        *time.Time                                        `json:"expires_at,omitempty"`
+			Url              string                                            `json:"url"`
+			Visibility       CreateSandboxPreview201JSONResponseBodyVisibility `json:"visibility"`
+		}
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetSandboxPortPreviewResponse parses an HTTP response from a GetSandboxPortPreviewWithResponse call
+func ParseGetSandboxPortPreviewResponse(rsp *http.Response) (*GetSandboxPortPreviewResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSandboxPortPreviewResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PortPreviewPolicy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetSandboxPortPreviewResponse parses an HTTP response from a SetSandboxPortPreviewWithResponse call
+func ParseSetSandboxPortPreviewResponse(rsp *http.Response) (*SetSandboxPortPreviewResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetSandboxPortPreviewResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest PortPreviewPolicy
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseStartSandboxResponse parses an HTTP response from a StartSandboxWithResponse call
+func ParseStartSandboxResponse(rsp *http.Response) (*StartSandboxResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StartSandboxResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest Sandbox
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseStopSandboxResponse parses an HTTP response from a StopSandboxWithResponse call
+func ParseStopSandboxResponse(rsp *http.Response) (*StopSandboxResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StopSandboxResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest Sandbox
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListSystemTemplatesResponse parses an HTTP response from a ListSystemTemplatesWithResponse call
+func ParseListSystemTemplatesResponse(rsp *http.Response) (*ListSystemTemplatesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSystemTemplatesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TemplateList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListTemplatesResponse parses an HTTP response from a ListTemplatesWithResponse call
+func ParseListTemplatesResponse(rsp *http.Response) (*ListTemplatesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListTemplatesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TemplateList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateTemplateResponse parses an HTTP response from a CreateTemplateWithResponse call
+func ParseCreateTemplateResponse(rsp *http.Response) (*CreateTemplateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateTemplateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Template
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteTemplateResponse parses an HTTP response from a DeleteTemplateWithResponse call
+func ParseDeleteTemplateResponse(rsp *http.Response) (*DeleteTemplateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteTemplateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetTemplateResponse parses an HTTP response from a GetTemplateWithResponse call
+func ParseGetTemplateResponse(rsp *http.Response) (*GetTemplateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTemplateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Template
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUpdateTemplateResponse parses an HTTP response from a UpdateTemplateWithResponse call
+func ParseUpdateTemplateResponse(rsp *http.Response) (*UpdateTemplateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UpdateTemplateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest Template
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateTemplateBuildResponse parses an HTTP response from a CreateTemplateBuildWithResponse call
+func ParseCreateTemplateBuildResponse(rsp *http.Response) (*CreateTemplateBuildResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateTemplateBuildResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest TemplateBuild
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetTemplateBuildResponse parses an HTTP response from a GetTemplateBuildWithResponse call
+func ParseGetTemplateBuildResponse(rsp *http.Response) (*GetTemplateBuildResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTemplateBuildResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TemplateBuild
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseForkTemplateResponse parses an HTTP response from a ForkTemplateWithResponse call
+func ParseForkTemplateResponse(rsp *http.Response) (*ForkTemplateResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ForkTemplateResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest Template
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteTemplateTagResponse parses an HTTP response from a DeleteTemplateTagWithResponse call
+func ParseDeleteTemplateTagResponse(rsp *http.Response) (*DeleteTemplateTagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteTemplateTagResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetTemplateTagResponse parses an HTTP response from a GetTemplateTagWithResponse call
+func ParseGetTemplateTagResponse(rsp *http.Response) (*GetTemplateTagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetTemplateTagResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TemplateTag
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetTemplateTagResponse parses an HTTP response from a SetTemplateTagWithResponse call
+func ParseSetTemplateTagResponse(rsp *http.Response) (*SetTemplateTagResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetTemplateTagResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest TemplateTag
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -879,6 +8481,12 @@ type ServerInterface interface {
 	// CreateSandboxPreview Authorize a sandbox HTTP port preview
 	// (POST /v1/sandboxes/{sandboxID}/previews)
 	CreateSandboxPreview(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// GetSandboxPortPreview Get a sandbox HTTP port visibility
+	// (GET /v1/sandboxes/{sandboxID}/previews/{port})
+	GetSandboxPortPreview(w http.ResponseWriter, r *http.Request, sandboxID string, port int)
+	// SetSandboxPortPreview Change a sandbox HTTP port visibility
+	// (PUT /v1/sandboxes/{sandboxID}/previews/{port})
+	SetSandboxPortPreview(w http.ResponseWriter, r *http.Request, sandboxID string, port int)
 	// StartSandbox Start a stopped sandbox
 	// (POST /v1/sandboxes/{sandboxID}/start)
 	StartSandbox(w http.ResponseWriter, r *http.Request, sandboxID string)
@@ -1605,6 +9213,76 @@ func (siw *ServerInterfaceWrapper) CreateSandboxPreview(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// GetSandboxPortPreview operation middleware
+func (siw *ServerInterfaceWrapper) GetSandboxPortPreview(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "port" -------------
+	var port int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "port", r.PathValue("port"), &port, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "port", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSandboxPortPreview(w, r, sandboxID, port)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetSandboxPortPreview operation middleware
+func (siw *ServerInterfaceWrapper) SetSandboxPortPreview(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "port" -------------
+	var port int
+
+	err = runtime.BindStyledParameterWithOptions("simple", "port", r.PathValue("port"), &port, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "integer", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "port", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetSandboxPortPreview(w, r, sandboxID, port)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // StartSandbox operation middleware
 func (siw *ServerInterfaceWrapper) StartSandbox(w http.ResponseWriter, r *http.Request) {
 
@@ -2184,6 +9862,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/app", wrapper.GetSandboxApp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/app-link", wrapper.CreateSandboxAppLink)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/previews", wrapper.CreateSandboxPreview)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/previews/{port}", wrapper.GetSandboxPortPreview)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/previews/{port}", wrapper.SetSandboxPortPreview)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/commands/run", wrapper.RunSandboxCommand)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/injection-rules", wrapper.ListInjectionRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/injection-rules", wrapper.CreateInjectionRule)

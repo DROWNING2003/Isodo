@@ -90,6 +90,13 @@ type SandboxOperation struct {
 	UpdatedAt      pgtype.Timestamptz
 }
 
+type SandboxPortPreview struct {
+	SandboxID  pgtype.UUID
+	Port       int32
+	Visibility string
+	Revision   int64
+}
+
 type SystemTemplateCatalog struct {
 	Name       string
 	TemplateID pgtype.UUID

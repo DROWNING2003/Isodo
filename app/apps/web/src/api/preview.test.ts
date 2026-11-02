@@ -2,7 +2,7 @@ import { afterEach, expect, it, vi } from "vite-plus/test";
 import { bootstrapSandboxPreview, previewFetch } from "./preview";
 
 afterEach(() => { vi.unstubAllGlobals(); vi.unstubAllEnvs(); });
-const host = "8080-3f40c38e-0af8-4628-878d-b0df7e42de80.isodo.localhost:8080";
+const host = "38080-3f40c38e-0af8-4628-878d-b0df7e42de80.isodo.localhost:8080";
 
 it("bootstraps the preview cookie before pairing without sending the fragment", async () => {
   vi.stubEnv("VITE_ISODO_PREVIEW_DOMAIN", "isodo.localhost");

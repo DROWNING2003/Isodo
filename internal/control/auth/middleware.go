@@ -53,7 +53,7 @@ func Middleware(authenticator Authenticator, next http.Handler) http.Handler {
 				// Executing code is strictly stronger than managing Sandbox metadata.
 				scope = "sandboxes:execute"
 			}
-			if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/previews") {
+			if (r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/previews")) || (r.Method == http.MethodPut && strings.Contains(r.URL.Path, "/previews/")) {
 				scope = "sandboxes:preview"
 			}
 			if !slices.Contains(identity.Scopes, scope) {

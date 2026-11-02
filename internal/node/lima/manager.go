@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/DROWNING2003/Isodo/internal/runtimeports"
 	"io"
 	"os/exec"
 	"runtime"
@@ -17,7 +18,7 @@ import (
 
 var ErrInstanceNotFound = errors.New("Lima instance not found")
 
-const guestAgentPort = 1024
+const guestAgentPort = runtimeports.GuestAgent
 
 // Config controls the host-local Lima instances owned by this Node.
 type Config struct {

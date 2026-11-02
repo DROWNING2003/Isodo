@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/DROWNING2003/Isodo/internal/runtimeports"
 	"io"
 	"os"
 	"strconv"
@@ -16,7 +17,7 @@ import (
 
 const baseProvisionerVersion = "v2"
 
-const t3ServerGuestPort = 8080
+const t3ServerGuestPort = runtimeports.Workbench
 
 // BaseInstanceName identifies the immutable OS + Guest Agent layer.
 func (m *Manager) BaseInstanceName() (string, error) {

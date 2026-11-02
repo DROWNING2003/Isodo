@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io"
+	"github.com/DROWNING2003/Isodo/internal/runtimeports"
 	"net"
 	"strings"
 	"time"
@@ -275,7 +275,7 @@ func dialVsock(ctx context.Context, socketPath string) (net.Conn, error) {
 			return nil, err
 		}
 	}
-	if _, err := io.WriteString(conn, "CONNECT 1024\n"); err != nil {
+	if _, err := fmt.Fprintf(conn, "CONNECT %d\n", runtimeports.GuestAgent); err != nil {
 		_ = conn.Close()
 		return nil, fmt.Errorf("open guest vsock port: %w", err)
 	}
@@ -300,7 +300,7 @@ func dialVsock(ctx context.Context, socketPath string) (net.Conn, error) {
 	}
 	if !strings.HasPrefix(string(acknowledgement), "OK ") || !strings.HasSuffix(string(acknowledgement), "\n") {
 		_ = conn.Close()
-		return nil, fmt.Errorf("guest vsock relay rejected port 1024 (reply %q)", strings.TrimSpace(string(acknowledgement)))
+		return nil, fmt.Errorf("guest vsock relay rejected runtime port (reply %q)", strings.TrimSpace(string(acknowledgement)))
 	}
 	if err := conn.SetDeadline(time.Time{}); err != nil {
 		_ = conn.Close()

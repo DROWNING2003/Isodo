@@ -33,6 +33,18 @@ type NonReadonly<T> = [T] extends [UnionToIntersection<T>] ? {
     : T[P];
 } : DistributeReadOnlyOverUnions<T>;
 
+export type PortPreviewPolicyVisibility = typeof PortPreviewPolicyVisibility[keyof typeof PortPreviewPolicyVisibility];
+
+
+export const PortPreviewPolicyVisibility = {
+  public: 'public',
+  private: 'private',
+} as const;
+
+export interface PortPreviewPolicy {
+  visibility: PortPreviewPolicyVisibility;
+}
+
 export interface FileWriteResult {
   path: string;
   bytes: number;
@@ -598,10 +610,19 @@ export type CreateSandboxPreviewBody = {
   port: number;
 };
 
+export type CreateSandboxPreview201Visibility = typeof CreateSandboxPreview201Visibility[keyof typeof CreateSandboxPreview201Visibility];
+
+
+export const CreateSandboxPreview201Visibility = {
+  public: 'public',
+  private: 'private',
+} as const;
+
 export type CreateSandboxPreview201 = {
+  visibility: CreateSandboxPreview201Visibility;
   url: string;
-  authorization_url: string;
-  expires_at: string;
+  authorization_url?: string;
+  expires_at?: string;
 };
 
 export type ListSystemTemplatesParams = {
@@ -1178,7 +1199,7 @@ export const getCreateSandboxPreviewUrl = (sandboxID: string,) => {
 }
 
 /**
- * Requires a running remote CHV sandbox and sandboxes:preview for API keys. Returns a five-minute bearer capability bound to the account, port and current Guest runtime. Open authorization_url in a browser to exchange its fragment for a host-only cookie. Stop, Start, Delete or reassignment invalidates it. Ports 1024 and 8080 are reserved. The URL alone grants no access.
+ * Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
  * @summary Authorize a sandbox HTTP port preview
  */
 export const createSandboxPreview = async (sandboxID: string,
@@ -1204,6 +1225,75 @@ return isodoFetch<CreateSandboxPreview201>(getCreateSandboxPreviewUrl(sandboxID)
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(createSandboxPreviewBody)
+  }
+);}
+
+
+
+export const getGetSandboxPortPreviewUrl = (sandboxID: string,
+    port: number,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}/previews/${port}`
+}
+
+/**
+ * Requires ownership and sandboxes:read. Unconfigured ports default to public. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited.
+ * @summary Get a sandbox HTTP port visibility
+ */
+export const getSandboxPortPreview = async (sandboxID: string,
+    port: number, options?: Parameters<typeof isodoFetch>[1]): Promise<PortPreviewPolicy> => {
+
+  return isodoFetch<PortPreviewPolicy>(getGetSandboxPortPreviewUrl(sandboxID,port),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getSetSandboxPortPreviewUrl = (sandboxID: string,
+    port: number,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}/previews/${port}`
+}
+
+/**
+ * Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+ * @summary Change a sandbox HTTP port visibility
+ */
+export const setSandboxPortPreview = async (sandboxID: string,
+    port: number,
+    portPreviewPolicy: PortPreviewPolicy, options?: Parameters<typeof isodoFetch>[1]): Promise<PortPreviewPolicy> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return isodoFetch<PortPreviewPolicy>(getSetSandboxPortPreviewUrl(sandboxID,port),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(portPreviewPolicy)
   }
 );}
 

@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"strings"
 
 	nodev1 "github.com/DROWNING2003/Isodo/internal/api/node/v1"
 	"github.com/DROWNING2003/Isodo/internal/control/auth"
@@ -19,6 +20,7 @@ type PreviewInspector interface {
 func (h *Handler) SetHTTPPreview(p *preview.Publisher, node PreviewInspector) {
 	h.httpPreview = p
 	h.previewNode = node
+	p.ConfigureHTTPAccess(h.ResolveHTTPPreview)
 }
 
 // AuthorizeHTTPPreview checks tenant ownership and the current runtime on every
@@ -26,6 +28,10 @@ func (h *Handler) SetHTTPPreview(p *preview.Publisher, node PreviewInspector) {
 func (h *Handler) AuthorizeHTTPPreview(ctx context.Context, g preview.HTTPGrant) error {
 	if h.previewNode == nil || g.TenantID == "" || g.Subject == "" || g.NodeID != h.previewNode.NodeID() {
 		return errors.New("preview Node unavailable")
+	}
+	policy, err := h.portPolicy(ctx, g.TenantID, g.SandboxID, g.Port)
+	if err != nil || policy.Revision != g.PolicyRevision || (g.Public && policy.Visibility != "public") || (!g.Public && policy.Visibility != "private") {
+		return errors.New("preview visibility changed")
 	}
 	item, err := h.store.GetSandbox(ctx, g.TenantID, g.SandboxID)
 	if err != nil {
@@ -45,6 +51,7 @@ func (h *Handler) AuthorizeHTTPPreview(ctx context.Context, g preview.HTTPGrant)
 }
 
 func (h *Handler) CreateSandboxPreview(w http.ResponseWriter, r *http.Request, id string) {
+	id = strings.ToLower(id)
 	target, item, ok := h.resolveRuntimeTargetWithSandbox(w, r, id, false)
 	if !ok {
 		return
@@ -63,8 +70,8 @@ func (h *Handler) CreateSandboxPreview(w http.ResponseWriter, r *http.Request, i
 	if !decodeJSON(w, r, &input) {
 		return
 	}
-	if input.Port < 1 || input.Port > 65535 || input.Port == 1024 || input.Port == 8080 {
-		writeError(w, 400, "INVALID_PREVIEW_PORT", "Choose a port between 1 and 65535, excluding management port 1024 and workbench port 8080.")
+	if input.Port < 1 || input.Port > 65535 || !preview.ValidHTTPPort(uint16(input.Port)) {
+		writeError(w, 400, "INVALID_PREVIEW_PORT", "Choose a port between 1 and 65535, excluding runtime ports 31024, 31080 and 38080.")
 		return
 	}
 	observed, err := h.previewNode.InspectSandbox(r.Context(), &nodev1.InspectSandboxRequest{SandboxId: id, OwnershipGeneration: target.OwnershipGeneration})
@@ -77,7 +84,12 @@ func (h *Handler) CreateSandboxPreview(w http.ResponseWriter, r *http.Request, i
 		return
 	}
 	identity, _ := auth.IdentityFromContext(r.Context())
-	link, err := h.httpPreview.IssueHTTP(r.Context(), preview.HTTPGrant{TenantID: identity.TenantID, Subject: identity.Subject, SandboxID: id, NodeID: item.NodeID, Generation: target.OwnershipGeneration, Revision: target.Revision, BootID: observed.BootId, GuestEpoch: observed.GuestEpoch, Port: uint16(input.Port)})
+	policy, err := h.portPolicy(r.Context(), identity.TenantID, id, uint16(input.Port))
+	if err != nil {
+		h.portPolicyError(w, err)
+		return
+	}
+	link, err := h.httpPreview.IssueHTTP(r.Context(), preview.HTTPGrant{Public: policy.Visibility == "public", PolicyRevision: policy.Revision, TenantID: identity.TenantID, Subject: identity.Subject, SandboxID: id, NodeID: item.NodeID, Generation: target.OwnershipGeneration, Revision: target.Revision, BootID: observed.BootId, GuestEpoch: observed.GuestEpoch, Port: uint16(input.Port)})
 	if err != nil {
 		writeError(w, 409, "PREVIEW_RUNTIME_CHANGED", "The sandbox runtime is unavailable or changed. Retry after it is running.")
 		return

@@ -207,6 +207,87 @@ func TestRealCHVHTTPPortPreview(t *testing.T) {
 	}
 	waitApp(11)
 	var old preview.HTTPLink
+	t.Logf("[开始] 匿名 Public / Private 动态切换 Sandbox ID=%s", id)
+	baseURL, _ := publisher.HTTPPortBaseURL(id, 3000)
+	directURL, _ := url.Parse(baseURL)
+	direct, err := request("GET", "/hello", directURL.Host, "", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	direct.Body.Close()
+	if direct.StatusCode != 200 {
+		t.Fatalf("direct default without issuance=%d", direct.StatusCode)
+	}
+	publicLink := issue(3000)
+	if publicLink.Visibility != "public" || publicLink.AuthorizationURL != "" {
+		t.Fatal("default is not anonymous public")
+	}
+	publicURL, _ := url.Parse(publicLink.URL)
+	checkPublic := func(want int) {
+		t.Helper()
+		response, err := request("POST", "/hello", publicURL.Host, "", "anonymous")
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer response.Body.Close()
+		if response.StatusCode != want {
+			t.Fatalf("anonymous HTTP %d want %d", response.StatusCode, want)
+		}
+	}
+	checkPublic(200)
+	for _, port := range []int{1024, 1080, 8080, 31024, 31080, 38080} {
+		response, err := request("GET", "/", fmt.Sprintf("%d-%s.localhost:18443", port, id), "", "")
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != 401 {
+			t.Fatalf("reserved %d HTTP %d", port, response.StatusCode)
+		}
+	}
+	setVisibility := func(mode string) {
+		t.Helper()
+		r, _ := http.NewRequestWithContext(ctx, "PUT", gateway.URL+"/v1/sandboxes/"+id+"/previews/3000", strings.NewReader(`{"visibility":"`+mode+`"}`))
+		r.Header.Set("Authorization", "Bearer owner")
+		response, err := httpClient.Do(r)
+		if err != nil {
+			t.Fatal(err)
+		}
+		response.Body.Close()
+		if response.StatusCode != 200 {
+			t.Fatalf("visibility PUT=%d", response.StatusCode)
+		}
+	}
+	setVisibility("private")
+	checkPublic(401)
+	privateLink := issue(3000)
+	privateURL, _ := url.Parse(privateLink.AuthorizationURL)
+	response, err := request("GET", "/hello", publicURL.Host, privateURL.Fragment, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != 200 {
+		t.Fatalf("private token=%d", response.StatusCode)
+	}
+	setVisibility("public")
+	checkPublic(200)
+	setVisibility("private")
+	checkPublic(401)
+	response, err = request("GET", "/hello", publicURL.Host, privateURL.Fragment, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	response.Body.Close()
+	if response.StatusCode != 401 {
+		t.Fatal("old policy token survived toggle")
+	}
+	for _, port := range []uint16{5173, 8000} {
+		if _, err := store.SetPortPreview(ctx, "owner", id, port, "private"); err != nil {
+			t.Fatal(err)
+		}
+	}
+	t.Logf("[成功] Public 默认匿名、Private 401、授权访问和双向切换 Sandbox ID=%s", id)
 	for _, port := range []int{3000, 5173, 8000} {
 		link := issue(port)
 		old = link
@@ -225,7 +306,7 @@ func TestRealCHVHTTPPortPreview(t *testing.T) {
 	}
 	link := issue(5173)
 	u, _ := url.Parse(link.AuthorizationURL)
-	response, err := request("GET", "/events", u.Host, u.Fragment, "")
+	response, err = request("GET", "/events", u.Host, u.Fragment, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -348,8 +429,9 @@ func TestRealCHVHTTPPortPreview(t *testing.T) {
 
 type previewCHVStore struct {
 	sandbox.Store
-	mu   sync.Mutex
-	item sandbox.Sandbox
+	mu       sync.Mutex
+	item     sandbox.Sandbox
+	policies map[uint16]preview.PortPolicy
 }
 
 func (s *previewCHVStore) GetSandbox(_ context.Context, tenant, id string) (sandbox.Sandbox, error) {
@@ -359,6 +441,39 @@ func (s *previewCHVStore) GetSandbox(_ context.Context, tenant, id string) (sand
 		return sandbox.Sandbox{}, sandbox.ErrNotFound
 	}
 	return s.item, nil
+}
+
+func (s *previewCHVStore) LookupPreviewSandbox(ctx context.Context, id string) (sandbox.Sandbox, error) {
+	return s.GetSandbox(ctx, "owner", id)
+}
+func (s *previewCHVStore) GetPortPreview(ctx context.Context, tenant, id string, port uint16) (preview.PortPolicy, error) {
+	if _, err := s.GetSandbox(ctx, tenant, id); err != nil {
+		return preview.PortPolicy{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	p, ok := s.policies[port]
+	if !ok {
+		return preview.PortPolicy{Visibility: "public"}, nil
+	}
+	return p, nil
+}
+func (s *previewCHVStore) SetPortPreview(ctx context.Context, tenant, id string, port uint16, visibility string) (preview.PortPolicy, error) {
+	if _, err := s.GetSandbox(ctx, tenant, id); err != nil {
+		return preview.PortPolicy{}, err
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if s.policies == nil {
+		s.policies = make(map[uint16]preview.PortPolicy)
+	}
+	p := s.policies[port]
+	if p.Visibility != visibility {
+		p.Revision++
+	}
+	p.Visibility = visibility
+	s.policies[port] = p
+	return p, nil
 }
 
 type previewCHVAuth struct{}

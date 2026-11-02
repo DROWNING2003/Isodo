@@ -2,4 +2,5 @@ package: publicapi
 output: internal/api/public/api.gen.go
 generate:
   models: true
+  client: true
   std-http-server: true

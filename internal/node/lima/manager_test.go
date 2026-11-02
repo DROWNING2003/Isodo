@@ -271,7 +271,7 @@ func TestLimaManagerGuestAgentLifecycle(t *testing.T) {
 			RequestId: "lima-t3-server-start",
 			Command: &guestv1.Command{Argv: []string{
 				"/bin/sh", "-c",
-				"mkdir -p /workspace/lima-integration/home/.t3 /workspace/lima-integration/home/.codex && cd /workspace/lima-integration/t3 && export HOME=/workspace/lima-integration/home T3CODE_HOME=/workspace/lima-integration/home/.t3 CODEX_HOME=/workspace/lima-integration/home/.codex T3CODE_SANDBOX=1 && exec node bin.mjs serve --port 8080 --host 127.0.0.1 --base-dir /workspace/lima-integration/home/.t3 --mode web >/tmp/lima-t3-server.log 2>&1",
+				"mkdir -p /workspace/lima-integration/home/.t3 /workspace/lima-integration/home/.codex && cd /workspace/lima-integration/t3 && export HOME=/workspace/lima-integration/home T3CODE_HOME=/workspace/lima-integration/home/.t3 CODEX_HOME=/workspace/lima-integration/home/.codex T3CODE_SANDBOX=1 && exec node bin.mjs serve --port 38080 --host 127.0.0.1 --base-dir /workspace/lima-integration/home/.t3 --mode web >/tmp/lima-t3-server.log 2>&1",
 			}},
 		})
 		if err != nil {
@@ -280,7 +280,7 @@ func TestLimaManagerGuestAgentLifecycle(t *testing.T) {
 		var httpResponse string
 		for attempt := 0; attempt < 120; attempt++ {
 			output, exitCode, checkErr := runGuestCommand(ctx, client, ready.GetIdentity(), fmt.Sprintf("lima-t3-http-check-%03d", attempt), []string{
-				"node", "-e", "fetch('http://127.0.0.1:8080/').then(async r => { const html = await r.text(); console.log(`${r.status} ${html.includes('id=\\\"root\\\"')}`); }).catch(e => { console.error(e.message); process.exitCode = 1; })",
+				"node", "-e", "fetch('http://127.0.0.1:38080/').then(async r => { const html = await r.text(); console.log(`${r.status} ${html.includes('id=\\\"root\\\"')}`); }).catch(e => { console.error(e.message); process.exitCode = 1; })",
 			})
 			if checkErr == nil && exitCode == 0 {
 				httpResponse = strings.TrimSpace(output)

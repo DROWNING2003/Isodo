@@ -1,10 +1,10 @@
 package preview
 
 import (
-	"strings"
 	"net/http"
 	"net/http/httptest"
 	"strconv"
+	"strings"
 	"testing"
 )
 
@@ -12,11 +12,11 @@ const portPreviewSandboxID = "f323e70d-cd11-4a02-a245-6b4ed2ce1e31"
 
 func TestHTTPPortBaseURLMatchesExistingPreviewHostShape(t *testing.T) {
 	p, err := New(Config{
-		Secret: "test-secret",
-		Domain: "drowning.top",
-		Scheme: "https",
+		Secret:     "test-secret",
+		Domain:     "drowning.top",
+		Scheme:     "https",
 		PublicPort: "18443",
-		APIPort: "5004",
+		APIPort:    "5004",
 	})
 	if err != nil || p == nil {
 		t.Fatalf("publisher = %v, err = %v", p, err)
@@ -55,12 +55,12 @@ func TestHTTPPortBaseURLRejectsManagementAndInvalidTargets(t *testing.T) {
 	}
 	for _, tc := range []struct {
 		name string
-		id string
+		id   string
 		port uint16
 	}{
 		{"zero", portPreviewSandboxID, 0},
-		{"Guest management", portPreviewSandboxID, 1024},
-		{"T3 reserved", portPreviewSandboxID, 8080},
+		{"Guest management", portPreviewSandboxID, 31024},
+		{"T3 reserved", portPreviewSandboxID, 38080},
 		{"invalid Sandbox ID", "not-a-sandbox", 3000},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

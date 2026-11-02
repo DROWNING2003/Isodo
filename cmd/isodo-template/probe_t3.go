@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/DROWNING2003/Isodo/internal/runtimeports"
 	"io"
 	"os"
 	"path/filepath"
@@ -160,7 +161,7 @@ func t3HTTP(ctx context.Context, client guestv1.GuestServiceClient, identity *gu
 		return 0, "", err
 	}
 	if err := stream.Send(&guestv1.PortForwardFrame{Frame: &guestv1.PortForwardFrame_Open{Open: &guestv1.PortForwardOpen{
-		Identity: identity, RequestId: "probe-t3-" + uuid.NewString(), Port: 8080, Service: "t3",
+		Identity: identity, RequestId: "probe-t3-" + uuid.NewString(), Port: runtimeports.Workbench, Service: "t3",
 	}}}); err != nil {
 		return 0, "", err
 	}

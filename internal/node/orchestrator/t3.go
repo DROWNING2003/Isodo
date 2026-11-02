@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/DROWNING2003/Isodo/internal/runtimeports"
 	"io"
 	"net/http"
 	"net/url"
@@ -25,7 +26,7 @@ import (
 )
 
 const (
-	t3GuestPort       = 8080
+	t3GuestPort       = runtimeports.Workbench
 	t3BundleGuestPath = "/workspace/.isodo/t3-server-dist.bundle"
 	t3WorkspaceDir    = "/workspace/.isodo/t3"
 	t3TemplateDir     = "/opt/isodo/t3"
@@ -296,7 +297,7 @@ func (s *LimaServer) startT3Server(ctx context.Context, operation *nodev1.Operat
 		}
 	}
 	process, err := startGuestProcessWithEnv(ctx, client, identity, requestID, []string{
-		"/bin/sh", "-c", "cd /workspace/.isodo/t3 && while true; do /usr/local/bin/node bin.mjs serve --port 8080 --host 127.0.0.1 --base-dir /workspace/.t3 --mode web >>/workspace/.isodo/t3-server.log 2>&1; sleep 1; done # isodo-t3-supervisor",
+		"/bin/sh", "-c", fmt.Sprintf("cd /workspace/.isodo/t3 && while true; do /usr/local/bin/node bin.mjs serve --port %d --host 127.0.0.1 --base-dir /workspace/.t3 --mode web >>/workspace/.isodo/t3-server.log 2>&1; sleep 1; done # isodo-t3-supervisor", t3GuestPort),
 	}, env)
 	if err != nil {
 		return fmt.Errorf("start T3 server in Lima Guest: %w", err)

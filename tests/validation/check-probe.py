@@ -7,7 +7,7 @@ for attempt in range(2):
     with socket.socket(socket.AF_UNIX, socket.SOCK_STREAM) as s:
         s.settimeout(10)
         s.connect(str(base/'vsock.sock'))
-        s.sendall(b'CONNECT 1024\n')
+        s.sendall(b'CONNECT 31024\n')
         handshake = b''
         while not handshake.endswith(b'\n'):
             chunk=s.recv(1)

@@ -5,12 +5,12 @@ description: 使用 API Key 创建远程沙箱，启动 Python HTTP 服务并获
 
 # 通过 API 预览 HTTP 服务
 
-在远程 CHV 沙箱中运行 Web 服务后，可以通过 `https://<port>-<sandboxID>.<preview-domain>/` 访问。Control API 校验账号归属并签发短期授权，再通过 Node 和 Guest 转发到沙箱内的 loopback 端口。
+在远程 CHV 沙箱中运行 Web 服务后，可以通过 `https://<port>-<sandboxID>.<preview-domain>/` 访问。通用 HTTP 端口默认 public，直接打开端口 URL 即可匿名访问；用户可以把指定端口改为 private，再使用短期授权。两种模式都通过 Node 和 Guest 转发到沙箱内的 loopback 端口。
 
 本指南串起两个公开接口：
 
 - [`POST /v1/sandboxes/{sandboxID}/commands/run`](/docs/api-reference/endpoints/RunSandboxCommand)：在 Guest 内执行命令。
-- [`POST /v1/sandboxes/{sandboxID}/previews`](/docs/api-reference/endpoints/CreateSandboxPreview)：申请指定端口的预览授权。
+- [`POST /v1/sandboxes/{sandboxID}/previews`](/docs/api-reference/endpoints/CreateSandboxPreview)：取得指定端口的 URL；private 时另返回短期授权。
 
 ## 准备 API Key 和环境
 
@@ -21,7 +21,7 @@ API、Node 和客户端需更新到支持 Commands/Previews 的版本。在“�
 | `sandboxes:write` | 创建、启动、停止或删除所属沙箱 |
 | `sandboxes:read` | 查询沙箱是否已经运行 |
 | `sandboxes:execute` | 在 Guest 内执行程序，需单独授权 |
-| `sandboxes:preview` | 访问 Guest HTTP 服务，需单独授权 |
+| `sandboxes:preview` | 修改端口 visibility、取得 private 授权，需单独授权 |
 
 如需查询可用模板，再增加 `templates:read`。读写权限不能替代命令执行或端口预览权限。API Key 明文只显示一次，数据库只保存摘要，无法从数据库还原旧密钥；丢失后请创建新密钥并撤销旧密钥。
 
@@ -118,8 +118,10 @@ if result.get('exit_code') != 0 or result.get('output_incomplete'):
 print(result['stdout'])
 
 preview = api('POST', f'/v1/sandboxes/{sandbox_id}/previews', {'port': 3000})
-print('Browser authorization URL:', preview['authorization_url'])
-print('Authorization expires at:', preview['expires_at'])
+print('Browser URL:', preview.get('authorization_url') or preview['url'])
+print('Visibility:', preview['visibility'])
+if preview.get('expires_at'):
+    print('Authorization expires at:', preview['expires_at'])
 ```
 
 创建接口返回 `202` 表示已接受；脚本等待运行状态和当前操作成功后才执行命令。命令接口的 HTTP `200` 不代表程序成功，仍需检查 `exit_code` 和输出完整性。同一次命令请求重试时，复用相同 `Idempotency-Key` 和请求体；不要把同一个 key 用于不同命令。
@@ -128,9 +130,19 @@ print('Authorization expires at:', preview['expires_at'])
 
 ## 打开、续期与程序访问
 
-浏览器打开响应中的 **`authorization_url`**。页面从 URL 片段读取短期令牌，移除片段，通过同源 POST 换取 host-only、HttpOnly Cookie，再跳转到服务首页。只打开 `url` 不会自动获得权限。
+Public 模式直接打开响应中的 **`url`**，不需要 Token/Cookie。未经配置的端口默认 public，任何能访问入口的人都能调用其中的应用接口。
 
-授权固定五分钟。到期后重新调用 `/previews`，打开新返回的授权链接；不需要重启 Python 服务或重建沙箱。停止、重启、删除、重新分配或 Guest 启动身份变化也会提前使旧授权失效，并关闭持续连接。
+指定端口可以主动切换为 private，API Key 需要 `sandboxes:preview`：
+
+```python
+api('PUT', f'/v1/sandboxes/{sandbox_id}/previews/3000', {'visibility': 'private'})
+# 改回公开：visibility=public；读取策略使用 GET 同一路径，需要 sandboxes:read。
+preview = api('POST', f'/v1/sandboxes/{sandbox_id}/previews', {'port': 3000})
+```
+
+Private 模式下，浏览器打开响应中的 **`authorization_url`**。页面从 URL 片段读取短期令牌，移除片段，通过同源 POST 换取 host-only、HttpOnly Cookie，再跳转到服务首页。只打开 `url` 不会自动获得权限。
+
+Private 授权固定五分钟。到期后重新调用 `/previews`，打开新返回的授权链接；不需要重启 Python 服务或重建沙箱。停止、重启、删除、重新分配或 Guest 启动身份变化也会提前使旧授权失效，并关闭持续连接。
 
 程序客户端可用预览响应进行请求：
 
@@ -138,9 +150,10 @@ print('Authorization expires at:', preview['expires_at'])
 from urllib.parse import urlsplit
 
 preview = api('POST', f'/v1/sandboxes/{sandbox_id}/previews', {'port': 3000})
-request = urllib.request.Request(preview['url'], headers={
-    'X-Isodo-Preview-Token': urlsplit(preview['authorization_url']).fragment,
-})
+headers = {}
+if preview['visibility'] == 'private':
+    headers['X-Isodo-Preview-Token'] = urlsplit(preview['authorization_url']).fragment
+request = urllib.request.Request(preview['url'], headers=headers)
 with urllib.request.urlopen(request, timeout=10) as response:
     print(response.status, response.read().decode())
 ```
@@ -153,25 +166,36 @@ with urllib.request.urlopen(request, timeout=10) as response:
 api('POST', f'/v1/sandboxes/{sandbox_id}/stop', {})
 ```
 
+visibility 按 Sandbox ID + 端口持久化，Stop 时停止转发，Start 后保留原策略；Delete 会清理策略。策略修改后新请求直接读取已提交值，本 Gateway 的已有流在修改响应前取消，其他 Gateway 的已有流至多在下一次 100ms 检查时关闭。public/private 互换也会使旧 private 授权失效。
+
+Public 限流按每个 Gateway 计：每 Sandbox/端口 10 请求/秒、突发 20、最多 8 个连接（含 SSE/WS）；全局 100 请求/秒、突发 200、最多 256 个连接。超限返回 429 和 Retry-After: 1。这些预算不跨多个 Gateway 汇总。
+
 停止保留实例磁盘；需要彻底清理时，再按生命周期 API 删除沙箱。
 
 ## 支持范围与排错
 
-支持普通 HTTP、WebSocket 和 SSE；Guest 服务应绑定 `127.0.0.1`，无需额外开放宿主端口。通用预览禁用 Guest 管理端口 `1024` 和工作台端口 `8080`。当前启用于远程 CHV，Lima 尚未启用。
+支持普通 HTTP、WebSocket 和 SSE；Guest 服务应绑定 `127.0.0.1`，无需额外开放宿主端口。通用预览禁用 Guest 管理端口 `31024`、出站代理端口 `31080` 和工作台端口 `38080`。当前启用于远程 CHV，Lima 尚未启用。
 
 | 现象 | 检查项 |
 | --- | --- |
 | 浏览器 `NXDOMAIN` | VPN、内部 DNS、通配预览域名；此时请求尚未到达 Gateway |
 | API `404` | 是否部署了包含 Commands/Previews 的 API；沙箱不存在或不属于当前账号也返回 404 |
 | API `403` / `INSUFFICIENT_SCOPE` | Key 是否单独授予 `sandboxes:execute` 或 `sandboxes:preview` |
-| 预览 `401` | 是否打开了授权链接，令牌/Cookie 是否过期或属于其他端口 |
+| 预览 `401` | private 端口是否打开了授权链接，令牌/Cookie 是否过期、策略是否已切换 |
+| 预览 `429` | public 端口请求速率或并发连接超限 |
 | 预览 `403` | 运行身份是否已变化；Cookie 写请求及浏览器 WebSocket 是否精确同源 |
 | 预览 `502` | Guest 服务是否就绪、端口是否正确、Node 是否已升级并返回运行身份校验确认 |
 
 Vite 需要允许生成的预览 Host；外部 HTTPS 非标准端口可能还需设置 HMR 的 wss 协议及外部 clientPort。不要开放其他宿主端口绕过 Gateway。
 
-## 已验证范围
+## 历史演示范围
+
+以下演示部署使用原有 private 授权策略；本次默认 public 的实现尚未部署，不代表该演示入口已经切换策略。
 
 2026-11-02，部署版本 `78c513d` 在 jfcs1024 上通过真实账号的临时 API Key 完成：Control worker 创建新 CHV 沙箱、Commands API 查询 Python 3.10.12 并启动 HTTP 服务、公开 HTTPS API 签发预览、Nginx → Gateway → mTLS Node → Guest 转发，以及真实浏览器授权跳转和页面显示。API Key 明文及短期授权 URL 不保存在文档中。
 
 独立 CHV 测试另覆盖 GET/POST、SSE flush、WebSocket、运行身份变化后的旧授权拒绝及活跃连接关闭。完整 Vite 页面 HMR、Electron E2E、生产 worker 驱动的 Stop/Start/Delete 全部组合仍需单独验收。
+
+## 内部服务端口升级
+
+当前开发版将 Guest 管理、出站代理和 T3 分别改为 31024、31080、38080；需匹配升级 Node、Guest 和基础镜像。迁移期旧 1024/1080/8080 也不允许通用预览。Control 宿主监听地址不随之改变。T3 仍使用原有独立授权流程；本次没有部署新端口到演示环境。

@@ -8,7 +8,7 @@
 #include <string.h>
 int main(void) {
  int s=socket(AF_VSOCK,SOCK_STREAM,0);
- struct sockaddr_vm addr={.svm_family=AF_VSOCK,.svm_cid=VMADDR_CID_ANY,.svm_port=1024};
+ struct sockaddr_vm addr={.svm_family=AF_VSOCK,.svm_cid=VMADDR_CID_ANY,.svm_port=31024};
  if(s<0 || bind(s,(struct sockaddr*)&addr,sizeof(addr)) || listen(s,4)){perror("vsock");return 1;}
  puts("ISODO_PROBE_READY"); fflush(stdout);
  for(;;){int c=accept(s,NULL,NULL);if(c<0)continue;

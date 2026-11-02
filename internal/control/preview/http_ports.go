@@ -3,6 +3,7 @@ package preview
 import (
 	"errors"
 	"fmt"
+	"github.com/DROWNING2003/Isodo/internal/runtimeports"
 	"net"
 )
 
@@ -10,15 +11,13 @@ import (
 // ordinary, user-published HTTP ports. This is a policy guard, not an
 // authorization check: callers must still validate ownership and VM identity.
 const (
-	guestManagementPort uint16 = 1024
-	t3WorkbenchPort     uint16 = 8080
+	t3WorkbenchPort uint16 = runtimeports.Workbench
 )
 
 // HTTPPortBaseURL computes the stable, user-facing address for a sandbox's
-// application HTTP port: <port>-<sandboxID>.<domain>. It does NOT grant access,
-// create a listener, or register a proxy route. Callers must use a separate,
-// short-lived and runtime-bound authorization workflow before showing this URL
-// as usable.
+// application HTTP port: <port>-<sandboxID>.<domain>. It creates no listener or
+// policy. The Gateway enforces the current persisted visibility and runtime;
+// public ports are anonymous, while private ports require a short-lived grant.
 //
 // The existing T3 Publish() behavior is deliberately unchanged.
 func (p *Publisher) HTTPPortBaseURL(sandboxID string, port uint16) (string, error) {
@@ -28,7 +27,7 @@ func (p *Publisher) HTTPPortBaseURL(sandboxID string, port uint16) (string, erro
 	if !uuidPattern.MatchString(sandboxID) || port == 0 {
 		return "", errors.New("invalid sandbox HTTP port target")
 	}
-	if port == guestManagementPort || port == t3WorkbenchPort {
+	if !ValidHTTPPort(port) {
 		return "", fmt.Errorf("port %d is reserved for sandbox management", port)
 	}
 	publicHost := fmt.Sprintf("%d-%s.%s", port, sandboxID, p.domain)

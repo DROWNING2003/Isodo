@@ -48,7 +48,7 @@ func TestRelayPortStreamsGuestData(t *testing.T) {
 	client := &Client{service: nodev1.NewNodeOrchestratorClient(connection)}
 	ctx, cancel := context.WithTimeout(t.Context(), 5*time.Second)
 	defer cancel()
-	conn, err := client.RelayPort(ctx, "f323e70d-cd11-4a02-a245-6b4ed2ce1e31", 1, 8080, "t3")
+	conn, err := client.RelayPort(ctx, "f323e70d-cd11-4a02-a245-6b4ed2ce1e31", 1, 38080, "t3")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -61,7 +61,7 @@ func TestRelayPortStreamsGuestData(t *testing.T) {
 	if _, err = conn.Read(buffer); err != io.EOF {
 		t.Fatalf("second read = %v, want EOF", err)
 	}
-	if fake.open == nil || fake.open.GetPort() != 8080 || fake.open.GetSandboxId() != "f323e70d-cd11-4a02-a245-6b4ed2ce1e31" {
+	if fake.open == nil || fake.open.GetPort() != 38080 || fake.open.GetSandboxId() != "f323e70d-cd11-4a02-a245-6b4ed2ce1e31" {
 		t.Fatalf("open = %+v", fake.open)
 	}
 }

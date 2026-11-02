@@ -45,7 +45,7 @@ SDK / HTTP
     → Control HTTPS：认证、Scope、Tenant 归属、Sandbox Node/Revision 检查
     → Node mTLS：isodo.node.v1.CommandRunner/RunCommand（单用途 RPC）
     → CHV Node：核对 journal 的 generation/revision、running、Guest identity
-    → CHV 私有 Vsock:1024：Guest StartProcess / SubscribeProcess / SignalProcess
+    → CHV 私有 Vsock:31024：Guest StartProcess / SubscribeProcess / SignalProcess
     → 沙箱内部进程
 ```
 
@@ -105,3 +105,5 @@ bash scripts/test-runtime-commands-chv.sh
 演示环境 Node/API 已部署 `78c513d`。通过真实账号的临时 API Key 调用 Control API，worker 创建 CHV 沙箱后，Commands API 成功执行 `python3 --version`（Python 3.10.12），再启动 Guest loopback 的 Python HTTP 服务。返回 exit_code=0，随后通过公开 HTTPS 预览及真实浏览器看到页面。创建、命令和 HTTP 预览在这次演示中使用真实数据库、Node、Guest 和 Nginx。
 
 这补充了正常路径的真实运行证据，不代表上面列出的完整生命周期组合与网络故障注入已经通过。可复现客户端脚本见[HTTP 服务预览指南](../docs-site/content/docs/guides/http-port-preview.mdx)。
+
+当前 Guest 内部端口为 31024 / 31080 / 38080，Node 与镜像需匹配升级，详见[迁移说明](runtime-service-ports.md)。历史测试记录保留原部署版本的范围。
