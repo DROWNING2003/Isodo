@@ -5,6 +5,15 @@ description: Isodo 文档和接口变更记录。
 
 # 更新日志
 
+## 2026-11-02 · 命令执行与 HTTP 预览
+
+- 公开 Commands API 支持非交互式 Guest 命令执行，API Key 单独授予 `sandboxes:execute`。
+- 新增短期 HTTP 端口预览授权，API Key 单独授予 `sandboxes:preview`；支持 HTTP、WebSocket 与 SSE。
+- 演示环境通过真实 API Key、Control worker、CHV、Python HTTP 服务及浏览器授权跳转验证。
+- 新增[完整开发者指南](/docs/guides/http-port-preview)，覆盖创建、启动服务、预览续期和停止清理。
+
+Commands 来自已合并的 #23；预览功能与文档在 #24，已部署演示版本，正式合并状态以该 PR 为准。完整 Vite HMR 与 Electron E2E 仍待验收。
+
 ## 2026-10-26 · 黑客松 MVP 联调
 
 - 同一 App 的 SandboxClient 接入本地 IPC 与云端 HTTP，使用 revision 与动作结果等待生命周期完成。
