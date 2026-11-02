@@ -696,6 +696,29 @@ type MakeSandboxDirectoryJSONBody struct {
 }
 
 // DownloadSandboxFileParams defines parameters for DownloadSandboxFile.
+// CommandRunRequest defines a bounded non-interactive Guest command.
+type CommandRunRequest struct {
+	Argv []string `json:"argv"`
+	Cwd *string `json:"cwd,omitempty"`
+	Env *map[string]string `json:"env,omitempty"`
+	TimeoutSeconds *int `json:"timeout_seconds,omitempty"`
+}
+
+// CommandRunResult is the completed Guest process output.
+type CommandRunResult struct {
+	ExecutionId string `json:"execution_id"`
+	Stdout string `json:"stdout"`
+	Stderr string `json:"stderr"`
+	ExitCode *int32 `json:"exit_code"`
+	Reason string `json:"reason"`
+	OutputIncomplete bool `json:"output_incomplete"`
+}
+
+// RunSandboxCommandParams defines command request headers.
+type RunSandboxCommandParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
 type DownloadSandboxFileParams struct {
 	// Path Canonical absolute path under /workspace
 	Path string `form:"path" json:"path"`
@@ -743,6 +766,9 @@ type CreateInjectionRuleJSONRequestBody = CreateInjectionRule
 
 // UpdateInjectionRuleJSONRequestBody defines body for UpdateInjectionRule for application/json ContentType.
 type UpdateInjectionRuleJSONRequestBody = PatchInjectionRule
+
+// RunSandboxCommandJSONRequestBody defines body for RunSandboxCommand for application/json ContentType.
+type RunSandboxCommandJSONRequestBody = CommandRunRequest
 
 // CreateSandboxJSONRequestBody defines body for CreateSandbox for application/json ContentType.
 type CreateSandboxJSONRequestBody = CreateSandbox
@@ -821,6 +847,9 @@ type ServerInterface interface {
 	// GetSandboxApp Open a sandbox application
 	// (GET /v1/sandboxes/{sandboxID}/app)
 	GetSandboxApp(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// RunSandboxCommand Run a bounded non-interactive command inside a sandbox Guest
+	// (POST /v1/sandboxes/{sandboxID}/commands/run)
+	RunSandboxCommand(w http.ResponseWriter, r *http.Request, sandboxID string, params RunSandboxCommandParams)
 	// CreateSandboxAppLink Create a sandbox application link
 	// (POST /v1/sandboxes/{sandboxID}/app-link)
 	CreateSandboxAppLink(w http.ResponseWriter, r *http.Request, sandboxID string)
@@ -1281,6 +1310,29 @@ func (siw *ServerInterfaceWrapper) GetSandboxApp(w http.ResponseWriter, r *http.
 		handler = middleware(handler)
 	}
 
+	handler.ServeHTTP(w, r)
+}
+
+// RunSandboxCommand operation middleware
+func (siw *ServerInterfaceWrapper) RunSandboxCommand(w http.ResponseWriter, r *http.Request) {
+	var sandboxID string
+	err := runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+	headers := r.Header.Values("Idempotency-Key")
+	if len(headers) != 1 {
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key"})
+		return
+	}
+	params := RunSandboxCommandParams{IdempotencyKey: headers[0]}
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RunSandboxCommand(w, r, sandboxID, params)
+	}))
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
 	handler.ServeHTTP(w, r)
 }
 
@@ -2063,6 +2115,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/stop", wrapper.StopSandbox)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/app", wrapper.GetSandboxApp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/app-link", wrapper.CreateSandboxAppLink)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/commands/run", wrapper.RunSandboxCommand)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/injection-rules", wrapper.ListInjectionRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/injection-rules", wrapper.CreateInjectionRule)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/injection-rules/{ruleID}", wrapper.DeleteInjectionRule)
