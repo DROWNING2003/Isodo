@@ -264,7 +264,8 @@ it("keeps account Skill and MCP market navigation out of the Agent workbench", a
   expect(renderer!.root.findAllByProps({ "aria-label": "MCP 市场" })).toHaveLength(0);
   fixture.pathname = "/sandboxes";
   await act(async () => renderer!.update(<CloudSidebar />));
-  const skill = renderer!.root.findByProps({ "aria-label": "Skill", disabled: true });
-  expect(skill.props.onClick).toBeUndefined();
+  const skill = renderer!.root.findByProps({ "aria-label": "Skill" });
+  expect(skill.props.onClick).toBeTypeOf("function");
+  expect(skill.props.disabled).toBeUndefined();
   expect(renderer!.root.findByProps({ "aria-label": "MCP 市场" }).props.disabled).toBeUndefined();
 });

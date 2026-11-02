@@ -1,0 +1,36 @@
+---
+title: Skill 市场
+description: 制作和收藏 Skill，在远程沙箱的 Agent 工作台选择并使用。
+---
+
+# Skill 市场
+
+Skill 将工作方法保存为 Agent 可以读取的 `SKILL.md` 指令文件。收藏与沙箱启用分开：收藏不会自动安装到所有沙箱。
+
+## 制作与收藏
+
+1. 打开全局侧栏的 **Skill**，浏览市场或搜索已有条目。
+2. 点击星标收藏。收藏内容在“我的 Skill”中显示。
+3. 点击“制作 Skill”，填写名称、说明和指令正文，创建后自动收藏。名称使用小写英文、数字与短横线，例如 `my-review`。
+
+个人 Skill 仅当前账号可见。第一版只制作指令正文，不导入 GitHub 仓库或附件，也不执行安装脚本；暂不支持原地修改，需要变更指令时使用新名称制作。不要在指令中填写密钥或凭证。
+
+## 在 Agent 工作台使用
+
+1. 进入远程 CHV 沙箱，在工作台的“安全连接”中勾选已收藏的 Skill。
+2. 使用右下角统一保存按钮，确认显示配置已同步。待同步或同步失败不代表已经安装。
+3. 新建 Codex 任务，输入 `$` 搜索并选择 Skill 标签，也可显式写出 `$my-review` 请求使用。
+
+文件同步到 `/workspace/.agents/skills/isodo-<Skill ID>/SKILL.md`，保留其他手工 Skill。工作台菜单只展示当前账号、当前沙箱已应用的选择。Agent 是否在某次任务中自动采用 Skill 仍取决于任务与说明是否匹配。
+
+## 移除和重启
+
+取消勾选后保存，会移除本功能管理的指令文件及新任务菜单入口；取消收藏不会自动卸载已有沙箱中的 Skill。已运行的会话可能已经读取指令，移除不会使其遗忘，应新建任务。
+
+Stop/Start 保留已安装文件。停止期间修改的选择需要在 Start 后重新保存；删除沙箱会清理选择与沙箱文件。Skill 会进入磁盘和包含该磁盘的快照，它不是 MCP 的可撤销 Token 授权。
+
+## 当前验收范围
+
+远程 Web → Control → Node → Guest → Codex 已完成真实专用沙箱验收：制作、收藏、统一保存、原生发现、工作台自动补全与任务使用、移除、Stop/Start 和删除清理。Claude、OpenCode、Lima 和完整 Electron 桌面端本轮未验收。
+
+账号级 Skill 接口需要登录会话或账号 Bearer 身份，Sandbox API Key 会被拒绝。接口详见 [ListSkills](/docs/api-reference/endpoints/ListSkills)、[CreateSkill](/docs/api-reference/endpoints/CreateSkill) 和 [SetSandboxSkills](/docs/api-reference/endpoints/SetSandboxSkills)。

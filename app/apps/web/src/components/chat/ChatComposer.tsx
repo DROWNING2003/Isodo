@@ -1,3 +1,4 @@
+import { useManagedSkills } from "../../features/isodo/useManagedSkills";
 import { runtimeModeConfig, runtimeModeOptions } from "./runtimeModeConfig";
 import { useRightPanelStore } from "~/rightPanelStore";
 import { AttachmentFilePreview } from "../files/AttachmentFilePreview";
@@ -1869,9 +1870,12 @@ export const ChatComposer = memo(function ChatComposer(props: ChatComposerProps)
     [selectedProviderEntry],
   );
   const compactCommandAvailable = providerSupportsManualCompaction(selectedProviderEntry);
-  const selectedProviderSkills = selectedProviderStatus
-    ? resolveProviderSkillsForCwd(selectedProviderStatus, gitCwd)
-    : [];
+  const selectedProviderSkills = useManagedSkills(
+    environmentId,
+    selectedProviderEntry?.driverKind === "codex",
+    gitCwd,
+    selectedProviderStatus ? resolveProviderSkillsForCwd(selectedProviderStatus, gitCwd) : [],
+  );
   const selectedProviderSlashCommands = selectedProviderStatus
     ? resolveProviderSlashCommandsForCwd(selectedProviderStatus, gitCwd)
     : [];

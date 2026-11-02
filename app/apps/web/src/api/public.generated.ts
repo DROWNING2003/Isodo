@@ -33,6 +33,64 @@ type NonReadonly<T> = [T] extends [UnionToIntersection<T>] ? {
     : T[P];
 } : DistributeReadOnlyOverUnions<T>;
 
+export interface SkillCreate {
+  /**
+     * @minLength 1
+     * @maxLength 64
+     * @pattern ^[a-z][a-z0-9]*(-[a-z0-9]+)*$
+     */
+  name: string;
+  /**
+     * @minLength 1
+     * @maxLength 1024
+     */
+  description: string;
+  /**
+     * @minLength 1
+     * @maxLength 32768
+     */
+  body: string;
+}
+
+export type SkillEntrySource = typeof SkillEntrySource[keyof typeof SkillEntrySource];
+
+
+export const SkillEntrySource = {
+  market: 'market',
+  personal: 'personal',
+} as const;
+
+export type SkillEntry = SkillCreate & {
+  id: string;
+  source: SkillEntrySource;
+  favorite: boolean;
+};
+
+export interface SkillCatalog {
+  items: SkillEntry[];
+}
+
+export interface SkillSelectionInput {
+  /** @maxItems 32 */
+  skill_ids: string[];
+}
+
+export type SkillSelectionSyncStatus = typeof SkillSelectionSyncStatus[keyof typeof SkillSelectionSyncStatus];
+
+
+export const SkillSelectionSyncStatus = {
+  pending: 'pending',
+  applied: 'applied',
+  failed: 'failed',
+} as const;
+
+export type SkillSelection = SkillSelectionInput & {
+  version: number;
+  applied_version: number;
+  sync_status: SkillSelectionSyncStatus;
+  restart_required: boolean;
+};
+
 export type CustomMCPCreateAuthKind = typeof CustomMCPCreateAuthKind[keyof typeof CustomMCPCreateAuthKind];
 
 
@@ -848,6 +906,180 @@ export const ListTemplatesScope = {
   system: 'system',
   available: 'available',
 } as const;
+
+export const getListSkillsUrl = () => {
+
+
+
+
+  return `/v1/skills`
+}
+
+/**
+ * @summary 列出平台与本人私有 Skill
+ */
+export const listSkills = async ( options?: Parameters<typeof isodoFetch>[1]): Promise<SkillCatalog> => {
+
+  return isodoFetch<SkillCatalog>(getListSkillsUrl(),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getCreateSkillUrl = () => {
+
+
+
+
+  return `/v1/skills`
+}
+
+/**
+ * @summary 制作个人 Skill（指令正文，自动收藏）
+ */
+export const createSkill = async (skillCreate: SkillCreate, options?: Parameters<typeof isodoFetch>[1]): Promise<SkillEntry> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return isodoFetch<SkillEntry>(getCreateSkillUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(skillCreate)
+  }
+);}
+
+
+
+export const getFavoriteSkillUrl = (skillID: string,) => {
+
+
+
+
+  return `/v1/skills/${skillID}/favorite`
+}
+
+/**
+ * @summary 收藏 Skill
+ */
+export const favoriteSkill = async (skillID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<void> => {
+
+  return isodoFetch<void>(getFavoriteSkillUrl(skillID),
+  {
+    ...options,
+    method: 'PUT'
+
+
+  }
+);}
+
+
+
+export const getUnfavoriteSkillUrl = (skillID: string,) => {
+
+
+
+
+  return `/v1/skills/${skillID}/favorite`
+}
+
+/**
+ * @summary 取消收藏（不自动移除沙箱中的 Skill）
+ */
+export const unfavoriteSkill = async (skillID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<void> => {
+
+  return isodoFetch<void>(getUnfavoriteSkillUrl(skillID),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
+export const getGetSandboxSkillsUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}/skills`
+}
+
+/**
+ * @summary 读取沙箱 Skill 选择与同步状态
+ */
+export const getSandboxSkills = async (sandboxID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<SkillSelection> => {
+
+  return isodoFetch<SkillSelection>(getGetSandboxSkillsUrl(sandboxID),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getSetSandboxSkillsUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}/skills`
+}
+
+/**
+ * 最多 32 个 Skill，合计序列化内容不超过 96 KiB。返回 applied 仅代表文件已同步，新 Agent 任务加载。
+ * @summary 保存完整 Skill 选择并同步；停止状态保留为 pending
+ */
+export const setSandboxSkills = async (sandboxID: string,
+    skillSelectionInput: SkillSelectionInput, options?: Parameters<typeof isodoFetch>[1]): Promise<SkillSelection> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return isodoFetch<SkillSelection>(getSetSandboxSkillsUrl(sandboxID),
+  {
+    ...options,
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(skillSelectionInput)
+  }
+);}
+
+
 
 export const getCompleteMCPOAuthUrl = (params: CompleteMCPOAuthParams,) => {
   const normalizedParams = new URLSearchParams();

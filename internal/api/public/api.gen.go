@@ -176,16 +176,16 @@ func (e MCPCatalogEntryAuthKind) Valid() bool {
 
 // Defines values for MCPCatalogEntrySource.
 const (
-	Custom MCPCatalogEntrySource = "custom"
-	Market MCPCatalogEntrySource = "market"
+	MCPCatalogEntrySourceCustom MCPCatalogEntrySource = "custom"
+	MCPCatalogEntrySourceMarket MCPCatalogEntrySource = "market"
 )
 
 // Valid indicates whether the value is a known member of the MCPCatalogEntrySource enum.
 func (e MCPCatalogEntrySource) Valid() bool {
 	switch e {
-	case Custom:
+	case MCPCatalogEntrySourceCustom:
 		return true
-	case Market:
+	case MCPCatalogEntrySourceMarket:
 		return true
 	default:
 		return false
@@ -501,6 +501,45 @@ func (e SandboxObservedState) Valid() bool {
 	case SandboxObservedStateStopping:
 		return true
 	case SandboxObservedStateUnknown:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SkillEntrySource.
+const (
+	SkillEntrySourceMarket   SkillEntrySource = "market"
+	SkillEntrySourcePersonal SkillEntrySource = "personal"
+)
+
+// Valid indicates whether the value is a known member of the SkillEntrySource enum.
+func (e SkillEntrySource) Valid() bool {
+	switch e {
+	case SkillEntrySourceMarket:
+		return true
+	case SkillEntrySourcePersonal:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for SkillSelectionSyncStatus.
+const (
+	SkillSelectionSyncStatusApplied SkillSelectionSyncStatus = "applied"
+	SkillSelectionSyncStatusFailed  SkillSelectionSyncStatus = "failed"
+	SkillSelectionSyncStatusPending SkillSelectionSyncStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the SkillSelectionSyncStatus enum.
+func (e SkillSelectionSyncStatus) Valid() bool {
+	switch e {
+	case SkillSelectionSyncStatusApplied:
+		return true
+	case SkillSelectionSyncStatusFailed:
+		return true
+	case SkillSelectionSyncStatusPending:
 		return true
 	default:
 		return false
@@ -1030,6 +1069,48 @@ type SetTemplateTag struct {
 	ExpectedBuildID *string `json:"expected_build_id,omitempty"`
 }
 
+// SkillCatalog defines model for SkillCatalog.
+type SkillCatalog struct {
+	Items []SkillEntry `json:"items"`
+}
+
+// SkillCreate defines model for SkillCreate.
+type SkillCreate struct {
+	Body        string `json:"body"`
+	Description string `json:"description"`
+	Name        string `json:"name"`
+}
+
+// SkillEntry defines model for SkillEntry.
+type SkillEntry struct {
+	Body        string             `json:"body"`
+	Description string             `json:"description"`
+	Favorite    bool               `json:"favorite"`
+	Id          openapi_types.UUID `json:"id"`
+	Name        string             `json:"name"`
+	Source      SkillEntrySource   `json:"source"`
+}
+
+// SkillEntrySource defines model for SkillEntry.Source.
+type SkillEntrySource string
+
+// SkillSelection defines model for SkillSelection.
+type SkillSelection struct {
+	AppliedVersion  int64                    `json:"applied_version"`
+	RestartRequired bool                     `json:"restart_required"`
+	SkillIds        []openapi_types.UUID     `json:"skill_ids"`
+	SyncStatus      SkillSelectionSyncStatus `json:"sync_status"`
+	Version         int64                    `json:"version"`
+}
+
+// SkillSelectionSyncStatus defines model for SkillSelection.SyncStatus.
+type SkillSelectionSyncStatus string
+
+// SkillSelectionInput defines model for SkillSelectionInput.
+type SkillSelectionInput struct {
+	SkillIds []openapi_types.UUID `json:"skill_ids"`
+}
+
 // Template defines model for Template.
 type Template struct {
 	CreatedAt   time.Time          `json:"created_at"`
@@ -1192,6 +1273,12 @@ type CreateSandboxPreviewJSONRequestBody CreateSandboxPreviewJSONBody
 
 // SetSandboxPortPreviewJSONRequestBody defines body for SetSandboxPortPreview for application/json ContentType.
 type SetSandboxPortPreviewJSONRequestBody = PortPreviewPolicy
+
+// SetSandboxSkillsJSONRequestBody defines body for SetSandboxSkills for application/json ContentType.
+type SetSandboxSkillsJSONRequestBody = SkillSelectionInput
+
+// CreateSkillJSONRequestBody defines body for CreateSkill for application/json ContentType.
+type CreateSkillJSONRequestBody = SkillCreate
 
 // CreateTemplateJSONRequestBody defines body for CreateTemplate for application/json ContentType.
 type CreateTemplateJSONRequestBody = CreateTemplate
@@ -1662,6 +1749,29 @@ type ClientInterface interface {
 	// Corresponds with PUT /v1/sandboxes/{sandboxID}/previews/{port} (the `SetSandboxPortPreview` operationId).
 	SetSandboxPortPreview(ctx context.Context, sandboxID string, port int, body SetSandboxPortPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// GetSandboxSkills 读取沙箱 Skill 选择与同步状态
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/skills (the `GetSandboxSkills` operationId).
+	GetSandboxSkills(ctx context.Context, sandboxID openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetSandboxSkillsWithBody 保存完整 Skill 选择并同步；停止状态保留为 pending
+	//
+	// 最多 32 个 Skill，合计序列化内容不超过 96 KiB。返回 applied 仅代表文件已同步，新 Agent 任务加载。.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with PUT /v1/sandboxes/{sandboxID}/skills (the `SetSandboxSkills` operationId).
+	SetSandboxSkillsWithBody(ctx context.Context, sandboxID openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SetSandboxSkills 保存完整 Skill 选择并同步；停止状态保留为 pending
+	//
+	// 最多 32 个 Skill，合计序列化内容不超过 96 KiB。返回 applied 仅代表文件已同步，新 Agent 任务加载。.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with PUT /v1/sandboxes/{sandboxID}/skills (the `SetSandboxSkills` operationId).
+	SetSandboxSkills(ctx context.Context, sandboxID openapi_types.UUID, body SetSandboxSkillsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// StartSandbox Start a stopped sandbox
 	//
 	// Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
@@ -1675,6 +1785,35 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/stop (the `StopSandbox` operationId).
 	StopSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSkills 列出平台与本人私有 Skill
+	//
+	// Corresponds with GET /v1/skills (the `ListSkills` operationId).
+	ListSkills(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSkillWithBody 制作个人 Skill（指令正文，自动收藏）
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/skills (the `CreateSkill` operationId).
+	CreateSkillWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateSkill 制作个人 Skill（指令正文，自动收藏）
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/skills (the `CreateSkill` operationId).
+	CreateSkill(ctx context.Context, body CreateSkillJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UnfavoriteSkill 取消收藏（不自动移除沙箱中的 Skill）
+	//
+	// Corresponds with DELETE /v1/skills/{skillID}/favorite (the `UnfavoriteSkill` operationId).
+	UnfavoriteSkill(ctx context.Context, skillID openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FavoriteSkill 收藏 Skill
+	//
+	// Corresponds with PUT /v1/skills/{skillID}/favorite (the `FavoriteSkill` operationId).
+	FavoriteSkill(ctx context.Context, skillID openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListSystemTemplates List platform default templates
 	//
@@ -2702,6 +2841,59 @@ func (c *Client) SetSandboxPortPreview(ctx context.Context, sandboxID string, po
 	return c.Client.Do(req)
 }
 
+// GetSandboxSkills 读取沙箱 Skill 选择与同步状态
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/skills (the `GetSandboxSkills` operationId).
+func (c *Client) GetSandboxSkills(ctx context.Context, sandboxID openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetSandboxSkillsRequest(c.Server, sandboxID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetSandboxSkillsWithBody 保存完整 Skill 选择并同步；停止状态保留为 pending
+//
+// 最多 32 个 Skill，合计序列化内容不超过 96 KiB。返回 applied 仅代表文件已同步，新 Agent 任务加载。.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with PUT /v1/sandboxes/{sandboxID}/skills (the `SetSandboxSkills` operationId).
+func (c *Client) SetSandboxSkillsWithBody(ctx context.Context, sandboxID openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetSandboxSkillsRequestWithBody(c.Server, sandboxID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SetSandboxSkills 保存完整 Skill 选择并同步；停止状态保留为 pending
+//
+// 最多 32 个 Skill，合计序列化内容不超过 96 KiB。返回 applied 仅代表文件已同步，新 Agent 任务加载。.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with PUT /v1/sandboxes/{sandboxID}/skills (the `SetSandboxSkills` operationId).
+func (c *Client) SetSandboxSkills(ctx context.Context, sandboxID openapi_types.UUID, body SetSandboxSkillsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSetSandboxSkillsRequest(c.Server, sandboxID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // StartSandbox Start a stopped sandbox
 //
 // Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
@@ -2726,6 +2918,85 @@ func (c *Client) StartSandbox(ctx context.Context, sandboxID string, reqEditors 
 // Corresponds with POST /v1/sandboxes/{sandboxID}/stop (the `StopSandbox` operationId).
 func (c *Client) StopSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewStopSandboxRequest(c.Server, sandboxID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListSkills 列出平台与本人私有 Skill
+//
+// Corresponds with GET /v1/skills (the `ListSkills` operationId).
+func (c *Client) ListSkills(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSkillsRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSkillWithBody 制作个人 Skill（指令正文，自动收藏）
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/skills (the `CreateSkill` operationId).
+func (c *Client) CreateSkillWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSkillRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateSkill 制作个人 Skill（指令正文，自动收藏）
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/skills (the `CreateSkill` operationId).
+func (c *Client) CreateSkill(ctx context.Context, body CreateSkillJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateSkillRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UnfavoriteSkill 取消收藏（不自动移除沙箱中的 Skill）
+//
+// Corresponds with DELETE /v1/skills/{skillID}/favorite (the `UnfavoriteSkill` operationId).
+func (c *Client) UnfavoriteSkill(ctx context.Context, skillID openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUnfavoriteSkillRequest(c.Server, skillID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// FavoriteSkill 收藏 Skill
+//
+// Corresponds with PUT /v1/skills/{skillID}/favorite (the `FavoriteSkill` operationId).
+func (c *Client) FavoriteSkill(ctx context.Context, skillID openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFavoriteSkillRequest(c.Server, skillID)
 	if err != nil {
 		return nil, err
 	}
@@ -4780,6 +5051,87 @@ func NewSetSandboxPortPreviewRequestWithBody(server string, sandboxID string, po
 	return req, nil
 }
 
+// NewGetSandboxSkillsRequest constructs an http.Request for the GetSandboxSkills method
+func NewGetSandboxSkillsRequest(server string, sandboxID openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/skills", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSetSandboxSkillsRequest calls the generic SetSandboxSkills builder with application/json body
+func NewSetSandboxSkillsRequest(server string, sandboxID openapi_types.UUID, body SetSandboxSkillsJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewSetSandboxSkillsRequestWithBody(server, sandboxID, "application/json", bodyReader)
+}
+
+// NewSetSandboxSkillsRequestWithBody constructs an http.Request for the SetSandboxSkills method, with any body, and a specified content type
+func NewSetSandboxSkillsRequestWithBody(server string, sandboxID openapi_types.UUID, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/skills", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
 // NewStartSandboxRequest constructs an http.Request for the StartSandbox method
 func NewStartSandboxRequest(server string, sandboxID string) (*http.Request, error) {
 	var err error
@@ -4841,6 +5193,141 @@ func NewStopSandboxRequest(server string, sandboxID string) (*http.Request, erro
 	}
 
 	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListSkillsRequest constructs an http.Request for the ListSkills method
+func NewListSkillsRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/skills")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateSkillRequest calls the generic CreateSkill builder with application/json body
+func NewCreateSkillRequest(server string, body CreateSkillJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateSkillRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateSkillRequestWithBody constructs an http.Request for the CreateSkill method, with any body, and a specified content type
+func NewCreateSkillRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/skills")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewUnfavoriteSkillRequest constructs an http.Request for the UnfavoriteSkill method
+func NewUnfavoriteSkillRequest(server string, skillID openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "skillID", skillID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/skills/%s/favorite", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewFavoriteSkillRequest constructs an http.Request for the FavoriteSkill method
+func NewFavoriteSkillRequest(server string, skillID openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "skillID", skillID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/skills/%s/favorite", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -5904,6 +6391,31 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /v1/sandboxes/{sandboxID}/previews/{port} (the `SetSandboxPortPreview` operationId).
 	SetSandboxPortPreviewWithResponse(ctx context.Context, sandboxID string, port int, body SetSandboxPortPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*SetSandboxPortPreviewResponse, error)
 
+	// GetSandboxSkillsWithResponse 读取沙箱 Skill 选择与同步状态
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/skills (the `GetSandboxSkills` operationId).
+	GetSandboxSkillsWithResponse(ctx context.Context, sandboxID openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSandboxSkillsResponse, error)
+
+	// SetSandboxSkillsWithBodyWithResponse 保存完整 Skill 选择并同步；停止状态保留为 pending
+	//
+	// 最多 32 个 Skill，合计序列化内容不超过 96 KiB。返回 applied 仅代表文件已同步，新 Agent 任务加载。.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/sandboxes/{sandboxID}/skills (the `SetSandboxSkills` operationId).
+	SetSandboxSkillsWithBodyWithResponse(ctx context.Context, sandboxID openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetSandboxSkillsResponse, error)
+
+	// SetSandboxSkillsWithResponse 保存完整 Skill 选择并同步；停止状态保留为 pending
+	//
+	// 最多 32 个 Skill，合计序列化内容不超过 96 KiB。返回 applied 仅代表文件已同步，新 Agent 任务加载。.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/sandboxes/{sandboxID}/skills (the `SetSandboxSkills` operationId).
+	SetSandboxSkillsWithResponse(ctx context.Context, sandboxID openapi_types.UUID, body SetSandboxSkillsJSONRequestBody, reqEditors ...RequestEditorFn) (*SetSandboxSkillsResponse, error)
+
 	// StartSandboxWithResponse Start a stopped sandbox
 	//
 	// Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
@@ -5921,6 +6433,41 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/stop (the `StopSandbox` operationId).
 	StopSandboxWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*StopSandboxResponse, error)
+
+	// ListSkillsWithResponse 列出平台与本人私有 Skill
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/skills (the `ListSkills` operationId).
+	ListSkillsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSkillsResponse, error)
+
+	// CreateSkillWithBodyWithResponse 制作个人 Skill（指令正文，自动收藏）
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/skills (the `CreateSkill` operationId).
+	CreateSkillWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSkillResponse, error)
+
+	// CreateSkillWithResponse 制作个人 Skill（指令正文，自动收藏）
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/skills (the `CreateSkill` operationId).
+	CreateSkillWithResponse(ctx context.Context, body CreateSkillJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSkillResponse, error)
+
+	// UnfavoriteSkillWithResponse 取消收藏（不自动移除沙箱中的 Skill）
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/skills/{skillID}/favorite (the `UnfavoriteSkill` operationId).
+	UnfavoriteSkillWithResponse(ctx context.Context, skillID openapi_types.UUID, reqEditors ...RequestEditorFn) (*UnfavoriteSkillResponse, error)
+
+	// FavoriteSkillWithResponse 收藏 Skill
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/skills/{skillID}/favorite (the `FavoriteSkill` operationId).
+	FavoriteSkillWithResponse(ctx context.Context, skillID openapi_types.UUID, reqEditors ...RequestEditorFn) (*FavoriteSkillResponse, error)
 
 	// ListSystemTemplatesWithResponse List platform default templates
 	//
@@ -8087,6 +8634,109 @@ func (r SetSandboxPortPreviewResponse) ContentType() string {
 	return ""
 }
 
+type GetSandboxSkillsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SkillSelection
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetSandboxSkillsResponse) GetJSON200() *SkillSelection {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetSandboxSkillsResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetSandboxSkillsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetSandboxSkillsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetSandboxSkillsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetSandboxSkillsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SetSandboxSkillsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SkillSelection
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *SkillSelection
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SetSandboxSkillsResponse) GetJSON200() *SkillSelection {
+	return r.JSON200
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r SetSandboxSkillsResponse) GetJSON202() *SkillSelection {
+	return r.JSON202
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r SetSandboxSkillsResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SetSandboxSkillsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SetSandboxSkillsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SetSandboxSkillsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SetSandboxSkillsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type StartSandboxResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -8177,6 +8827,184 @@ func (r StopSandboxResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r StopSandboxResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListSkillsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *SkillCatalog
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSkillsResponse) GetJSON200() *SkillCatalog {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListSkillsResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSkillsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSkillsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSkillsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSkillsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateSkillResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *SkillEntry
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateSkillResponse) GetJSON201() *SkillEntry {
+	return r.JSON201
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r CreateSkillResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateSkillResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateSkillResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateSkillResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateSkillResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UnfavoriteSkillResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r UnfavoriteSkillResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UnfavoriteSkillResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UnfavoriteSkillResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UnfavoriteSkillResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UnfavoriteSkillResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type FavoriteSkillResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r FavoriteSkillResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r FavoriteSkillResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r FavoriteSkillResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r FavoriteSkillResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r FavoriteSkillResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -9511,6 +10339,49 @@ func (c *ClientWithResponses) SetSandboxPortPreviewWithResponse(ctx context.Cont
 	return ParseSetSandboxPortPreviewResponse(rsp)
 }
 
+// GetSandboxSkillsWithResponse 读取沙箱 Skill 选择与同步状态
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/skills (the `GetSandboxSkills` operationId).
+func (c *ClientWithResponses) GetSandboxSkillsWithResponse(ctx context.Context, sandboxID openapi_types.UUID, reqEditors ...RequestEditorFn) (*GetSandboxSkillsResponse, error) {
+	rsp, err := c.GetSandboxSkills(ctx, sandboxID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetSandboxSkillsResponse(rsp)
+}
+
+// SetSandboxSkillsWithBodyWithResponse 保存完整 Skill 选择并同步；停止状态保留为 pending
+//
+// 最多 32 个 Skill，合计序列化内容不超过 96 KiB。返回 applied 仅代表文件已同步，新 Agent 任务加载。.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/sandboxes/{sandboxID}/skills (the `SetSandboxSkills` operationId).
+func (c *ClientWithResponses) SetSandboxSkillsWithBodyWithResponse(ctx context.Context, sandboxID openapi_types.UUID, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetSandboxSkillsResponse, error) {
+	rsp, err := c.SetSandboxSkillsWithBody(ctx, sandboxID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetSandboxSkillsResponse(rsp)
+}
+
+// SetSandboxSkillsWithResponse 保存完整 Skill 选择并同步；停止状态保留为 pending
+//
+// 最多 32 个 Skill，合计序列化内容不超过 96 KiB。返回 applied 仅代表文件已同步，新 Agent 任务加载。.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/sandboxes/{sandboxID}/skills (the `SetSandboxSkills` operationId).
+func (c *ClientWithResponses) SetSandboxSkillsWithResponse(ctx context.Context, sandboxID openapi_types.UUID, body SetSandboxSkillsJSONRequestBody, reqEditors ...RequestEditorFn) (*SetSandboxSkillsResponse, error) {
+	rsp, err := c.SetSandboxSkills(ctx, sandboxID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSetSandboxSkillsResponse(rsp)
+}
+
 // StartSandboxWithResponse Start a stopped sandbox
 //
 // Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
@@ -9539,6 +10410,71 @@ func (c *ClientWithResponses) StopSandboxWithResponse(ctx context.Context, sandb
 		return nil, err
 	}
 	return ParseStopSandboxResponse(rsp)
+}
+
+// ListSkillsWithResponse 列出平台与本人私有 Skill
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/skills (the `ListSkills` operationId).
+func (c *ClientWithResponses) ListSkillsWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListSkillsResponse, error) {
+	rsp, err := c.ListSkills(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSkillsResponse(rsp)
+}
+
+// CreateSkillWithBodyWithResponse 制作个人 Skill（指令正文，自动收藏）
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/skills (the `CreateSkill` operationId).
+func (c *ClientWithResponses) CreateSkillWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSkillResponse, error) {
+	rsp, err := c.CreateSkillWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSkillResponse(rsp)
+}
+
+// CreateSkillWithResponse 制作个人 Skill（指令正文，自动收藏）
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/skills (the `CreateSkill` operationId).
+func (c *ClientWithResponses) CreateSkillWithResponse(ctx context.Context, body CreateSkillJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSkillResponse, error) {
+	rsp, err := c.CreateSkill(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateSkillResponse(rsp)
+}
+
+// UnfavoriteSkillWithResponse 取消收藏（不自动移除沙箱中的 Skill）
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/skills/{skillID}/favorite (the `UnfavoriteSkill` operationId).
+func (c *ClientWithResponses) UnfavoriteSkillWithResponse(ctx context.Context, skillID openapi_types.UUID, reqEditors ...RequestEditorFn) (*UnfavoriteSkillResponse, error) {
+	rsp, err := c.UnfavoriteSkill(ctx, skillID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUnfavoriteSkillResponse(rsp)
+}
+
+// FavoriteSkillWithResponse 收藏 Skill
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/skills/{skillID}/favorite (the `FavoriteSkill` operationId).
+func (c *ClientWithResponses) FavoriteSkillWithResponse(ctx context.Context, skillID openapi_types.UUID, reqEditors ...RequestEditorFn) (*FavoriteSkillResponse, error) {
+	rsp, err := c.FavoriteSkill(ctx, skillID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFavoriteSkillResponse(rsp)
 }
 
 // ListSystemTemplatesWithResponse List platform default templates
@@ -11201,6 +12137,79 @@ func ParseSetSandboxPortPreviewResponse(rsp *http.Response) (*SetSandboxPortPrev
 	return response, nil
 }
 
+// ParseGetSandboxSkillsResponse parses an HTTP response from a GetSandboxSkillsWithResponse call
+func ParseGetSandboxSkillsResponse(rsp *http.Response) (*GetSandboxSkillsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetSandboxSkillsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SkillSelection
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSetSandboxSkillsResponse parses an HTTP response from a SetSandboxSkillsWithResponse call
+func ParseSetSandboxSkillsResponse(rsp *http.Response) (*SetSandboxSkillsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SetSandboxSkillsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SkillSelection
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest SkillSelection
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseStartSandboxResponse parses an HTTP response from a StartSandboxWithResponse call
 func ParseStartSandboxResponse(rsp *http.Response) (*StartSandboxResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -11254,6 +12263,130 @@ func ParseStopSandboxResponse(rsp *http.Response) (*StopSandboxResponse, error) 
 			return nil, err
 		}
 		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListSkillsResponse parses an HTTP response from a ListSkillsWithResponse call
+func ParseListSkillsResponse(rsp *http.Response) (*ListSkillsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSkillsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest SkillCatalog
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateSkillResponse parses an HTTP response from a CreateSkillWithResponse call
+func ParseCreateSkillResponse(rsp *http.Response) (*CreateSkillResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateSkillResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest SkillEntry
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUnfavoriteSkillResponse parses an HTTP response from a UnfavoriteSkillWithResponse call
+func ParseUnfavoriteSkillResponse(rsp *http.Response) (*UnfavoriteSkillResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UnfavoriteSkillResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseFavoriteSkillResponse parses an HTTP response from a FavoriteSkillWithResponse call
+func ParseFavoriteSkillResponse(rsp *http.Response) (*FavoriteSkillResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &FavoriteSkillResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest Error
@@ -11786,12 +12919,30 @@ type ServerInterface interface {
 	// SetSandboxPortPreview Change a sandbox HTTP port visibility
 	// (PUT /v1/sandboxes/{sandboxID}/previews/{port})
 	SetSandboxPortPreview(w http.ResponseWriter, r *http.Request, sandboxID string, port int)
+	// GetSandboxSkills 读取沙箱 Skill 选择与同步状态
+	// (GET /v1/sandboxes/{sandboxID}/skills)
+	GetSandboxSkills(w http.ResponseWriter, r *http.Request, sandboxID openapi_types.UUID)
+	// SetSandboxSkills 保存完整 Skill 选择并同步；停止状态保留为 pending
+	// (PUT /v1/sandboxes/{sandboxID}/skills)
+	SetSandboxSkills(w http.ResponseWriter, r *http.Request, sandboxID openapi_types.UUID)
 	// StartSandbox Start a stopped sandbox
 	// (POST /v1/sandboxes/{sandboxID}/start)
 	StartSandbox(w http.ResponseWriter, r *http.Request, sandboxID string)
 	// StopSandbox Stop a running sandbox
 	// (POST /v1/sandboxes/{sandboxID}/stop)
 	StopSandbox(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// ListSkills 列出平台与本人私有 Skill
+	// (GET /v1/skills)
+	ListSkills(w http.ResponseWriter, r *http.Request)
+	// CreateSkill 制作个人 Skill（指令正文，自动收藏）
+	// (POST /v1/skills)
+	CreateSkill(w http.ResponseWriter, r *http.Request)
+	// UnfavoriteSkill 取消收藏（不自动移除沙箱中的 Skill）
+	// (DELETE /v1/skills/{skillID}/favorite)
+	UnfavoriteSkill(w http.ResponseWriter, r *http.Request, skillID openapi_types.UUID)
+	// FavoriteSkill 收藏 Skill
+	// (PUT /v1/skills/{skillID}/favorite)
+	FavoriteSkill(w http.ResponseWriter, r *http.Request, skillID openapi_types.UUID)
 	// ListSystemTemplates List platform default templates
 	// (GET /v1/system-templates)
 	ListSystemTemplates(w http.ResponseWriter, r *http.Request, params ListSystemTemplatesParams)
@@ -13087,6 +14238,58 @@ func (siw *ServerInterfaceWrapper) SetSandboxPortPreview(w http.ResponseWriter, 
 	handler.ServeHTTP(w, r)
 }
 
+// GetSandboxSkills operation middleware
+func (siw *ServerInterfaceWrapper) GetSandboxSkills(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetSandboxSkills(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SetSandboxSkills operation middleware
+func (siw *ServerInterfaceWrapper) SetSandboxSkills(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SetSandboxSkills(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // StartSandbox operation middleware
 func (siw *ServerInterfaceWrapper) StartSandbox(w http.ResponseWriter, r *http.Request) {
 
@@ -13130,6 +14333,86 @@ func (siw *ServerInterfaceWrapper) StopSandbox(w http.ResponseWriter, r *http.Re
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.StopSandbox(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSkills operation middleware
+func (siw *ServerInterfaceWrapper) ListSkills(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSkills(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateSkill operation middleware
+func (siw *ServerInterfaceWrapper) CreateSkill(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSkill(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnfavoriteSkill operation middleware
+func (siw *ServerInterfaceWrapper) UnfavoriteSkill(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "skillID" -------------
+	var skillID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "skillID", r.PathValue("skillID"), &skillID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "skillID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnfavoriteSkill(w, r, skillID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// FavoriteSkill operation middleware
+func (siw *ServerInterfaceWrapper) FavoriteSkill(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "skillID" -------------
+	var skillID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "skillID", r.PathValue("skillID"), &skillID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "skillID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.FavoriteSkill(w, r, skillID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -13648,6 +14931,12 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/skills", wrapper.ListSkills)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/skills", wrapper.CreateSkill)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/skills/{skillID}/favorite", wrapper.UnfavoriteSkill)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/skills/{skillID}/favorite", wrapper.FavoriteSkill)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/skills", wrapper.GetSandboxSkills)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/skills", wrapper.SetSandboxSkills)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/mcp/oauth/callback", wrapper.CompleteMCPOAuth)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/mcp/custom", wrapper.CreateCustomMCP)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/mcp/custom/{customID}", wrapper.DeleteCustomMCP)

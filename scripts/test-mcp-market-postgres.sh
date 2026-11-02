@@ -28,17 +28,23 @@ import os,pathlib,subprocess,sys
 root,work,port,binary=sys.argv[1:]
 password=(pathlib.Path(work)/'postgres.env').read_text().splitlines()[0].split('=',1)[1]
 env=dict(os.environ,ISODO_TEST_DATABASE_URL='postgres://postgres:'+password+'@127.0.0.1:'+port+'/isodo_mcp_market?sslmode=disable')
-args=[binary,'-test.run','^Test(PostgresMCPAccountOAuthBindingLifecycle|MCPRuntimeRolePermissions|PostgresCustomMCPIsolationAndRevocation)$','-test.v'] if binary else ['go','test','./internal/control/mcpmarket','-run','^Test(PostgresMCPAccountOAuthBindingLifecycle|MCPRuntimeRolePermissions|PostgresCustomMCPIsolationAndRevocation)$','-count=1','-v']
+args=[binary,'-test.run','^Test(PostgresMCPAccountOAuthBindingLifecycle|MCPRuntimeRolePermissions|PostgresCustomMCPIsolationAndRevocation|PostgresSkillAccountIsolationAndSync)$','-test.v'] if binary else ['go','test','./internal/control/mcpmarket','./internal/control/skillmarket','-run','^Test(PostgresMCPAccountOAuthBindingLifecycle|MCPRuntimeRolePermissions|PostgresCustomMCPIsolationAndRevocation|PostgresSkillAccountIsolationAndSync)$','-count=1','-v']
 with (pathlib.Path(work)/'test.log').open('w') as log:
- p=subprocess.run(args,cwd=root,env=env,stdout=log,stderr=subprocess.STDOUT)
+ p=subprocess.run(args,cwd=str(pathlib.Path(root)/"internal/control/mcpmarket") if binary else root,env=env,stdout=log,stderr=subprocess.STDOUT)
  print((pathlib.Path(work)/'test.log').read_text())
  if p.returncode:raise SystemExit(p.returncode)
+ if binary and os.environ.get('ISODO_SKILL_TEST_BINARY'):
+  result=subprocess.run([os.environ['ISODO_SKILL_TEST_BINARY'],'-test.run','^TestPostgresSkillAccountIsolationAndSync$','-test.v'],cwd=root,env=env,capture_output=True,text=True)
+  (pathlib.Path(work)/'skill-test.log').write_text(result.stdout+result.stderr)
+  print(result.stdout+result.stderr)
+  if result.returncode:raise SystemExit(result.returncode)
+
 PY
 # Verify the new migration is reversible on this disposable database.
 python3 - "$ROOT/migrations" "$WORK" <<'PY'
 import pathlib,sys
 migrations,work=map(pathlib.Path,sys.argv[1:])
-sources=[(migrations/name).read_text() for name in ['0016_mcp_market.sql','0017_custom_mcp.sql']]
+sources=[(migrations/name).read_text() for name in ['0016_mcp_market.sql','0017_custom_mcp.sql','0018_skill_market.sql']]
 (work/'down.sql').write_text('\n'.join(s.split('-- +goose Down')[1] for s in reversed(sources)))
 (work/'up.sql').write_text('\n'.join(s.split('-- +goose Up')[1].split('-- +goose Down')[0] for s in sources))
 PY

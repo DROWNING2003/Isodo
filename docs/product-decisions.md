@@ -113,3 +113,11 @@
 - 首先验收 remote Streamable HTTP + API Key/Header，复用 HTTP injection；OAuth 单独增加第三方授权、PKCE、令牌加密保存和刷新，不能用 Isodo 的登录 token 替代上游 token。
 - 需要密钥的 stdio MCP 不能通过将真实 Key 写入 Guest 环境变量实现既定 Secretless 目标；首版延后，后续考虑沙箱外的 MCP adapter。
 - 当前真实代理 + 本地 HTTPS MCP fixture 的握手、会话头、tools/list、tools/call、SSE 首事件、撤销后的新请求拒绝测试通过；不等同于第三方 OAuth、完整 Agent 客户端或 Guest 真机验证。
+
+## Skill 市场第一版（2026-11-02）
+
+- 全局 Skill 入口启用，提供市场、我的 Skill、搜索、详情和个人指令制作；不进行 GitHub 导入。
+- 收藏与沙箱启用分开，沙箱在工作台安全连接中选择并统一保存。取消收藏不自动改变已有沙箱选择。
+- 首版为不可变 v1 `SKILL.md` 指令文件，优先远程 CHV + Codex；不扩大 Agent 权限、不分发凭证、不执行安装脚本。
+- 新任务加载同步后的 Skill；移除不清除旧任务上下文。待同步与失败状态必须展示，停止期间的改动启动后显式重新保存。
+- 实现与当前验收边界见 [Skill 市场](skill-market.md)，上线需要匹配 API/Node 与数据库迁移，不因 UI 或组件测试通过就宣称真实 Agent 已验收。

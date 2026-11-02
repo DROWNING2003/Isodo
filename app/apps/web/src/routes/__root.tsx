@@ -216,12 +216,14 @@ function RootRouteView() {
             <SlowRpcRequestToastCoordinator />
             {!pathname.startsWith("/sandboxes") &&
             pathname !== "/settings/sandbox" &&
-            pathname !== "/mcp-market" ? (
+            pathname !== "/mcp-market" &&
+            pathname !== "/skill-market" ? (
               <HostedStaticEnvironmentBootstrap />
             ) : null}
             {!pathname.startsWith("/sandboxes") &&
             pathname !== "/settings/sandbox" &&
-            pathname !== "/mcp-market" ? (
+            pathname !== "/mcp-market" &&
+            pathname !== "/skill-market" ? (
               <SandboxEnvironmentSync />
             ) : null}
             {primaryEnvironmentAuthenticated ? (
