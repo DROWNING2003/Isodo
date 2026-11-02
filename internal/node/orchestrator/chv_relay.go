@@ -7,6 +7,7 @@ import (
 	"net"
 
 	nodev1 "github.com/DROWNING2003/Isodo/internal/api/node/v1"
+	"github.com/DROWNING2003/Isodo/internal/node/guesttransport"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -111,6 +112,27 @@ func (s *CHVServer) RelayPortConn(ctx context.Context, sandboxID string, generat
 	identity := instance.Identity()
 	if identity == nil || (generation != 0 && generation != identity.OwnershipGeneration) {
 		return nil, errRelayGeneration
+	}
+	// Only Control over Node mTLS may request a raw Guest gRPC stream.
+	// The execution API never exposes the raw relay to external callers.
+	if service == "guest-rpc" {
+		if port != 1024 || generation == 0 {
+			return nil, errRelayInvalid
+		}
+		s.mu.Lock()
+		record, found := s.journal.getSandbox(sandboxID)
+		busy := s.busy[sandboxID]
+		s.mu.Unlock()
+		if !found || busy || record.State != "running" {
+			return nil, errRelayNotFound
+		}
+		if record.Generation != identity.GetOwnershipGeneration() || record.BootID != identity.GetBootId() || record.GuestEpoch != identity.GetGuestEpoch() || identity.GetSandboxId() != sandboxID || record.BootID == "" || record.GuestEpoch == "" {
+			return nil, errRelayGeneration
+		}
+		return guesttransport.DialVsock(ctx, instance.VsockSocket())
+	}
+	if service != "t3" {
+		return nil, errRelayInvalid
 	}
 	return s.dialGuestPort(ctx, instance.VsockSocket(), identity, port)
 }
