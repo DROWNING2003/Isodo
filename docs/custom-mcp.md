@@ -52,4 +52,4 @@ Guest Codex
 
 真实 PostgreSQL 测试覆盖加密、账号隔离、会话限制、工具调用、未知工具/旧 generation 拒绝、停止准入、删除及在途撤销；其中上游和 Node 是 fixture，不能称为 CHV E2E。组件测试覆盖多 MCP 配置保留、非法 ID 和 symlink 拒绝。前端覆盖搜索/管理接线、自定义认证表单、账号切换、全局与工作台入口隔离。
 
-真实公网服务、CHV 与 Codex 的执行证据在部署验收记录中补充；没有执行的项目不标为成功。Bearer Token 的第三方真实验收需要目标服务提供的测试凭证；本轮不能用合成 fixture 冒充。
+真实公网服务、CHV 与 Codex 已按 [部署验收记录](validation/custom-mcp-web-chv-20261102.md) 完成无认证服务调用及解绑 403 验证；新沙箱仍需首次工作台连接初始化出站桥，纯 API 冷启动链路尚未完成验收。Bearer Token 的第三方真实验收需要目标服务提供的测试凭证；本轮不能用合成 fixture 冒充。
