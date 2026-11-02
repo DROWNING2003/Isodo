@@ -24,6 +24,7 @@ const SCOPE_LABELS: Record<ApiKeyScope, string> = {
   "sandboxes:read": "沙箱读取",
   "sandboxes:write": "沙箱管理",
   "sandboxes:execute": "命令执行",
+  "sandboxes:preview": "端口预览",
   "templates:read": "模板读取",
   "templates:write": "模板管理",
 };
@@ -142,6 +143,7 @@ export function ApiKeysPage() {
   const [name, setName] = useState("");
   const [expiresInDays, setExpiresInDays] = useState("30");
   const [allowExecution, setAllowExecution] = useState(false);
+  const [allowPreview, setAllowPreview] = useState(false);
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -175,8 +177,14 @@ export function ApiKeysPage() {
     setError(null);
     setCreating(true);
     try {
-      const scopes: ApiKeyScope[] = ["sandboxes:read", "sandboxes:write", "templates:read", "templates:write"];
+      const scopes: ApiKeyScope[] = [
+        "sandboxes:read",
+        "sandboxes:write",
+        "templates:read",
+        "templates:write",
+      ];
       if (allowExecution) scopes.push("sandboxes:execute");
+      if (allowPreview) scopes.push("sandboxes:preview");
       const { api_key, ...created } = await apiKeys.create({
         name,
         scopes,
@@ -190,6 +198,7 @@ export function ApiKeysPage() {
       setCopied(false);
       setName("");
       setAllowExecution(false);
+      setAllowPreview(false);
       setShowCreateForm(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "创建密钥失败");
@@ -325,7 +334,22 @@ export function ApiKeysPage() {
                 <span>
                   <span className="block font-medium">允许执行沙箱内命令</span>
                   <span className="block text-xs text-muted-foreground">
-                    额外授予 sandboxes:execute 权限，允许凭此密钥在所属沙箱内执行任意程序；默认关闭。
+                    额外授予 sandboxes:execute
+                    权限，允许凭此密钥在所属沙箱内执行任意程序；默认关闭。
+                  </span>
+                </span>
+              </label>
+              <label className="flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 rounded border-input"
+                  checked={allowPreview}
+                  onChange={(event) => setAllowPreview(event.target.checked)}
+                />
+                <span>
+                  <span className="block font-medium">允许预览沙箱 HTTP 端口</span>
+                  <span className="block text-xs text-muted-foreground">
+                    额外授予 sandboxes:preview 权限，可访问沙箱内 Web 服务；默认关闭。
                   </span>
                 </span>
               </label>

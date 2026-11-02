@@ -9,6 +9,7 @@ import (
 
 	nodev1 "github.com/DROWNING2003/Isodo/internal/api/node/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/test/bufconn"
 )
 
@@ -62,5 +63,25 @@ func TestRelayPortStreamsGuestData(t *testing.T) {
 	}
 	if fake.open == nil || fake.open.GetPort() != 8080 || fake.open.GetSandboxId() != "f323e70d-cd11-4a02-a245-6b4ed2ce1e31" {
 		t.Fatalf("open = %+v", fake.open)
+	}
+}
+
+func TestHTTPRelayRejectsUnfencedLegacyNode(t *testing.T) {
+	listener := bufconn.Listen(1 << 20)
+	server := grpc.NewServer()
+	nodev1.RegisterNodeOrchestratorServer(server, &relayTestServer{})
+	go func() { _ = server.Serve(listener) }()
+	defer server.Stop()
+	connection, err := grpc.NewClient("passthrough:///legacy", grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) { return listener.DialContext(ctx) }), grpc.WithTransportCredentials(insecure.NewCredentials()))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer connection.Close()
+	client := &Client{service: nodev1.NewNodeOrchestratorClient(connection)}
+	ctx, cancel := context.WithTimeout(t.Context(), time.Second)
+	defer cancel()
+	conn, err := client.RelayHTTPPort(ctx, &nodev1.RelayOpen{SandboxId: "f323e70d-cd11-4a02-a245-6b4ed2ce1e31", OwnershipGeneration: 7, Revision: 11, BootId: "boot", GuestEpoch: "epoch", Port: 3000, Service: "http-port"})
+	if err == nil || conn != nil {
+		t.Fatal("legacy Node data accepted without a fencing acknowledgement")
 	}
 }

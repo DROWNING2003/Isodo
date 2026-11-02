@@ -214,6 +214,7 @@ components:
       - sandboxes:read
       - sandboxes:write
       - sandboxes:execute
+      - sandboxes:preview
       - templates:read
       - templates:write
       x-go-type: string

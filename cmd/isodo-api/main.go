@@ -110,6 +110,10 @@ func run(logger *slog.Logger) error {
 	}
 	if publisher != nil {
 		sandboxHandler.SetAppLinkPublisher(publisher)
+		if nodeClient != nil && relay != nil {
+			sandboxHandler.SetHTTPPreview(publisher, nodeClient)
+			publisher.ConfigureHTTP(sandboxHandler.AuthorizeHTTPPreview, nodeClient)
+		}
 	}
 	injectionKey, err := injection.LoadKey(os.Getenv("ISODO_INJECTION_KEY"), envOr("ISODO_INJECTION_KEY_FILE", "./certs/injection.key"))
 	if err != nil {

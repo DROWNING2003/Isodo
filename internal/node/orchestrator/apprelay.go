@@ -182,7 +182,8 @@ func (c *portForwardConn) CloseWrite() error {
 
 func (c *portForwardConn) Close() error {
 	c.closed.Do(func() {
-		_ = c.stream.Send(&guestv1.PortForwardFrame{Frame: &guestv1.PortForwardFrame_End{End: &guestv1.PortForwardEnd{Write: true}}})
+		// Cancellation also interrupts a blocked Send; Close must not send
+		// concurrently with the relay writer or wait for the Guest to read.
 		if c.cancel != nil {
 			c.cancel()
 		}

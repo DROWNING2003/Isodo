@@ -501,6 +501,42 @@ paths:
           required: true
           schema:
             type: string
+  /v1/sandboxes/{sandboxID}/previews:
+    parameters:
+      - {name: sandboxID, in: path, required: true, schema: {type: string}}
+    post:
+      operationId: CreateSandboxPreview
+      summary: Authorize a sandbox HTTP port preview
+      description: Requires a running remote CHV sandbox and sandboxes:preview for API keys. Returns a five-minute bearer capability bound to the account, port and current Guest runtime. Open authorization_url in a browser to exchange its fragment for a host-only cookie. Stop, Start, Delete or reassignment invalidates it. Ports 1024 and 8080 are reserved. The URL alone grants no access.
+      tags: [Previews]
+      security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [port]
+              additionalProperties: false
+              properties:
+                port: {type: integer, minimum: 1, maximum: 65535}
+      responses:
+        "201":
+          description: A short-lived preview authorization link. Treat authorization_url as a secret.
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [url, authorization_url, expires_at]
+                properties:
+                  url: {type: string, format: uri}
+                  authorization_url: {type: string, format: uri}
+                  expires_at: {type: string, format: date-time}
+        default:
+          description: Authentication, port validation or runtime error.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
   /v1/sandboxes/{sandboxID}/commands/run:
     parameters:
       - {name: sandboxID, in: path, required: true, schema: {type: string}}

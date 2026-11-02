@@ -590,6 +590,20 @@ limit?: number;
 offset?: number;
 };
 
+export type CreateSandboxPreviewBody = {
+  /**
+     * @minimum 1
+     * @maximum 65535
+     */
+  port: number;
+};
+
+export type CreateSandboxPreview201 = {
+  url: string;
+  authorization_url: string;
+  expires_at: string;
+};
+
 export type ListSystemTemplatesParams = {
 /**
  * @minimum 1
@@ -1150,6 +1164,46 @@ export const createSandboxAppLink = async (sandboxID: string, options?: Paramete
     method: 'POST'
 
 
+  }
+);}
+
+
+
+export const getCreateSandboxPreviewUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}/previews`
+}
+
+/**
+ * Requires a running remote CHV sandbox and sandboxes:preview for API keys. Returns a five-minute bearer capability bound to the account, port and current Guest runtime. Open authorization_url in a browser to exchange its fragment for a host-only cookie. Stop, Start, Delete or reassignment invalidates it. Ports 1024 and 8080 are reserved. The URL alone grants no access.
+ * @summary Authorize a sandbox HTTP port preview
+ */
+export const createSandboxPreview = async (sandboxID: string,
+    createSandboxPreviewBody: CreateSandboxPreviewBody, options?: Parameters<typeof isodoFetch>[1]): Promise<CreateSandboxPreview201> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return isodoFetch<CreateSandboxPreview201>(getCreateSandboxPreviewUrl(sandboxID),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(createSandboxPreviewBody)
   }
 );}
 
