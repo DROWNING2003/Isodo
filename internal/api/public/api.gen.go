@@ -57,6 +57,27 @@ func (e CustomMCPCreateAuthKind) Valid() bool {
 	}
 }
 
+// Defines values for FileMetadataKind.
+const (
+	Directory FileMetadataKind = "directory"
+	Regular   FileMetadataKind = "regular"
+	Symlink   FileMetadataKind = "symlink"
+)
+
+// Valid indicates whether the value is a known member of the FileMetadataKind enum.
+func (e FileMetadataKind) Valid() bool {
+	switch e {
+	case Directory:
+		return true
+	case Regular:
+		return true
+	case Symlink:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ForkTemplateVisibility.
 const (
 	ForkTemplateVisibilityPrivate ForkTemplateVisibility = "private"
@@ -739,6 +760,32 @@ type Error struct {
 	} `json:"error"`
 }
 
+// FileDirectoryPage defines model for FileDirectoryPage.
+type FileDirectoryPage struct {
+	Entries []FileMetadata `json:"entries"`
+
+	// NextPageToken Empty when there are no more entries
+	NextPageToken string `json:"next_page_token"`
+}
+
+// FileMetadata defines model for FileMetadata.
+type FileMetadata struct {
+	Kind FileMetadataKind `json:"kind"`
+
+	// Mode Unix permission bits as a decimal integer
+	Mode       int       `json:"mode"`
+	ModifiedAt time.Time `json:"modified_at"`
+	Name       string    `json:"name"`
+	Path       string    `json:"path"`
+	SizeBytes  int64     `json:"size_bytes"`
+
+	// SymlinkTarget Raw symlink metadata only; never followed outside workspace
+	SymlinkTarget *string `json:"symlink_target,omitempty"`
+}
+
+// FileMetadataKind defines model for FileMetadata.Kind.
+type FileMetadataKind string
+
 // FileWriteResult defines model for FileWriteResult.
 type FileWriteResult struct {
 	Bytes  int64  `json:"bytes"`
@@ -1184,10 +1231,25 @@ type RunSandboxCommandParams struct {
 	IdempotencyKey string `json:"Idempotency-Key"`
 }
 
+// ListSandboxDirectoryParams defines parameters for ListSandboxDirectory.
+type ListSandboxDirectoryParams struct {
+	Path      string  `form:"path" json:"path"`
+	PageSize  *int    `form:"page_size,omitempty" json:"page_size,omitempty"`
+	PageToken *string `form:"page_token,omitempty" json:"page_token,omitempty"`
+}
+
 // MakeSandboxDirectoryJSONBody defines parameters for MakeSandboxDirectory.
 type MakeSandboxDirectoryJSONBody struct {
 	Parents *bool  `json:"parents,omitempty"`
 	Path    string `json:"path"`
+}
+
+// RemoveSandboxFileParams defines parameters for RemoveSandboxFile.
+type RemoveSandboxFileParams struct {
+	Recursive *bool `form:"recursive,omitempty" json:"recursive,omitempty"`
+
+	// Path Canonical absolute path under /workspace
+	Path string `form:"path" json:"path"`
 }
 
 // DownloadSandboxFileParams defines parameters for DownloadSandboxFile.
@@ -1205,6 +1267,19 @@ type UploadSandboxFileMultipartBody struct {
 type UploadSandboxFileParams struct {
 	Overwrite *bool `form:"overwrite,omitempty" json:"overwrite,omitempty"`
 
+	// Path Canonical absolute path under /workspace
+	Path string `form:"path" json:"path"`
+}
+
+// MoveSandboxFileJSONBody defines parameters for MoveSandboxFile.
+type MoveSandboxFileJSONBody struct {
+	Destination string `json:"destination"`
+	Overwrite   *bool  `json:"overwrite,omitempty"`
+	Source      string `json:"source"`
+}
+
+// StatSandboxFileParams defines parameters for StatSandboxFile.
+type StatSandboxFileParams struct {
 	// Path Canonical absolute path under /workspace
 	Path string `form:"path" json:"path"`
 }
@@ -1264,6 +1339,9 @@ type MakeSandboxDirectoryJSONRequestBody MakeSandboxDirectoryJSONBody
 
 // UploadSandboxFileMultipartRequestBody defines body for UploadSandboxFile for multipart/form-data ContentType.
 type UploadSandboxFileMultipartRequestBody UploadSandboxFileMultipartBody
+
+// MoveSandboxFileJSONRequestBody defines body for MoveSandboxFile for application/json ContentType.
+type MoveSandboxFileJSONRequestBody MoveSandboxFileJSONBody
 
 // SetSandboxInjectionsJSONRequestBody defines body for SetSandboxInjections for application/json ContentType.
 type SetSandboxInjectionsJSONRequestBody SetSandboxInjectionsJSONBody
@@ -1633,6 +1711,13 @@ type ClientInterface interface {
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/commands/run (the `RunSandboxCommand` operationId).
 	RunSandboxCommand(ctx context.Context, sandboxID string, params *RunSandboxCommandParams, body RunSandboxCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListSandboxDirectory List a workspace directory
+	//
+	// Lexical name order. page_size defaults to 100 and is limited to 500. Pass next_page_token unchanged to page_token; tokens are name cursors, not a consistent snapshot across concurrent mutations. A directory is limited to 4096 entries. Symlink metadata is returned without following the final symlink.
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/directories (the `ListSandboxDirectory` operationId).
+	ListSandboxDirectory(ctx context.Context, sandboxID string, params *ListSandboxDirectoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// MakeSandboxDirectoryWithBody Create a workspace directory
 	//
 	// Takes any type of body and a specified content type.
@@ -1646,6 +1731,13 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
 	MakeSandboxDirectory(ctx context.Context, sandboxID string, body MakeSandboxDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// RemoveSandboxFile Remove a workspace file or directory
+	//
+	// Idempotent for missing paths. Removes symlinks themselves. Empty directories require no recursive flag; nonempty directories require recursive=true and are limited to 4096 entries. Workspace root and runtime-owned paths are forbidden. Mutations reject symlink parents.
+	//
+	// Corresponds with DELETE /v1/sandboxes/{sandboxID}/files (the `RemoveSandboxFile` operationId).
+	RemoveSandboxFile(ctx context.Context, sandboxID string, params *RemoveSandboxFileParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// DownloadSandboxFile Download a verified binary file
 	//
@@ -1662,6 +1754,31 @@ type ClientInterface interface {
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/files (the `UploadSandboxFile` operationId).
 	UploadSandboxFileWithBody(ctx context.Context, sandboxID string, params *UploadSandboxFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MoveSandboxFileWithBody Move a workspace file or directory
+	//
+	// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/files/move (the `MoveSandboxFile` operationId).
+	MoveSandboxFileWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// MoveSandboxFile Move a workspace file or directory
+	//
+	// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/files/move (the `MoveSandboxFile` operationId).
+	MoveSandboxFile(ctx context.Context, sandboxID string, body MoveSandboxFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StatSandboxFile Inspect workspace path metadata
+	//
+	// Returns lstat metadata, including symlink_target for a final symlink, without following it. Workspace root is allowed; paths outside workspace are rejected.
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/files/stat (the `StatSandboxFile` operationId).
+	StatSandboxFile(ctx context.Context, sandboxID string, params *StatSandboxFileParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// GetSandboxInjections Read masked host-side injection configuration
 	//
@@ -2565,6 +2682,23 @@ func (c *Client) RunSandboxCommand(ctx context.Context, sandboxID string, params
 	return c.Client.Do(req)
 }
 
+// ListSandboxDirectory List a workspace directory
+//
+// Lexical name order. page_size defaults to 100 and is limited to 500. Pass next_page_token unchanged to page_token; tokens are name cursors, not a consistent snapshot across concurrent mutations. A directory is limited to 4096 entries. Symlink metadata is returned without following the final symlink.
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/directories (the `ListSandboxDirectory` operationId).
+func (c *Client) ListSandboxDirectory(ctx context.Context, sandboxID string, params *ListSandboxDirectoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSandboxDirectoryRequest(c.Server, sandboxID, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // MakeSandboxDirectoryWithBody Create a workspace directory
 //
 // Takes any type of body and a specified content type.
@@ -2589,6 +2723,23 @@ func (c *Client) MakeSandboxDirectoryWithBody(ctx context.Context, sandboxID str
 // Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
 func (c *Client) MakeSandboxDirectory(ctx context.Context, sandboxID string, body MakeSandboxDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewMakeSandboxDirectoryRequest(c.Server, sandboxID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// RemoveSandboxFile Remove a workspace file or directory
+//
+// Idempotent for missing paths. Removes symlinks themselves. Empty directories require no recursive flag; nonempty directories require recursive=true and are limited to 4096 entries. Workspace root and runtime-owned paths are forbidden. Mutations reject symlink parents.
+//
+// Corresponds with DELETE /v1/sandboxes/{sandboxID}/files (the `RemoveSandboxFile` operationId).
+func (c *Client) RemoveSandboxFile(ctx context.Context, sandboxID string, params *RemoveSandboxFileParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewRemoveSandboxFileRequest(c.Server, sandboxID, params)
 	if err != nil {
 		return nil, err
 	}
@@ -2625,6 +2776,61 @@ func (c *Client) DownloadSandboxFile(ctx context.Context, sandboxID string, para
 // Corresponds with POST /v1/sandboxes/{sandboxID}/files (the `UploadSandboxFile` operationId).
 func (c *Client) UploadSandboxFileWithBody(ctx context.Context, sandboxID string, params *UploadSandboxFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewUploadSandboxFileRequestWithBody(c.Server, sandboxID, params, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// MoveSandboxFileWithBody Move a workspace file or directory
+//
+// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/files/move (the `MoveSandboxFile` operationId).
+func (c *Client) MoveSandboxFileWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMoveSandboxFileRequestWithBody(c.Server, sandboxID, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// MoveSandboxFile Move a workspace file or directory
+//
+// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/files/move (the `MoveSandboxFile` operationId).
+func (c *Client) MoveSandboxFile(ctx context.Context, sandboxID string, body MoveSandboxFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewMoveSandboxFileRequest(c.Server, sandboxID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StatSandboxFile Inspect workspace path metadata
+//
+// Returns lstat metadata, including symlink_target for a final symlink, without following it. Workspace root is allowed; paths outside workspace are rejected.
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/files/stat (the `StatSandboxFile` operationId).
+func (c *Client) StatSandboxFile(ctx context.Context, sandboxID string, params *StatSandboxFileParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStatSandboxFileRequest(c.Server, sandboxID, params)
 	if err != nil {
 		return nil, err
 	}
@@ -4496,6 +4702,87 @@ func NewRunSandboxCommandRequestWithBody(server string, sandboxID string, params
 	return req, nil
 }
 
+// NewListSandboxDirectoryRequest constructs an http.Request for the ListSandboxDirectory method
+func NewListSandboxDirectoryRequest(server string, sandboxID string, params *ListSandboxDirectoryParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/directories", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.PageSize != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page_size", *params.PageSize, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "integer", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.PageToken != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "page_token", *params.PageToken, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewMakeSandboxDirectoryRequest calls the generic MakeSandboxDirectory builder with application/json body
 func NewMakeSandboxDirectoryRequest(server string, sandboxID string, body MakeSandboxDirectoryJSONRequestBody) (*http.Request, error) {
 	var bodyReader io.Reader
@@ -4539,6 +4826,75 @@ func NewMakeSandboxDirectoryRequestWithBody(server string, sandboxID string, con
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewRemoveSandboxFileRequest constructs an http.Request for the RemoveSandboxFile method
+func NewRemoveSandboxFileRequest(server string, sandboxID string, params *RemoveSandboxFileParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/files", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if params.Recursive != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "recursive", *params.Recursive, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "boolean", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -4667,6 +5023,110 @@ func NewUploadSandboxFileRequestWithBody(server string, sandboxID string, params
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewMoveSandboxFileRequest calls the generic MoveSandboxFile builder with application/json body
+func NewMoveSandboxFileRequest(server string, sandboxID string, body MoveSandboxFileJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewMoveSandboxFileRequestWithBody(server, sandboxID, "application/json", bodyReader)
+}
+
+// NewMoveSandboxFileRequestWithBody constructs an http.Request for the MoveSandboxFile method, with any body, and a specified content type
+func NewMoveSandboxFileRequestWithBody(server string, sandboxID string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/files/move", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewStatSandboxFileRequest constructs an http.Request for the StatSandboxFile method
+func NewStatSandboxFileRequest(server string, sandboxID string, params *StatSandboxFileParams) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/files/stat", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "path", params.Path, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -6261,6 +6721,15 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/commands/run (the `RunSandboxCommand` operationId).
 	RunSandboxCommandWithResponse(ctx context.Context, sandboxID string, params *RunSandboxCommandParams, body RunSandboxCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*RunSandboxCommandResponse, error)
 
+	// ListSandboxDirectoryWithResponse List a workspace directory
+	//
+	// Lexical name order. page_size defaults to 100 and is limited to 500. Pass next_page_token unchanged to page_token; tokens are name cursors, not a consistent snapshot across concurrent mutations. A directory is limited to 4096 entries. Symlink metadata is returned without following the final symlink.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/directories (the `ListSandboxDirectory` operationId).
+	ListSandboxDirectoryWithResponse(ctx context.Context, sandboxID string, params *ListSandboxDirectoryParams, reqEditors ...RequestEditorFn) (*ListSandboxDirectoryResponse, error)
+
 	// MakeSandboxDirectoryWithBodyWithResponse Create a workspace directory
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -6274,6 +6743,15 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
 	MakeSandboxDirectoryWithResponse(ctx context.Context, sandboxID string, body MakeSandboxDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*MakeSandboxDirectoryResponse, error)
+
+	// RemoveSandboxFileWithResponse Remove a workspace file or directory
+	//
+	// Idempotent for missing paths. Removes symlinks themselves. Empty directories require no recursive flag; nonempty directories require recursive=true and are limited to 4096 entries. Workspace root and runtime-owned paths are forbidden. Mutations reject symlink parents.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/sandboxes/{sandboxID}/files (the `RemoveSandboxFile` operationId).
+	RemoveSandboxFileWithResponse(ctx context.Context, sandboxID string, params *RemoveSandboxFileParams, reqEditors ...RequestEditorFn) (*RemoveSandboxFileResponse, error)
 
 	// DownloadSandboxFileWithResponse Download a verified binary file
 	//
@@ -6292,6 +6770,33 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/files (the `UploadSandboxFile` operationId).
 	UploadSandboxFileWithBodyWithResponse(ctx context.Context, sandboxID string, params *UploadSandboxFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSandboxFileResponse, error)
+
+	// MoveSandboxFileWithBodyWithResponse Move a workspace file or directory
+	//
+	// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/files/move (the `MoveSandboxFile` operationId).
+	MoveSandboxFileWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MoveSandboxFileResponse, error)
+
+	// MoveSandboxFileWithResponse Move a workspace file or directory
+	//
+	// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/files/move (the `MoveSandboxFile` operationId).
+	MoveSandboxFileWithResponse(ctx context.Context, sandboxID string, body MoveSandboxFileJSONRequestBody, reqEditors ...RequestEditorFn) (*MoveSandboxFileResponse, error)
+
+	// StatSandboxFileWithResponse Inspect workspace path metadata
+	//
+	// Returns lstat metadata, including symlink_target for a final symlink, without following it. Workspace root is allowed; paths outside workspace are rejected.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/files/stat (the `StatSandboxFile` operationId).
+	StatSandboxFileWithResponse(ctx context.Context, sandboxID string, params *StatSandboxFileParams, reqEditors ...RequestEditorFn) (*StatSandboxFileResponse, error)
 
 	// GetSandboxInjectionsWithResponse Read masked host-side injection configuration
 	//
@@ -8023,6 +8528,54 @@ func (r RunSandboxCommandResponse) ContentType() string {
 	return ""
 }
 
+type ListSandboxDirectoryResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FileDirectoryPage
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSandboxDirectoryResponse) GetJSON200() *FileDirectoryPage {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListSandboxDirectoryResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSandboxDirectoryResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSandboxDirectoryResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSandboxDirectoryResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSandboxDirectoryResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type MakeSandboxDirectoryResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -8069,6 +8622,47 @@ func (r MakeSandboxDirectoryResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r MakeSandboxDirectoryResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type RemoveSandboxFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r RemoveSandboxFileResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r RemoveSandboxFileResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r RemoveSandboxFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r RemoveSandboxFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r RemoveSandboxFileResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -8165,6 +8759,102 @@ func (r UploadSandboxFileResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r UploadSandboxFileResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type MoveSandboxFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FileMetadata
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r MoveSandboxFileResponse) GetJSON200() *FileMetadata {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r MoveSandboxFileResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r MoveSandboxFileResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r MoveSandboxFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r MoveSandboxFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r MoveSandboxFileResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type StatSandboxFileResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *FileMetadata
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r StatSandboxFileResponse) GetJSON200() *FileMetadata {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r StatSandboxFileResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r StatSandboxFileResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StatSandboxFileResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StatSandboxFileResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StatSandboxFileResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -10113,6 +10803,21 @@ func (c *ClientWithResponses) RunSandboxCommandWithResponse(ctx context.Context,
 	return ParseRunSandboxCommandResponse(rsp)
 }
 
+// ListSandboxDirectoryWithResponse List a workspace directory
+//
+// Lexical name order. page_size defaults to 100 and is limited to 500. Pass next_page_token unchanged to page_token; tokens are name cursors, not a consistent snapshot across concurrent mutations. A directory is limited to 4096 entries. Symlink metadata is returned without following the final symlink.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/directories (the `ListSandboxDirectory` operationId).
+func (c *ClientWithResponses) ListSandboxDirectoryWithResponse(ctx context.Context, sandboxID string, params *ListSandboxDirectoryParams, reqEditors ...RequestEditorFn) (*ListSandboxDirectoryResponse, error) {
+	rsp, err := c.ListSandboxDirectory(ctx, sandboxID, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSandboxDirectoryResponse(rsp)
+}
+
 // MakeSandboxDirectoryWithBodyWithResponse Create a workspace directory
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
@@ -10137,6 +10842,21 @@ func (c *ClientWithResponses) MakeSandboxDirectoryWithResponse(ctx context.Conte
 		return nil, err
 	}
 	return ParseMakeSandboxDirectoryResponse(rsp)
+}
+
+// RemoveSandboxFileWithResponse Remove a workspace file or directory
+//
+// Idempotent for missing paths. Removes symlinks themselves. Empty directories require no recursive flag; nonempty directories require recursive=true and are limited to 4096 entries. Workspace root and runtime-owned paths are forbidden. Mutations reject symlink parents.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/sandboxes/{sandboxID}/files (the `RemoveSandboxFile` operationId).
+func (c *ClientWithResponses) RemoveSandboxFileWithResponse(ctx context.Context, sandboxID string, params *RemoveSandboxFileParams, reqEditors ...RequestEditorFn) (*RemoveSandboxFileResponse, error) {
+	rsp, err := c.RemoveSandboxFile(ctx, sandboxID, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseRemoveSandboxFileResponse(rsp)
 }
 
 // DownloadSandboxFileWithResponse Download a verified binary file
@@ -10167,6 +10887,51 @@ func (c *ClientWithResponses) UploadSandboxFileWithBodyWithResponse(ctx context.
 		return nil, err
 	}
 	return ParseUploadSandboxFileResponse(rsp)
+}
+
+// MoveSandboxFileWithBodyWithResponse Move a workspace file or directory
+//
+// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/files/move (the `MoveSandboxFile` operationId).
+func (c *ClientWithResponses) MoveSandboxFileWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MoveSandboxFileResponse, error) {
+	rsp, err := c.MoveSandboxFileWithBody(ctx, sandboxID, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMoveSandboxFileResponse(rsp)
+}
+
+// MoveSandboxFileWithResponse Move a workspace file or directory
+//
+// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/files/move (the `MoveSandboxFile` operationId).
+func (c *ClientWithResponses) MoveSandboxFileWithResponse(ctx context.Context, sandboxID string, body MoveSandboxFileJSONRequestBody, reqEditors ...RequestEditorFn) (*MoveSandboxFileResponse, error) {
+	rsp, err := c.MoveSandboxFile(ctx, sandboxID, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseMoveSandboxFileResponse(rsp)
+}
+
+// StatSandboxFileWithResponse Inspect workspace path metadata
+//
+// Returns lstat metadata, including symlink_target for a final symlink, without following it. Workspace root is allowed; paths outside workspace are rejected.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/files/stat (the `StatSandboxFile` operationId).
+func (c *ClientWithResponses) StatSandboxFileWithResponse(ctx context.Context, sandboxID string, params *StatSandboxFileParams, reqEditors ...RequestEditorFn) (*StatSandboxFileResponse, error) {
+	rsp, err := c.StatSandboxFile(ctx, sandboxID, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStatSandboxFileResponse(rsp)
 }
 
 // GetSandboxInjectionsWithResponse Read masked host-side injection configuration
@@ -11707,6 +12472,39 @@ func ParseRunSandboxCommandResponse(rsp *http.Response) (*RunSandboxCommandRespo
 	return response, nil
 }
 
+// ParseListSandboxDirectoryResponse parses an HTTP response from a ListSandboxDirectoryWithResponse call
+func ParseListSandboxDirectoryResponse(rsp *http.Response) (*ListSandboxDirectoryResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSandboxDirectoryResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FileDirectoryPage
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseMakeSandboxDirectoryResponse parses an HTTP response from a MakeSandboxDirectoryWithResponse call
 func ParseMakeSandboxDirectoryResponse(rsp *http.Response) (*MakeSandboxDirectoryResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -11729,6 +12527,35 @@ func ParseMakeSandboxDirectoryResponse(rsp *http.Response) (*MakeSandboxDirector
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseRemoveSandboxFileResponse parses an HTTP response from a RemoveSandboxFileWithResponse call
+func ParseRemoveSandboxFileResponse(rsp *http.Response) (*RemoveSandboxFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &RemoveSandboxFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest Error
@@ -11797,6 +12624,72 @@ func ParseUploadSandboxFileResponse(rsp *http.Response) (*UploadSandboxFileRespo
 	switch {
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
 		var dest FileWriteResult
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseMoveSandboxFileResponse parses an HTTP response from a MoveSandboxFileWithResponse call
+func ParseMoveSandboxFileResponse(rsp *http.Response) (*MoveSandboxFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &MoveSandboxFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FileMetadata
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseStatSandboxFileResponse parses an HTTP response from a StatSandboxFileWithResponse call
+func ParseStatSandboxFileResponse(rsp *http.Response) (*StatSandboxFileResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StatSandboxFileResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest FileMetadata
 		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
 			return nil, err
 		}
@@ -12883,15 +13776,27 @@ type ServerInterface interface {
 	// RunSandboxCommand Run a bounded non-interactive command inside a sandbox Guest
 	// (POST /v1/sandboxes/{sandboxID}/commands/run)
 	RunSandboxCommand(w http.ResponseWriter, r *http.Request, sandboxID string, params RunSandboxCommandParams)
+	// ListSandboxDirectory List a workspace directory
+	// (GET /v1/sandboxes/{sandboxID}/directories)
+	ListSandboxDirectory(w http.ResponseWriter, r *http.Request, sandboxID string, params ListSandboxDirectoryParams)
 	// MakeSandboxDirectory Create a workspace directory
 	// (POST /v1/sandboxes/{sandboxID}/directories)
 	MakeSandboxDirectory(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// RemoveSandboxFile Remove a workspace file or directory
+	// (DELETE /v1/sandboxes/{sandboxID}/files)
+	RemoveSandboxFile(w http.ResponseWriter, r *http.Request, sandboxID string, params RemoveSandboxFileParams)
 	// DownloadSandboxFile Download a verified binary file
 	// (GET /v1/sandboxes/{sandboxID}/files)
 	DownloadSandboxFile(w http.ResponseWriter, r *http.Request, sandboxID string, params DownloadSandboxFileParams)
 	// UploadSandboxFile Upload and atomically commit one file
 	// (POST /v1/sandboxes/{sandboxID}/files)
 	UploadSandboxFile(w http.ResponseWriter, r *http.Request, sandboxID string, params UploadSandboxFileParams)
+	// MoveSandboxFile Move a workspace file or directory
+	// (POST /v1/sandboxes/{sandboxID}/files/move)
+	MoveSandboxFile(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// StatSandboxFile Inspect workspace path metadata
+	// (GET /v1/sandboxes/{sandboxID}/files/stat)
+	StatSandboxFile(w http.ResponseWriter, r *http.Request, sandboxID string, params StatSandboxFileParams)
 	// GetSandboxInjections Read masked host-side injection configuration
 	// (GET /v1/sandboxes/{sandboxID}/injections)
 	GetSandboxInjections(w http.ResponseWriter, r *http.Request, sandboxID string)
@@ -13836,6 +14741,74 @@ func (siw *ServerInterfaceWrapper) RunSandboxCommand(w http.ResponseWriter, r *h
 	handler.ServeHTTP(w, r)
 }
 
+// ListSandboxDirectory operation middleware
+func (siw *ServerInterfaceWrapper) ListSandboxDirectory(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListSandboxDirectoryParams
+
+	// ------------- Required query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_size" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_size", r.URL.Query(), &params.PageSize, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_size"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_size", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "page_token" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "page_token", r.URL.Query(), &params.PageToken, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "page_token"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "page_token", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSandboxDirectory(w, r, sandboxID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // MakeSandboxDirectory operation middleware
 func (siw *ServerInterfaceWrapper) MakeSandboxDirectory(w http.ResponseWriter, r *http.Request) {
 
@@ -13853,6 +14826,61 @@ func (siw *ServerInterfaceWrapper) MakeSandboxDirectory(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.MakeSandboxDirectory(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RemoveSandboxFile operation middleware
+func (siw *ServerInterfaceWrapper) RemoveSandboxFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RemoveSandboxFileParams
+
+	// ------------- Optional query parameter "recursive" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "recursive", r.URL.Query(), &params.Recursive, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "recursive"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "recursive", Err: err})
+		}
+		return
+	}
+
+	// ------------- Required query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RemoveSandboxFile(w, r, sandboxID, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -13950,6 +14978,74 @@ func (siw *ServerInterfaceWrapper) UploadSandboxFile(w http.ResponseWriter, r *h
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.UploadSandboxFile(w, r, sandboxID, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// MoveSandboxFile operation middleware
+func (siw *ServerInterfaceWrapper) MoveSandboxFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.MoveSandboxFile(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StatSandboxFile operation middleware
+func (siw *ServerInterfaceWrapper) StatSandboxFile(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params StatSandboxFileParams
+
+	// ------------- Required query parameter "path" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "path", r.URL.Query(), &params.Path, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "path"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "path", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StatSandboxFile(w, r, sandboxID, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -14955,9 +16051,13 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/mcp/{marketID}", wrapper.UnbindSandboxMCP)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/mcp/{marketID}", wrapper.BindSandboxMCP)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/mcp/{marketID}/sync", wrapper.SyncSandboxMCP)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/files", wrapper.RemoveSandboxFile)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/files", wrapper.DownloadSandboxFile)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/files", wrapper.UploadSandboxFile)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/directories", wrapper.ListSandboxDirectory)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/directories", wrapper.MakeSandboxDirectory)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/files/stat", wrapper.StatSandboxFile)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/files/move", wrapper.MoveSandboxFile)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/injections", wrapper.GetSandboxInjections)
 	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/injections", wrapper.SetSandboxInjections)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/credential-documents/{kind}", wrapper.ListCredentialDocuments)

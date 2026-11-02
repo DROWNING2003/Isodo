@@ -2,6 +2,8 @@
   "title": "HTTP 端点",
   "pages": [
     "---沙箱管理---",
+    "StatSandboxFile",
+    "MoveSandboxFile",
     "ListSandboxes",
     "CreateSandbox",
     "GetSandbox",
@@ -19,6 +21,8 @@
     "---文件---",
     "DownloadSandboxFile",
     "UploadSandboxFile",
+    "RemoveSandboxFile",
+    "ListSandboxDirectory",
     "MakeSandboxDirectory",
     "---安全连接---",
     "GetSandboxInjections",

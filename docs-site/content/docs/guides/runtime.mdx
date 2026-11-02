@@ -62,3 +62,22 @@ ISODO_WEB_URL=http://app.isodo.localhost:5734
 ## 环境保留
 
 录屏前先检查现有 PID、监听端口和容器，复用已经运行的隔离服务。不要重新运行初始化、格式化或整套部署。只操作明确属于本次测试的 VM、目录与端口。
+
+## Files 公开运行时 API
+
+除上传、下载和创建目录外，Files 还提供以下接口：
+
+| 功能 | 路径 |
+| --- | --- |
+| 元数据 | `GET /v1/sandboxes/{id}/files/stat?path=/workspace/...` |
+| 分页目录 | `GET /v1/sandboxes/{id}/directories?path=/workspace/...&page_size=100` |
+| 删除 | `DELETE /v1/sandboxes/{id}/files?path=/workspace/...&recursive=false` |
+| 移动 | `POST /v1/sandboxes/{id}/files/move` |
+
+查询需要 `sandboxes:read`，修改需要 `sandboxes:write`。仅运行中的 Sandbox 接受 Files，Control 与 Node 同时检查所有权、生命周期和运行身份。
+
+Move 接收 `source`、`destination` 和可选 `overwrite`，默认覆盖普通文件，与上传约定一致；目录不能被覆盖。Remove 对不存在路径返回 204，非空目录要求显式递归。根目录和 `.isodo`、`.t3` 保护路径不能删除或移动；修改操作拒绝符号链接父目录。
+
+ListDirectory 默认每页 100 条，最大 500 条；将 `next_page_token` 原样作为下一次 `page_token`，空字符串表示结束。分页不是并发文件变更期间的一致性快照。
+
+详见 [Stat](/docs/api-reference/endpoints/StatSandboxFile)、[ListDirectory](/docs/api-reference/endpoints/ListSandboxDirectory)、[Remove](/docs/api-reference/endpoints/RemoveSandboxFile) 和 [Move](/docs/api-reference/endpoints/MoveSandboxFile) 的生成契约。远程 CHV 已有独立真实 API 验收；Lima/Electron 界面未新增实机验收。

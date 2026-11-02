@@ -25,6 +25,10 @@ const (
 	SandboxRuntime_SyncMCP_FullMethodName          = "/isodo.node.v1.SandboxRuntime/SyncMCP"
 	SandboxRuntime_WriteFile_FullMethodName        = "/isodo.node.v1.SandboxRuntime/WriteFile"
 	SandboxRuntime_ReadFile_FullMethodName         = "/isodo.node.v1.SandboxRuntime/ReadFile"
+	SandboxRuntime_Stat_FullMethodName             = "/isodo.node.v1.SandboxRuntime/Stat"
+	SandboxRuntime_ListDirectory_FullMethodName    = "/isodo.node.v1.SandboxRuntime/ListDirectory"
+	SandboxRuntime_Remove_FullMethodName           = "/isodo.node.v1.SandboxRuntime/Remove"
+	SandboxRuntime_Move_FullMethodName             = "/isodo.node.v1.SandboxRuntime/Move"
 	SandboxRuntime_MakeDirectory_FullMethodName    = "/isodo.node.v1.SandboxRuntime/MakeDirectory"
 	SandboxRuntime_RevokeCredential_FullMethodName = "/isodo.node.v1.SandboxRuntime/RevokeCredential"
 	SandboxRuntime_GetInjections_FullMethodName    = "/isodo.node.v1.SandboxRuntime/GetInjections"
@@ -42,6 +46,10 @@ type SandboxRuntimeClient interface {
 	SyncMCP(ctx context.Context, in *SyncMCPRequest, opts ...grpc.CallOption) (*SyncMCPResponse, error)
 	WriteFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[RuntimeWriteFrame, v1.WriteFileResponse], error)
 	ReadFile(ctx context.Context, in *RuntimeReadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[v1.ReadFileFrame], error)
+	Stat(ctx context.Context, in *RuntimeReadRequest, opts ...grpc.CallOption) (*v1.FileInfo, error)
+	ListDirectory(ctx context.Context, in *RuntimeListRequest, opts ...grpc.CallOption) (*v1.ListDirectoryResponse, error)
+	Remove(ctx context.Context, in *RuntimeRemoveRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
+	Move(ctx context.Context, in *RuntimeMoveRequest, opts ...grpc.CallOption) (*v1.FileInfo, error)
 	MakeDirectory(ctx context.Context, in *RuntimeDirectoryRequest, opts ...grpc.CallOption) (*v1.FileInfo, error)
 	RevokeCredential(ctx context.Context, in *RevokeCredentialRequest, opts ...grpc.CallOption) (*emptypb.Empty, error)
 	GetInjections(ctx context.Context, in *SandboxTarget, opts ...grpc.CallOption) (*SandboxInjections, error)
@@ -108,6 +116,46 @@ func (c *sandboxRuntimeClient) ReadFile(ctx context.Context, in *RuntimeReadRequ
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type SandboxRuntime_ReadFileClient = grpc.ServerStreamingClient[v1.ReadFileFrame]
 
+func (c *sandboxRuntimeClient) Stat(ctx context.Context, in *RuntimeReadRequest, opts ...grpc.CallOption) (*v1.FileInfo, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.FileInfo)
+	err := c.cc.Invoke(ctx, SandboxRuntime_Stat_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sandboxRuntimeClient) ListDirectory(ctx context.Context, in *RuntimeListRequest, opts ...grpc.CallOption) (*v1.ListDirectoryResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.ListDirectoryResponse)
+	err := c.cc.Invoke(ctx, SandboxRuntime_ListDirectory_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sandboxRuntimeClient) Remove(ctx context.Context, in *RuntimeRemoveRequest, opts ...grpc.CallOption) (*emptypb.Empty, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(emptypb.Empty)
+	err := c.cc.Invoke(ctx, SandboxRuntime_Remove_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *sandboxRuntimeClient) Move(ctx context.Context, in *RuntimeMoveRequest, opts ...grpc.CallOption) (*v1.FileInfo, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(v1.FileInfo)
+	err := c.cc.Invoke(ctx, SandboxRuntime_Move_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 func (c *sandboxRuntimeClient) MakeDirectory(ctx context.Context, in *RuntimeDirectoryRequest, opts ...grpc.CallOption) (*v1.FileInfo, error) {
 	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
 	out := new(v1.FileInfo)
@@ -159,6 +207,10 @@ type SandboxRuntimeServer interface {
 	SyncMCP(context.Context, *SyncMCPRequest) (*SyncMCPResponse, error)
 	WriteFile(grpc.ClientStreamingServer[RuntimeWriteFrame, v1.WriteFileResponse]) error
 	ReadFile(*RuntimeReadRequest, grpc.ServerStreamingServer[v1.ReadFileFrame]) error
+	Stat(context.Context, *RuntimeReadRequest) (*v1.FileInfo, error)
+	ListDirectory(context.Context, *RuntimeListRequest) (*v1.ListDirectoryResponse, error)
+	Remove(context.Context, *RuntimeRemoveRequest) (*emptypb.Empty, error)
+	Move(context.Context, *RuntimeMoveRequest) (*v1.FileInfo, error)
 	MakeDirectory(context.Context, *RuntimeDirectoryRequest) (*v1.FileInfo, error)
 	RevokeCredential(context.Context, *RevokeCredentialRequest) (*emptypb.Empty, error)
 	GetInjections(context.Context, *SandboxTarget) (*SandboxInjections, error)
@@ -184,6 +236,18 @@ func (UnimplementedSandboxRuntimeServer) WriteFile(grpc.ClientStreamingServer[Ru
 }
 func (UnimplementedSandboxRuntimeServer) ReadFile(*RuntimeReadRequest, grpc.ServerStreamingServer[v1.ReadFileFrame]) error {
 	return status.Errorf(codes.Unimplemented, "method ReadFile not implemented")
+}
+func (UnimplementedSandboxRuntimeServer) Stat(context.Context, *RuntimeReadRequest) (*v1.FileInfo, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Stat not implemented")
+}
+func (UnimplementedSandboxRuntimeServer) ListDirectory(context.Context, *RuntimeListRequest) (*v1.ListDirectoryResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ListDirectory not implemented")
+}
+func (UnimplementedSandboxRuntimeServer) Remove(context.Context, *RuntimeRemoveRequest) (*emptypb.Empty, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Remove not implemented")
+}
+func (UnimplementedSandboxRuntimeServer) Move(context.Context, *RuntimeMoveRequest) (*v1.FileInfo, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method Move not implemented")
 }
 func (UnimplementedSandboxRuntimeServer) MakeDirectory(context.Context, *RuntimeDirectoryRequest) (*v1.FileInfo, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method MakeDirectory not implemented")
@@ -272,6 +336,78 @@ func _SandboxRuntime_ReadFile_Handler(srv interface{}, stream grpc.ServerStream)
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type SandboxRuntime_ReadFileServer = grpc.ServerStreamingServer[v1.ReadFileFrame]
 
+func _SandboxRuntime_Stat_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RuntimeReadRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SandboxRuntimeServer).Stat(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SandboxRuntime_Stat_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SandboxRuntimeServer).Stat(ctx, req.(*RuntimeReadRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SandboxRuntime_ListDirectory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RuntimeListRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SandboxRuntimeServer).ListDirectory(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SandboxRuntime_ListDirectory_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SandboxRuntimeServer).ListDirectory(ctx, req.(*RuntimeListRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SandboxRuntime_Remove_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RuntimeRemoveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SandboxRuntimeServer).Remove(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SandboxRuntime_Remove_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SandboxRuntimeServer).Remove(ctx, req.(*RuntimeRemoveRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _SandboxRuntime_Move_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RuntimeMoveRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SandboxRuntimeServer).Move(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SandboxRuntime_Move_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SandboxRuntimeServer).Move(ctx, req.(*RuntimeMoveRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 func _SandboxRuntime_MakeDirectory_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
 	in := new(RuntimeDirectoryRequest)
 	if err := dec(in); err != nil {
@@ -358,6 +494,22 @@ var SandboxRuntime_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "SyncMCP",
 			Handler:    _SandboxRuntime_SyncMCP_Handler,
+		},
+		{
+			MethodName: "Stat",
+			Handler:    _SandboxRuntime_Stat_Handler,
+		},
+		{
+			MethodName: "ListDirectory",
+			Handler:    _SandboxRuntime_ListDirectory_Handler,
+		},
+		{
+			MethodName: "Remove",
+			Handler:    _SandboxRuntime_Remove_Handler,
+		},
+		{
+			MethodName: "Move",
+			Handler:    _SandboxRuntime_Move_Handler,
 		},
 		{
 			MethodName: "MakeDirectory",

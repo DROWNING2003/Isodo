@@ -9,10 +9,13 @@ import (
 	nodev1 "github.com/DROWNING2003/Isodo/internal/api/node/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
+	"google.golang.org/protobuf/types/known/timestamppb"
 	"io"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"path"
 	"strings"
 	"testing"
 )
@@ -120,5 +123,62 @@ func TestUploadRejectsTraversalAndReservedPathsBeforeBackend(t *testing.T) {
 		if response.Code < 400 || backend.writes != 0 {
 			t.Fatalf("allowed %s", destination)
 		}
+	}
+}
+
+func (b *memoryBackend) Stat(_ context.Context, r *nodev1.RuntimeReadRequest) (*guestv1.FileInfo, error) {
+	return &guestv1.FileInfo{Path: r.Path, Name: "file", Kind: guestv1.FileKind_FILE_KIND_REGULAR, ModifiedAt: timestamppb.Now()}, nil
+}
+func (b *memoryBackend) List(_ context.Context, r *nodev1.RuntimeListRequest) (*guestv1.ListDirectoryResponse, error) {
+	return &guestv1.ListDirectoryResponse{Entries: []*guestv1.FileInfo{{Path: r.Path + "/file", Name: "file", Kind: guestv1.FileKind_FILE_KIND_REGULAR, ModifiedAt: timestamppb.Now()}}, NextPageToken: r.PageToken}, nil
+}
+func (b *memoryBackend) Remove(context.Context, *nodev1.RuntimeRemoveRequest) (*emptypb.Empty, error) {
+	return &emptypb.Empty{}, nil
+}
+func (b *memoryBackend) Move(_ context.Context, r *nodev1.RuntimeMoveRequest) (*guestv1.FileInfo, error) {
+	b.overwrite = r.Overwrite
+	return &guestv1.FileInfo{Path: r.Destination, Name: path.Base(r.Destination), Kind: guestv1.FileKind_FILE_KIND_REGULAR, ModifiedAt: timestamppb.Now()}, nil
+}
+
+func TestMetadataHTTPContract(t *testing.T) {
+	b := &memoryBackend{}
+	h := testHTTP(b)
+	cases := []struct {
+		name, method, url, body string
+		handler                 func(http.ResponseWriter, *http.Request, string)
+		want                    int
+	}{
+		{"stat", "GET", "/files/stat?path=/workspace/file", "", h.Stat, 200},
+		{"list cursor", "GET", "/directories?path=/workspace&page_size=1&page_token=ZmlsZQ", "", h.ListDirectory, 200},
+		{"bad page size", "GET", "/directories?path=/workspace&page_size=0", "", h.ListDirectory, 400},
+		{"huge page size", "GET", "/directories?path=/workspace&page_size=501", "", h.ListDirectory, 400},
+		{"bad recursive", "DELETE", "/files?path=/workspace/file&recursive=wat", "", h.Remove, 400},
+		{"remove", "DELETE", "/files?path=/workspace/file", "", h.Remove, 204},
+		{"remove root", "DELETE", "/files?path=/workspace", "", h.Remove, 403},
+		{"remove protected", "DELETE", "/files?path=/workspace/.isodo&recursive=true", "", h.Remove, 403},
+		{"move default", "POST", "/files/move", `{"source":"/workspace/old","destination":"/workspace/new"}`, h.Move, 200},
+		{"move traversal", "POST", "/files/move", `{"source":"/workspace/../old","destination":"/workspace/new"}`, h.Move, 400},
+		{"move protected", "POST", "/files/move", `{"source":"/workspace/file","destination":"/workspace/.t3/file"}`, h.Move, 403},
+		{"unknown property", "POST", "/files/move", `{"source":"/workspace/a","destination":"/workspace/b","extra":1}`, h.Move, 400},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			w := httptest.NewRecorder()
+			tc.handler(w, httptest.NewRequest(tc.method, tc.url, strings.NewReader(tc.body)), "sandbox")
+			if w.Code != tc.want {
+				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+			}
+			if tc.name == "move default" && !b.overwrite {
+				t.Fatal("Move did not default overwrite=true")
+			}
+			if tc.name == "list cursor" && !strings.Contains(w.Body.String(), `"next_page_token":"ZmlsZQ"`) {
+				t.Fatal("page cursor changed")
+			}
+		})
+	}
+	w := httptest.NewRecorder()
+	h.Move(w, httptest.NewRequest("POST", "/files/move", strings.NewReader(`{"source":"/workspace/a","destination":"/workspace/b","overwrite":false}`)), "sandbox")
+	if w.Code != 200 || b.overwrite {
+		t.Fatal("explicit overwrite=false ignored")
 	}
 }

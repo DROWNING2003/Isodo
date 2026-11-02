@@ -13,6 +13,7 @@ import (
 	"github.com/DROWNING2003/Isodo/internal/sandboxfiles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 type fileGuest struct {
@@ -39,7 +40,7 @@ func checkFileRecord(record sandboxRecord, ok, busy bool, target *nodev1.Sandbox
 	}
 	return nil
 }
-func (s *CHVServer) fileGuest(_ context.Context, target *nodev1.SandboxTarget) (fileGuest, error) {
+func (s *CHVServer) fileGuest(ctx context.Context, target *nodev1.SandboxTarget) (fileGuest, error) {
 	s.mu.Lock()
 	record, ok := s.journal.getSandbox(target.GetSandboxId())
 	instance := s.live[target.GetSandboxId()]
@@ -50,6 +51,9 @@ func (s *CHVServer) fileGuest(_ context.Context, target *nodev1.SandboxTarget) (
 	s.mu.Unlock()
 	if err != nil {
 		return fileGuest{}, err
+	}
+	if running, err := instance.Running(ctx); err != nil || !running {
+		return fileGuest{}, status.Error(codes.FailedPrecondition, "sandbox VM is not running")
 	}
 	identity := instance.Identity()
 	if identity.GetBootId() != record.BootID || identity.GetGuestEpoch() != record.GuestEpoch || identity.GetOwnershipGeneration() != record.Generation || identity.GetSandboxId() != record.SandboxID {
@@ -268,4 +272,123 @@ func (s *CHVServer) MakeDirectory(ctx context.Context, request *nodev1.RuntimeDi
 }
 func (s *LimaServer) MakeDirectory(ctx context.Context, request *nodev1.RuntimeDirectoryRequest) (*guestv1.FileInfo, error) {
 	return s.FileBackend().Mkdir(ctx, request)
+}
+
+func (b guestFileBackend) Stat(ctx context.Context, request *nodev1.RuntimeReadRequest) (*guestv1.FileInfo, error) {
+	if err := sandboxfiles.ValidatePath(request.GetPath(), false); err != nil {
+		return nil, err
+	}
+	guest, err := b.open(ctx, request.GetTarget())
+	if err != nil {
+		return nil, err
+	}
+	defer guest.close()
+	result, err := guest.client.Stat(ctx, &guestv1.StatRequest{Identity: guest.identity, Path: request.Path})
+	if err != nil {
+		return nil, err
+	}
+	if err := guest.check(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *CHVServer) Stat(ctx context.Context, request *nodev1.RuntimeReadRequest) (*guestv1.FileInfo, error) {
+	return s.FileBackend().Stat(ctx, request)
+}
+
+func (s *LimaServer) Stat(ctx context.Context, request *nodev1.RuntimeReadRequest) (*guestv1.FileInfo, error) {
+	return s.FileBackend().Stat(ctx, request)
+}
+
+func (b guestFileBackend) List(ctx context.Context, request *nodev1.RuntimeListRequest) (*guestv1.ListDirectoryResponse, error) {
+	if err := sandboxfiles.ValidatePath(request.GetPath(), false); err != nil {
+		return nil, err
+	}
+	if request.GetPageSize() > 500 || len(request.GetPageToken()) > 1024 {
+		return nil, status.Error(codes.InvalidArgument, "invalid directory pagination")
+	}
+	guest, err := b.open(ctx, request.GetTarget())
+	if err != nil {
+		return nil, err
+	}
+	defer guest.close()
+	result, err := guest.client.ListDirectory(ctx, &guestv1.ListDirectoryRequest{Identity: guest.identity, Path: request.Path, PageSize: request.PageSize, PageToken: request.PageToken})
+	if err != nil {
+		return nil, err
+	}
+	if err := guest.check(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *CHVServer) ListDirectory(ctx context.Context, request *nodev1.RuntimeListRequest) (*guestv1.ListDirectoryResponse, error) {
+	return s.FileBackend().List(ctx, request)
+}
+
+func (s *LimaServer) ListDirectory(ctx context.Context, request *nodev1.RuntimeListRequest) (*guestv1.ListDirectoryResponse, error) {
+	return s.FileBackend().List(ctx, request)
+}
+
+func (b guestFileBackend) Remove(ctx context.Context, request *nodev1.RuntimeRemoveRequest) (*emptypb.Empty, error) {
+	if err := sandboxfiles.ValidatePath(request.GetPath(), true); err != nil {
+		return nil, err
+	}
+	if request.GetRequestId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "request ID required")
+	}
+	guest, err := b.open(ctx, request.GetTarget())
+	if err != nil {
+		return nil, err
+	}
+	defer guest.close()
+	result, err := guest.client.Remove(ctx, &guestv1.RemoveRequest{Identity: guest.identity, Path: request.Path, Recursive: request.Recursive, RequestId: request.RequestId})
+	if err != nil {
+		return nil, err
+	}
+	if err := guest.check(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *CHVServer) Remove(ctx context.Context, request *nodev1.RuntimeRemoveRequest) (*emptypb.Empty, error) {
+	return s.FileBackend().Remove(ctx, request)
+}
+
+func (s *LimaServer) Remove(ctx context.Context, request *nodev1.RuntimeRemoveRequest) (*emptypb.Empty, error) {
+	return s.FileBackend().Remove(ctx, request)
+}
+
+func (b guestFileBackend) Move(ctx context.Context, request *nodev1.RuntimeMoveRequest) (*guestv1.FileInfo, error) {
+	for _, p := range []string{request.GetSource(), request.GetDestination()} {
+		if err := sandboxfiles.ValidatePath(p, true); err != nil {
+			return nil, err
+		}
+	}
+	if request.GetRequestId() == "" {
+		return nil, status.Error(codes.InvalidArgument, "request ID required")
+	}
+	guest, err := b.open(ctx, request.GetTarget())
+	if err != nil {
+		return nil, err
+	}
+	defer guest.close()
+	result, err := guest.client.Move(ctx, &guestv1.MoveRequest{Identity: guest.identity, Source: request.Source, Destination: request.Destination, Overwrite: request.Overwrite, RequestId: request.RequestId})
+	if err != nil {
+		return nil, err
+	}
+	if err := guest.check(); err != nil {
+		return nil, err
+	}
+	return result, nil
+}
+
+func (s *CHVServer) Move(ctx context.Context, request *nodev1.RuntimeMoveRequest) (*guestv1.FileInfo, error) {
+	return s.FileBackend().Move(ctx, request)
+}
+
+func (s *LimaServer) Move(ctx context.Context, request *nodev1.RuntimeMoveRequest) (*guestv1.FileInfo, error) {
+	return s.FileBackend().Move(ctx, request)
 }
