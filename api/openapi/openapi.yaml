@@ -213,6 +213,7 @@ components:
       enum:
       - sandboxes:read
       - sandboxes:write
+      - sandboxes:execute
       - templates:read
       - templates:write
       x-go-type: string
