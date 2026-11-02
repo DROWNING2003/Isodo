@@ -113,3 +113,42 @@ func TestSandboxRunCommandAuthorizationAndValidation(t *testing.T) {
 		t.Fatalf("stopped sandbox command: status=%d calls=%d", response.Code, runner.calls)
 	}
 }
+
+func TestSandboxCommandsRequireSafeIdempotencyKey(t *testing.T) {
+	store := newMemoryStore()
+	item := store.items[otherSandboxID]
+	item.ObservedState, item.DesiredState = "running", "running"
+	item.Revision, item.NodeID, item.OwnershipGeneration = "1", "node-a", 7
+	store.items[otherSandboxID] = item
+	runner := &recordingCommandRunner{}
+	handler := sandbox.NewHandler(store)
+	handler.SetRuntime(testCommandRuntime{})
+	handler.SetCommandRunner(runner)
+	mux := httpapi.NewHandler(nil, nil, handler, &auth.Access{Bearer: commandAuth{}})
+	endpoint := "/v1/sandboxes/" + otherSandboxID + "/commands/run"
+
+	for _, tc := range []struct {
+		name, key string
+	}{
+		{"missing", ""},
+		{"too short", "short"},
+		{"unsafe characters", "contains spaces"},
+		{"invalid newline", "bad-line\nkey"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, endpoint, strings.NewReader(`{"argv":["/bin/true"]}`))
+			req.Header.Set("Authorization", "Bearer user-a")
+			if tc.key != "" {
+				req.Header.Set("Idempotency-Key", tc.key)
+			}
+			response := httptest.NewRecorder()
+			mux.ServeHTTP(response, req)
+			if response.Code != http.StatusBadRequest {
+				t.Fatalf("status=%d, want 400, body=%s", response.Code, response.Body.String())
+			}
+		})
+	}
+	if runner.calls != 0 {
+		t.Fatalf("invalid keys reached Guest runner %d times", runner.calls)
+	}
+}
