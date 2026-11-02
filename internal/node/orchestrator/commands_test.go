@@ -2,24 +2,24 @@ package orchestrator
 
 import (
 	"context"
-	"net"
-	"time"
 	"encoding/json"
+	"net"
 	"testing"
+	"time"
 
 	guestv1 "github.com/DROWNING2003/Isodo/internal/api/guest/v1"
 	"github.com/DROWNING2003/Isodo/internal/runtimecommands"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
-	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/grpc/status"
+	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
 
 func TestCommandsNodeRejectsInvalidRequestsBeforeOpeningGuest(t *testing.T) {
 	cases := []struct {
-		name string
+		name    string
 		payload []byte
 	}{
 		{"missing envelope", nil},
@@ -60,7 +60,7 @@ func mustMarshalCommand(t *testing.T, request runtimecommands.Request) []byte {
 
 func TestCommandKeyValidation(t *testing.T) {
 	for _, input := range []struct {
-		key string
+		key   string
 		valid bool
 	}{
 		{"request-12345678", true},

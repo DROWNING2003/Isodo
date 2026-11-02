@@ -33,22 +33,6 @@ type NonReadonly<T> = [T] extends [UnionToIntersection<T>] ? {
     : T[P];
 } : DistributeReadOnlyOverUnions<T>;
 
-export interface CommandRunRequest {
-  argv: string[];
-  cwd?: string;
-  env?: Record<string, string>;
-  timeout_seconds?: number;
-}
-
-export interface CommandRunResult {
-  execution_id: string;
-  stdout: string;
-  stderr: string;
-  exit_code: number | null;
-  reason: string;
-  output_incomplete: boolean;
-}
-
 export interface FileWriteResult {
   path: string;
   bytes: number;
@@ -115,6 +99,33 @@ export interface SandboxInjectionState {
   rules: SandboxInjection[];
   enabled: boolean;
   stats: SandboxInjectionStateStats;
+}
+
+export type CommandRunRequestEnv = {[key: string]: string};
+
+export interface CommandRunRequest {
+  /**
+     * @minItems 1
+     * @maxItems 256
+     */
+  argv: string[];
+  cwd?: string;
+  env?: CommandRunRequestEnv;
+  /**
+     * @minimum 0
+     * @maximum 300
+     */
+  timeout_seconds?: number;
+}
+
+export interface CommandRunResult {
+  execution_id: string;
+  stdout: string;
+  stderr: string;
+  /** @nullable */
+  exit_code: number | null;
+  reason: string;
+  output_incomplete: boolean;
 }
 
 export type ErrorError = {
@@ -1144,31 +1155,45 @@ export const createSandboxAppLink = async (sandboxID: string, options?: Paramete
 
 
 
-export const getRunSandboxCommandUrl = (sandboxID: string) => {
-  return `/v1/sandboxes/${sandboxID}/commands/run`;
-};
+export const getRunSandboxCommandUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}/commands/run`
+}
 
 /**
- * Run argv inside the sandbox Guest, never on the host.
- * Idempotency-Key is mandatory and must be reused for retries.
+ * Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
  * @summary Run a bounded non-interactive command inside a sandbox Guest
  */
-export const runSandboxCommand = async (
-  sandboxID: string,
-  command: CommandRunRequest,
-  idempotencyKey: string,
-  options?: Parameters<typeof isodoFetch>[1],
-): Promise<CommandRunResult> => {
-  const headers = new Headers(options?.headers);
-  headers.set("Content-Type", "application/json");
-  headers.set("Idempotency-Key", idempotencyKey);
-  return isodoFetch<CommandRunResult>(getRunSandboxCommandUrl(sandboxID), {
+export const runSandboxCommand = async (sandboxID: string,
+    commandRunRequest: CommandRunRequest, options?: Parameters<typeof isodoFetch>[1]): Promise<CommandRunResult> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return isodoFetch<CommandRunResult>(getRunSandboxCommandUrl(sandboxID),
+  {
     ...options,
-    method: "POST",
-    headers,
-    body: JSON.stringify(command),
-  });
-};
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(commandRunRequest)
+  }
+);}
+
+
 
 export const getListInjectionRulesUrl = () => {
 

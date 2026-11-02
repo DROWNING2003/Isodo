@@ -21,6 +21,7 @@ import (
 )
 
 const commandRunMethod = "/isodo.node.v1.CommandRunner/RunCommand"
+
 // The Node mTLS gRPC server enforces a 1 MiB response limit. Text output can
 // expand up to sixfold when serialized as JSON, so cap raw output at 128 KiB.
 const commandOutputLimit = 128 << 10
@@ -111,11 +112,11 @@ func (s *CHVServer) RunCommand(ctx context.Context, request *wrapperspb.BytesVal
 	requestID := guestCommandRequestID(input.SandboxID, input.Generation, record.BootID, record.GuestEpoch, input.Key)
 	timeout := uint32(input.Command.TimeoutSeconds)
 	start := &guestv1.StartProcessRequest{
-		Identity: identity,
-		RequestId: requestID,
-		Command: &guestv1.Command{Argv: input.Command.Argv},
-		Cwd: &input.Command.Cwd,
-		Env: input.Command.Env,
+		Identity:              identity,
+		RequestId:             requestID,
+		Command:               &guestv1.Command{Argv: input.Command.Argv},
+		Cwd:                   &input.Command.Cwd,
+		Env:                   input.Command.Env,
 		CommandTimeoutSeconds: &timeout,
 	}
 	process, err := guest.StartProcess(ctx, start)
@@ -198,7 +199,6 @@ func validCommandKey(value string) bool {
 	}
 	return true
 }
-
 
 // guestCommandRequestID is stable across transport retries in the same VM run.
 // Stop/Start or restore changes bootID/epoch, so the old key cannot refer to

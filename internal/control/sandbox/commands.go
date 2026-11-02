@@ -7,8 +7,8 @@ import (
 
 	nodev1 "github.com/DROWNING2003/Isodo/internal/api/node/v1"
 	publicapi "github.com/DROWNING2003/Isodo/internal/api/public"
-	"google.golang.org/grpc/codes"
 	"github.com/DROWNING2003/Isodo/internal/runtimecommands"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
 )
 
@@ -97,9 +97,13 @@ func (h *Handler) RunSandboxCommand(w http.ResponseWriter, r *http.Request, sand
 // validCommandKey accepts stable client-generated tokens without control characters.
 // The Node independently validates the same rule before any Guest RPC.
 func validCommandKey(value string) bool {
-	if len(value) < 8 || len(value) > 128 { return false }
+	if len(value) < 8 || len(value) > 128 {
+		return false
+	}
 	for _, ch := range []byte(value) {
-		if (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '-' || ch == '_' || ch == '.' || ch == ':' { continue }
+		if (ch >= '0' && ch <= '9') || (ch >= 'a' && ch <= 'z') || (ch >= 'A' && ch <= 'Z') || ch == '-' || ch == '_' || ch == '.' || ch == ':' {
+			continue
+		}
 		return false
 	}
 	return true

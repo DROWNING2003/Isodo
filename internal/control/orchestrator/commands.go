@@ -28,11 +28,11 @@ func (c *Client) RunCommand(ctx context.Context, target *nodev1.SandboxTarget, c
 		return sandbox.CommandResult{}, status.Error(codes.InvalidArgument, "invalid command target or idempotency key")
 	}
 	envelope := runtimecommands.Request{
-		SandboxID: target.GetSandboxId(),
+		SandboxID:  target.GetSandboxId(),
 		Generation: target.GetOwnershipGeneration(),
-		Revision: target.GetRevision(),
-		Key: command.RequestID,
-		Command: command,
+		Revision:   target.GetRevision(),
+		Key:        command.RequestID,
+		Command:    command,
 	}
 	encoded, err := json.Marshal(envelope)
 	if err != nil {
@@ -49,4 +49,3 @@ func (c *Client) RunCommand(ctx context.Context, target *nodev1.SandboxTarget, c
 	}
 	return result, nil
 }
-

@@ -8,9 +8,9 @@ import (
 
 func TestSandboxCommandRequiresExplicitExecuteScope(t *testing.T) {
 	for _, test := range []struct {
-		name string
+		name   string
 		scopes []string
-		want int
+		want   int
 	}{
 		{"management is not execution", []string{"sandboxes:write"}, http.StatusForbidden},
 		{"read is not execution", []string{"sandboxes:read"}, http.StatusForbidden},

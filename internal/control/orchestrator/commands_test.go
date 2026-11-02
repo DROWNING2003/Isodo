@@ -36,7 +36,7 @@ func TestCommandRunnerUnavailableOnOldNode(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
 	_, err = client.RunCommand(ctx, &nodev1.SandboxTarget{
-		SandboxId: "f323e70d-cd11-4a02-a245-6b4ed2ce1e31",
+		SandboxId:           "f323e70d-cd11-4a02-a245-6b4ed2ce1e31",
 		OwnershipGeneration: 1, Revision: 1,
 	}, sandbox.CommandRequest{
 		Argv: []string{"/bin/true"}, RequestID: "request-12345678", TimeoutSeconds: 30,

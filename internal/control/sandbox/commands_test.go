@@ -11,6 +11,8 @@ import (
 	"github.com/DROWNING2003/Isodo/internal/control/auth"
 	"github.com/DROWNING2003/Isodo/internal/control/sandbox"
 	"github.com/DROWNING2003/Isodo/internal/httpapi"
+	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/status"
 )
 
 type testCommandRuntime struct{}
@@ -24,8 +26,8 @@ func (testCommandRuntime) SetInjections(context.Context, *nodev1.SetInjectionsRe
 }
 
 type recordingCommandRunner struct {
-	calls int
-	input sandbox.CommandRequest
+	calls  int
+	input  sandbox.CommandRequest
 	target *nodev1.SandboxTarget
 }
 
@@ -67,7 +69,7 @@ func TestSandboxRunCommandAuthorizationAndValidation(t *testing.T) {
 
 	cases := []struct {
 		name, token, body string
-		want int
+		want              int
 	}{
 		{"owner", "Bearer user-a", `{"argv":["/bin/echo","hello"]}`, 200},
 		{"explicit execution key", "Bearer executor", `{"argv":["/bin/echo","hello"]}`, 200},
@@ -150,5 +152,47 @@ func TestSandboxCommandsRequireSafeIdempotencyKey(t *testing.T) {
 	}
 	if runner.calls != 0 {
 		t.Fatalf("invalid keys reached Guest runner %d times", runner.calls)
+	}
+}
+
+type commandErrorRunner struct{ err error }
+
+func (f commandErrorRunner) RunCommand(context.Context, *nodev1.SandboxTarget, sandbox.CommandRequest) (sandbox.CommandResult, error) {
+	return sandbox.CommandResult{}, f.err
+}
+
+func TestCommandErrorsPreservePublicHTTPMeaning(t *testing.T) {
+	for _, tc := range []struct {
+		grpc  codes.Code
+		http  int
+		label string
+	}{
+		{codes.OutOfRange, 413, "COMMAND_OUTPUT_LIMIT"},
+		{codes.ResourceExhausted, 429, "SANDBOX_PROCESS_LIMIT"},
+		{codes.AlreadyExists, 409, "IDEMPOTENCY_CONFLICT"},
+		{codes.DataLoss, 502, "COMMAND_OUTPUT_INCOMPLETE"},
+		{codes.DeadlineExceeded, 504, "COMMAND_DEADLINE"},
+		{codes.Unimplemented, 501, "COMMANDS_UNSUPPORTED"},
+		{codes.Aborted, 409, "SANDBOX_STATE_CONFLICT"},
+	} {
+		t.Run(tc.label, func(t *testing.T) {
+			store := newMemoryStore()
+			item := store.items[otherSandboxID]
+			item.ObservedState, item.DesiredState = "running", "running"
+			item.Revision, item.NodeID, item.OwnershipGeneration = "1", "node-a", 7
+			store.items[otherSandboxID] = item
+			handler := sandbox.NewHandler(store)
+			handler.SetRuntime(testCommandRuntime{})
+			handler.SetCommandRunner(commandErrorRunner{status.Error(tc.grpc, "private transport detail")})
+			mux := httpapi.NewHandler(nil, nil, handler, &auth.Access{Bearer: commandAuth{}})
+			req := httptest.NewRequest("POST", "/v1/sandboxes/"+otherSandboxID+"/commands/run", strings.NewReader(`{"argv":["/bin/true"]}`))
+			req.Header.Set("Idempotency-Key", "request-12345678")
+			req.Header.Set("Authorization", "Bearer executor")
+			w := httptest.NewRecorder()
+			mux.ServeHTTP(w, req)
+			if w.Code != tc.http || !strings.Contains(w.Body.String(), tc.label) || strings.Contains(w.Body.String(), "private transport detail") {
+				t.Fatalf("status=%d body=%s", w.Code, w.Body.String())
+			}
+		})
 	}
 }
