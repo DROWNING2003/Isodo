@@ -43,8 +43,15 @@ Web 相关 28 文件、153 项测试通过；Web TypeScript 检查、生产构�
 ## 尚待完成
 
 - 已确认正确构建参数发布后，Web 进入真实云端任务界面（文件、安全连接和输入区）；Agent 模型配置验证仍进行中。
-- 实际 Codex CLI 工具发现及调用；上述真实工具调用者是 Guest Python MCP 客户端，不能称为 Agent 验收成功。
-- 实际解绑/撤销后的拒绝、真实 Secret 泄露扫描、首个 E2E Sandbox 清理。
+- 实际 Codex CLI 已验证：通过公开 Commands API 在专用 Guest 运行 gpt-6.1-sol，调用 isodo_github.get_file_contents 成功，50.224s，exit_code=0、output_incomplete=false，返回 README 标题 # Isodo 与 main commit 12e549861fff8aafd8755e9724b5284699905893。证据摘要 `/tmp/isodo-codex-mcp-evidence.json`。
+- 直接 Commands 进程默认不继承出站环境，首次模型请求失败；使用现有 Guest proxy.env 后正常。非交互 Codex 的默认 MCP 工具确认造成取消，测试仅对已获用户授权、服务端限制为只读工具的 isodo_github 设置会话级 default_tools_approval_mode=approve；仍 read-only Sandbox，未关闭认证、TLS 或运行身份校验，未使用 bypass sandbox 参数。
+- 真实解绑后 Guest MCP initialize 返回 HTTP 403（0.114s），Node 路径立即拒绝。
+- 有限扫描 5500 个 Guest Codex/Isodo 文件（单文件上限 2 MiB）未命中 GitHub token 特征，模型与 MCP 配置均使用占位符。这不是对所有进程/文件的完整 Secret 审计。
+- 首个 E2E Sandbox 为后续 Desktop 验证保留，尚未删除；不记为清理完成。
 - Web 完成后再验证 Desktop，遵循用户顺序。
 
 下一步性能改进：部署时预热已校验模板缓存；UI 展示下载、校验、磁盘、Guest、工作台阶段；进一步测量发布后冷校验而不是降低完整性校验。
+
+## MCP 勾选状态
+
+安全连接页原来的 checkbox 只是新绑定选择，已绑定时仍为空，存在语义歧义。改为以服务器现有绑定回显；用户修改后显示未保存状态，保存时仅新增或撤销差异。刷新保持绑定，切换 Sandbox 不携带未保存选择；创建表单仍默认未选中。相关测试先观察失败，再通过修复。
