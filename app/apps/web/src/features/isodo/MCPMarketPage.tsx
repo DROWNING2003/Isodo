@@ -11,6 +11,7 @@ import {
   ArrowLeftIcon,
   ExternalLinkIcon,
 } from "lucide-react";
+import { NotionIcon } from "../../components/Icons";
 import { Button } from "../../components/ui/button";
 import { isodoFetch } from "../../api/transport";
 import { CloudPage } from "./CloudPages";
@@ -25,6 +26,11 @@ import {
   useMCPOAuth,
   type MCPBinding,
 } from "./mcpMarket";
+
+function MCPServiceIcon({ marketID, className }: { marketID: string; className: string }) {
+  const Icon = marketID === "github" ? GithubIcon : marketID === "notion" ? NotionIcon : ServerIcon;
+  return <Icon className={className} aria-hidden="true" />;
+}
 
 export function MCPMarketPage() {
   const market = useMCPMarket();
@@ -102,11 +108,7 @@ export function MCPMarketPage() {
                 onClick={() => setSelected(item.market_mcp_id)}
                 className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm ${selected === item.market_mcp_id ? "bg-muted" : "hover:bg-muted/60"}`}
               >
-                {item.source === "custom" ? (
-                  <ServerIcon className="size-4 shrink-0" />
-                ) : (
-                  <GithubIcon className="size-4 shrink-0" />
-                )}
+                <MCPServiceIcon marketID={item.market_mcp_id} className="size-4 shrink-0" />
                 <span className="truncate">{item.name}</span>
               </button>
             ))}
@@ -139,11 +141,10 @@ export function MCPMarketPage() {
                 返回 MCP 列表
               </button>
               <div className="flex items-center gap-4">
-                {selectedItem.market_mcp_id !== "github" ? (
-                  <ServerIcon className="size-10" />
-                ) : (
-                  <GithubIcon className="size-10" />
-                )}
+                <MCPServiceIcon
+                  marketID={selectedItem.market_mcp_id}
+                  className="size-10 shrink-0"
+                />
                 <div>
                   <h2 className="text-xl font-semibold">{selectedItem.name}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
@@ -302,11 +303,7 @@ export function MCPMarketPage() {
                       className="flex min-w-0 flex-1 items-center gap-3 text-left"
                       onClick={() => setSelected(item.market_mcp_id)}
                     >
-                      {item.source === "custom" ? (
-                        <ServerIcon className="size-8 shrink-0" />
-                      ) : (
-                        <GithubIcon className="size-8 shrink-0" />
-                      )}
+                      <MCPServiceIcon marketID={item.market_mcp_id} className="size-8 shrink-0" />
                       <span className="min-w-0">
                         <span className="block text-sm font-medium">{item.name}</span>
                         <span className="mt-1 block truncate text-xs text-muted-foreground">

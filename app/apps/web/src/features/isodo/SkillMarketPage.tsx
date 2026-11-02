@@ -279,12 +279,9 @@ export function SandboxSkillSelection({
 }) {
   const entries = state.catalog.data?.items ?? [];
   return (
-    <section className="mb-6 grid gap-3 rounded-xl border p-5">
-      <h2 className="font-medium">Skill</h2>
-      <p className="text-sm text-muted-foreground">
-        选择已收藏的 Skill，统一保存到当前远程沙箱的 Codex
-        技能目录。新任务加载更改；移除不会抹去已有会话读过的内容。
-      </p>
+    <section className="grid gap-2">
+      <h3 className="text-sm font-medium">Skill</h3>
+      <p className="text-sm text-muted-foreground">选择已收藏的 Skill，保存后在新任务中使用。</p>
       {state.loading ? (
         <p role="status">正在读取 Skill…</p>
       ) : state.failed ? (
@@ -294,7 +291,10 @@ export function SandboxSkillSelection({
           {entries
             .filter((entry) => entry.favorite || state.selected.includes(entry.id))
             .map((entry) => (
-              <label key={entry.id} className="flex items-start gap-3 rounded-lg border p-3">
+              <label
+                key={entry.id}
+                className="flex items-center gap-3 rounded-lg border border-border p-3"
+              >
                 <input
                   type="checkbox"
                   aria-label={`启用 ${entry.name} Skill`}
@@ -303,8 +303,8 @@ export function SandboxSkillSelection({
                   onChange={(e) => state.toggle(entry.id, e.target.checked)}
                 />
                 <span>
-                  <span className="block">{entry.name}</span>
-                  <span className="text-sm text-muted-foreground">{entry.description}</span>
+                  <span className="block text-sm font-medium">{entry.name}</span>
+                  <span className="block text-xs text-muted-foreground">{entry.description}</span>
                 </span>
               </label>
             ))}
@@ -313,13 +313,11 @@ export function SandboxSkillSelection({
               还没有收藏的 Skill，请先到全局 Skill 市场收藏。
             </p>
           ) : null}
-          {state.saved.data?.version ? (
+          {state.saved.data?.version && state.saved.data.sync_status !== "applied" ? (
             <p className="text-xs text-muted-foreground">
-              {state.saved.data.sync_status === "applied"
-                ? "配置已同步，新建任务使用。"
-                : state.saved.data.sync_status === "failed"
-                  ? "同步失败，请检查托管目录冲突并重新保存。"
-                  : "配置待同步，请启动沙箱后重新保存。"}
+              {state.saved.data.sync_status === "failed"
+                ? "同步失败，请检查托管目录冲突并重新保存。"
+                : "配置待同步，请启动沙箱后重新保存。"}
             </p>
           ) : null}
         </>
