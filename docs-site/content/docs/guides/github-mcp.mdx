@@ -36,3 +36,12 @@ GitHub Token 只在 Control 加密保存和使用。Guest 配置仅含内部 `ht
 接口和生成客户端见 API 参考的 **MCP 市场** 分组，包含 catalog、favorites、OAuth 连接、事务、工具发现和 sandbox bindings。账号操作需要交互式认证与既有 CSRF 校验，普通 Sandbox API Key 不允许管理 OAuth；接口不返回 Token、Secret 或 Node capability。
 
 [GitHub 官方 Remote MCP](https://github.com/github/github-mcp-server/blob/main/docs/remote-server.md) 使用 readonly 端点；[官方 Host 接入说明](https://github.com/github/github-mcp-server/blob/main/docs/host-integration.md) 明确不支持 DCR。本版使用预注册 App、Authorization Code + PKCE S256。
+
+
+## 自定义 HTTPS MCP
+
+在全局 MCP 市场点击“添加 MCP”，填写名称和公网 HTTPS Streamable HTTP 地址，选择无需认证或 Bearer Token。验证连接与工具发现后保存，个人服务仅当前账号可见；再到指定远程沙箱的安全连接中勾选并统一保存。
+
+第一版仅支持公网 HTTPS 443，不支持 GitHub 仓库导入、stdio、自定义 OAuth 或私网目标。真实 Token 加密保存在 Control，Guest 只使用内部代理地址与占位符。无认证 DeepWiki 的真实 CHV / Codex 调用已验收；真实第三方 Bearer Token 服务仍需相应测试凭证，不能用 fixture 测试替代。
+
+凭证库不再显示旧“MCP 凭证”区块，新的服务连接统一从 MCP 市场管理；隐藏区块不会删除既有数据。

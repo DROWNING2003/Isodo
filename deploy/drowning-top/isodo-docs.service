@@ -1,0 +1,29 @@
+[Unit]
+Description=Isodo developer documentation
+After=network-online.target
+ConditionPathExists=/opt/isodo/docs/current/docs-site/server.js
+
+[Service]
+Type=simple
+DynamicUser=yes
+WorkingDirectory=/opt/isodo/docs/current/docs-site
+ExecStart=/usr/bin/node /opt/isodo/docs/current/docs-site/server.js
+Environment=NODE_ENV=production
+Environment=HOSTNAME=127.0.0.1
+Environment=PORT=13000
+CacheDirectory=isodo-docs
+CacheDirectoryMode=0750
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectSystem=strict
+ProtectHome=yes
+RestrictSUIDSGID=yes
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+MemoryMax=1G
+TasksMax=128
+Restart=on-failure
+RestartSec=3
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -7,5 +7,6 @@ const projectRoot = path.dirname(fileURLToPath(import.meta.url));
 
 export default withMDX({
   reactStrictMode: true,
+  output: 'standalone',
   turbopack: { root: projectRoot },
 });

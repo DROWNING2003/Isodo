@@ -807,66 +807,6 @@ export function CloudCredentials() {
           ) : null}
         </div>
       </section>
-      <section aria-labelledby="mcp-credentials-heading" className="grid gap-4">
-        <div className="flex items-center justify-between gap-3">
-          <h2 id="mcp-credentials-heading" className="text-base font-semibold">
-            MCP 凭证
-          </h2>
-          <Button
-            size="icon"
-            variant="ghost"
-            aria-label="添加 MCP 凭证"
-            onClick={() => {
-              setCredentialType("mcp");
-              setEditing(null);
-              setDialogOpen(true);
-            }}
-          >
-            <PlusIcon className="size-4" />
-          </Button>
-        </div>
-        <div className="grid gap-4 md:grid-cols-3">
-          {rules.data
-            ?.filter((rule) => rule.type === "mcp")
-            .map((rule) => (
-              <Card key={rule.id} className="shadow-none">
-                <CardHeader className="flex flex-row items-start justify-between gap-3">
-                  <CardTitle>{rule.name}</CardTitle>
-                  <div className="flex gap-1">
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      aria-label={`编辑 ${rule.name}`}
-                      onClick={() => openEdit(rule)}
-                    >
-                      <SettingsIcon className="size-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      aria-label={`删除 ${rule.name}`}
-                      onClick={() => {
-                        setDeleteError(null);
-                        setDeleting(rule);
-                      }}
-                    >
-                      <Trash2Icon className="size-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardPanel className="text-sm text-muted-foreground">
-                  <p className="break-all">{rule.base_url}</p>
-                  <p className="mt-2">Streamable HTTP · {rule.header_name || "Authorization"}</p>
-                  <p className="mt-2 font-mono text-xs">{rule.secret_hint}</p>
-                  <p className="mt-2">已授权 {summary.data?.[rule.id] ?? 0} 个沙箱</p>
-                </CardPanel>
-              </Card>
-            ))}
-          {rules.isSuccess && !rules.data?.some((rule) => rule.type === "mcp") ? (
-            <p className="text-sm text-muted-foreground">还没有 MCP 凭证。</p>
-          ) : null}
-        </div>
-      </section>
       <section aria-labelledby="http-credentials-heading" className="grid gap-4">
         <div className="flex items-center justify-between gap-3">
           <h2 id="http-credentials-heading" className="text-base font-semibold">
@@ -957,7 +897,7 @@ export function CloudCredentials() {
         </div>
       </section>
 
-      <p className="text-xs text-muted-foreground">在本地沙箱的“安全连接”中选择要使用的凭证。</p>
+      <p className="text-xs text-muted-foreground">在沙箱的“安全连接”中选择要使用的凭证。</p>
 
       {agentDialogOpen ? (
         <AgentConfigDialog
