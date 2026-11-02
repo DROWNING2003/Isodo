@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"testing"
 
+	guestv1 "github.com/DROWNING2003/Isodo/internal/api/guest/v1"
 	"github.com/DROWNING2003/Isodo/internal/runtimecommands"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
@@ -116,5 +117,39 @@ func TestCommandRPCIsASeparateSingleMethodService(t *testing.T) {
 	// The old arbitrary Guest RPC tunnel is not part of this service's API.
 	if methods := server.GetServiceInfo()[commandRunnerServiceDesc.ServiceName].Methods; len(methods) != 1 || methods[0].Name != "RunCommand" {
 		t.Fatalf("unexpected Node Commands methods: %+v", methods)
+	}
+}
+
+func TestCommandRuntimeFencesRevisionAndGuestIdentity(t *testing.T) {
+	id := "f323e70d-cd11-4a02-a245-6b4ed2ce1e31"
+	instance := &fakeCHV{identity: &guestv1.RuntimeIdentity{
+		SandboxId: id, OwnershipGeneration: 7, BootId: "boot-7", GuestEpoch: "epoch-7",
+	}}
+	instance.running.Store(true)
+	node := &CHVServer{
+		journal: &limaJournal{sandboxes: map[string]sandboxRecord{
+			id: {SandboxID: id, State: "running", Generation: 7, Revision: 11, BootID: "boot-7", GuestEpoch: "epoch-7"},
+		}},
+		live: map[string]CHVRuntime{id: instance},
+		busy: map[string]bool{},
+	}
+	command := runtimecommands.Request{
+		SandboxID: id, Generation: 7, Revision: 10, Key: "request-12345678",
+		Command: runtimecommands.Command{Argv: []string{"/bin/true"}, TimeoutSeconds: 30},
+	}
+	_, err := node.RunCommand(context.Background(), wrapperspb.Bytes(mustMarshalCommand(t, command)))
+	if status.Code(err) != codes.Aborted {
+		t.Fatalf("stale revision: code=%v, want Aborted", status.Code(err))
+	}
+	command.Revision = 11
+	instance.identity.GuestEpoch = "old-epoch"
+	_, err = node.RunCommand(context.Background(), wrapperspb.Bytes(mustMarshalCommand(t, command)))
+	if status.Code(err) != codes.Aborted {
+		t.Fatalf("stale Guest identity: code=%v, want Aborted", status.Code(err))
+	}
+	instance.identity.GuestEpoch = "epoch-7"
+	_, err = node.RunCommand(context.Background(), wrapperspb.Bytes(mustMarshalCommand(t, command)))
+	if status.Code(err) != codes.FailedPrecondition {
+		t.Fatalf("unavailable Guest transport: code=%v, want FailedPrecondition", status.Code(err))
 	}
 }
