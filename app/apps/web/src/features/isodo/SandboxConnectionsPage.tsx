@@ -1,3 +1,4 @@
+import { SandboxMCPBindings } from "./MCPMarketPage";
 import { TemporaryAgentDialog, type TemporaryAgent } from "./TemporaryAgentDialog";
 import { useEffect, useState } from "react";
 import { LoaderIcon, PlusIcon, SettingsIcon, Trash2Icon, SaveIcon } from "lucide-react";
@@ -185,11 +186,13 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
   if (localRuntime.loading || (!localRuntime.record && platform.loading))
     return (
       <CloudPage title="安全连接">
+        {!localRuntime.record ? <SandboxMCPBindings sandboxId={sandboxId} /> : null}
         <p className="text-sm text-muted-foreground">正在读取沙箱…</p>
       </CloudPage>
     );
   return (
     <CloudPage title="安全连接">
+      {!localRuntime.record ? <SandboxMCPBindings sandboxId={sandboxId} /> : null}
       {!runtimeSupported ? (
         <p className="text-sm text-muted-foreground">沙箱尚未就绪，暂时无法配置凭证。</p>
       ) : null}

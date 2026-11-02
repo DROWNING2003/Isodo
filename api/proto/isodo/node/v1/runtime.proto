@@ -7,6 +7,7 @@ option go_package = "github.com/DROWNING2003/Isodo/internal/api/node/v1;nodev1";
 // SandboxRuntime is the mTLS-only data/configuration plane. Secret material
 // terminates at Node's host proxy and must never be forwarded to Guest files.
 service SandboxRuntime {
+ rpc SyncMCP(SyncMCPRequest) returns (SyncMCPResponse);
  rpc WriteFile(stream RuntimeWriteFrame) returns (isodo.guest.v1.WriteFileResponse);
  rpc ReadFile(RuntimeReadRequest) returns (stream isodo.guest.v1.ReadFileFrame);
  rpc MakeDirectory(RuntimeDirectoryRequest) returns (isodo.guest.v1.FileInfo);
@@ -75,3 +76,11 @@ message RuntimeWriteFrame {
 }
 message RuntimeReadRequest { SandboxTarget target = 1; string path = 2; }
 message RuntimeDirectoryRequest { SandboxTarget target = 1; string path = 2; bool parents = 3; string request_id = 4; }
+
+// MCP capability is trusted Control-to-Node material, never Guest configuration.
+message SyncMCPRequest {
+ SandboxTarget target = 1;
+ repeated MCPBinding bindings = 2;
+}
+message MCPBinding { string binding_id = 1; string market_mcp_id = 2; string capability = 3; }
+message SyncMCPResponse { bool restart_required = 1; }

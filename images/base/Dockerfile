@@ -6,7 +6,7 @@ ARG NODE_VERSION=v24.13.1
 ARG NODE_ARCH=x64
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-      ca-certificates curl xz-utils \
+      ca-certificates curl xz-utils python3-tomli \
     && rm -rf /var/lib/apt/lists/* \
     && cd /tmp \
     && archive="node-${NODE_VERSION}-linux-${NODE_ARCH}.tar.xz" \

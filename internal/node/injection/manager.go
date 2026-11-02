@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/http"
 	"os"
 	"path/filepath"
 	"sort"
@@ -14,6 +15,7 @@ import (
 // Manager owns the host-side CA and one proxy listener per sandbox. A proxy is
 // started before T3 so rules can change without restarting the guest runtime.
 type Manager struct {
+	mcpHandler       func(string, http.ResponseWriter, *http.Request)
 	publicEgressOnly bool
 	mu               sync.Mutex
 	stateDir         string
@@ -153,6 +155,7 @@ func (m *Manager) ensureProxyLocked(sandboxID string) (*Proxy, error) {
 	if err != nil {
 		return nil, err
 	}
+	proxy.mcpHandler = m.mcpHandler
 	m.proxies[sandboxID] = proxy
 	return proxy, nil
 }
@@ -232,3 +235,10 @@ func (m *Manager) Close() {
 		delete(m.proxies, id)
 	}
 }
+
+// SetMCPHandler is configured once before the runtime starts proxies.
+func (m *Manager) SetMCPHandler(handler func(string, http.ResponseWriter, *http.Request)) {
+	m.mcpHandler = handler
+}
+func (m *Manager) MCP(sandboxID string) []MCPBinding             { return m.store.Get(sandboxID).MCP }
+func (m *Manager) SetMCP(sandboxID string, b []MCPBinding) error { return m.store.SetMCP(sandboxID, b) }

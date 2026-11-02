@@ -11,6 +11,7 @@ import (
 	publicapi "github.com/DROWNING2003/Isodo/internal/api/public"
 	"github.com/DROWNING2003/Isodo/internal/control/auth"
 	"github.com/DROWNING2003/Isodo/internal/control/injection"
+	"github.com/DROWNING2003/Isodo/internal/control/mcpmarket"
 	"github.com/DROWNING2003/Isodo/internal/control/sandbox"
 	"github.com/DROWNING2003/Isodo/internal/control/template"
 )
@@ -25,6 +26,7 @@ var _ adminapi.ServerInterface = (*adminHandlers)(nil)
 type sandboxHandlers = sandbox.Handler
 type templateHandlers = template.Handler
 type publicHandlers struct {
+	*MCPHandlers
 	*sandboxHandlers
 	*templateHandlers
 	*injection.Handler
@@ -41,6 +43,11 @@ func NewHandler(web *auth.Web, keys *auth.APIKeyHandler, sandboxes *sandbox.Hand
 // injection handler keeps the routes registered but returns 503, so tests that
 // only exercise sandboxes and templates do not need a secret store.
 func NewHandlerWithInjections(web *auth.Web, keys *auth.APIKeyHandler, sandboxes *sandbox.Handler, access *auth.Access, injections *injection.Handler, templates ...*template.Handler) http.Handler {
+	return NewHandlerWithMCP(web, keys, sandboxes, access, injections, nil, templates...)
+}
+
+// NewHandlerWithMCP wires market operations through the generated public API.
+func NewHandlerWithMCP(web *auth.Web, keys *auth.APIKeyHandler, sandboxes *sandbox.Handler, access *auth.Access, injections *injection.Handler, market *mcpmarket.Handler, templates ...*template.Handler) http.Handler {
 	templateHandler := template.NewHandler(nil)
 	if len(templates) > 0 && templates[0] != nil {
 		templateHandler = templates[0]
@@ -62,10 +69,16 @@ func NewHandlerWithInjections(web *auth.Web, keys *auth.APIKeyHandler, sandboxes
 			})
 		}},
 	})
-	publicapi.HandlerWithOptions(&publicHandlers{sandboxHandlers: sandboxes, templateHandlers: templateHandler, Handler: injectionHandler}, publicapi.StdHTTPServerOptions{
+	publicapi.HandlerWithOptions(&publicHandlers{MCPHandlers: &MCPHandlers{Market: market}, sandboxHandlers: sandboxes, templateHandlers: templateHandler, Handler: injectionHandler}, publicapi.StdHTTPServerOptions{
 		BaseRouter: mux,
 		Middlewares: []publicapi.MiddlewareFunc{func(next http.Handler) http.Handler {
-			return auth.Middleware(access, next)
+			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				if r.URL.Path == "/v1/mcp/oauth/callback" {
+					next.ServeHTTP(w, r)
+					return
+				}
+				auth.Middleware(access, next).ServeHTTP(w, r)
+			})
 		}},
 		ErrorHandlerFunc: func(w http.ResponseWriter, _ *http.Request, err error) {
 			if e, ok := errors.AsType[*publicapi.InvalidParamFormatError](err); ok {

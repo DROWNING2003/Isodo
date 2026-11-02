@@ -1,6 +1,10 @@
 # MCP 与凭证库接入
 
-## 当前结果
+## 2026-11-02 GitHub 市场实现
+
+独立分支新增账号收藏、预注册 GitHub App OAuth、沙箱绑定、Control Broker 与 Node 内部 MCP Gateway。源码与自动化测试状态、部署前置条件及真实验收边界见 [GitHub MCP 接入说明](github-mcp-market.md)。线上服务尚未升级，真实 GitHub + Codex + CHV 尚未验收。以下保留原静态 Header MCP 的设计与历史结果。
+
+## 原静态 MCP 结果
 
 已将侧栏名称统一为 Skill，并增加灰色禁用的 MCP 入口。凭证库现支持独立 MCP 类型的新增、编辑、删除，URL 与 Header 凭证按账号加密保存。沙箱安全连接和创建表单可选择授权，运行时转换为 HTTP injection。Agent 的 MCP 配置自动同步、OAuth 登录与刷新尚未实现。
 

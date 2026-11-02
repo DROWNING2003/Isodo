@@ -5,6 +5,7 @@
     "demo",
     "runtime",
     "authentication",
-    "http-port-preview"
+    "http-port-preview",
+    "github-mcp"
   ]
 }

@@ -203,3 +203,13 @@ func (c *Client) RevokeInjectionCredential(ctx context.Context, id string) error
 	_, err := c.sandboxRuntime.RevokeCredential(ctx, &nodev1.RevokeCredentialRequest{PersistentId: id})
 	return err
 }
+
+// SyncMCP uses the existing mTLS runtime channel. Capabilities never go to Guest.
+func (c *Client) SyncMCP(ctx context.Context, request *nodev1.SyncMCPRequest) (*nodev1.SyncMCPResponse, error) {
+	if _, err := c.GetNodeStatus(ctx); err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	return c.sandboxRuntime.SyncMCP(ctx, request)
+}

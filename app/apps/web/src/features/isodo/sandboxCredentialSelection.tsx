@@ -64,41 +64,34 @@ export function CredentialSelectionFields({
           <p className="text-sm text-muted-foreground">凭证库中还没有 Agent 配置。</p>
         ) : null}
       </div>
-      {(["http", "mcp"] as const).map((kind) => (
-        <div key={kind} className="grid gap-2">
-          <h3 className="text-sm font-medium">{kind === "mcp" ? "MCP 凭证" : "HTTP 凭证"}</h3>
-          {kind === "mcp" ? (
-            <p className="text-xs text-muted-foreground">
-              授权后仍需在 Agent 中配置 MCP URL，使用占位符作为认证值。
-            </p>
-          ) : null}
-          {standalone
-            .filter((credential) => (credential.type === "mcp") === (kind === "mcp"))
-            .map((credential) => (
-              <label
-                key={credential.id}
-                className="flex items-start gap-3 rounded-lg border border-border p-3"
-              >
-                <input
-                  className="mt-1"
-                  type="checkbox"
-                  disabled={disabled}
-                  checked={value.credentialIds.includes(credential.id)}
-                  onChange={(e) => toggle("credentialIds", credential.id, e.target.checked)}
-                />
-                <span className="min-w-0 text-sm">
-                  <span className="font-medium">{credential.name}</span>
-                  <span className="mt-1 block break-all text-xs text-muted-foreground">
-                    {credential.base_url}
-                  </span>
+      <div className="grid gap-2">
+        <h3 className="text-sm font-medium">HTTP 凭证</h3>
+        {standalone
+          .filter((credential) => credential.type !== "mcp")
+          .map((credential) => (
+            <label
+              key={credential.id}
+              className="flex items-start gap-3 rounded-lg border border-border p-3"
+            >
+              <input
+                className="mt-1"
+                type="checkbox"
+                disabled={disabled}
+                checked={value.credentialIds.includes(credential.id)}
+                onChange={(e) => toggle("credentialIds", credential.id, e.target.checked)}
+              />
+              <span className="min-w-0 text-sm">
+                <span className="font-medium">{credential.name}</span>
+                <span className="mt-1 block break-all text-xs text-muted-foreground">
+                  {credential.base_url}
                 </span>
-              </label>
-            ))}
-          {!standalone.some((credential) => (credential.type === "mcp") === (kind === "mcp")) ? (
-            <p className="text-sm text-muted-foreground">还没有可选凭证。</p>
-          ) : null}
-        </div>
-      ))}
+              </span>
+            </label>
+          ))}
+        {!standalone.some((credential) => credential.type !== "mcp") ? (
+          <p className="text-sm text-muted-foreground">还没有可选凭证。</p>
+        ) : null}
+      </div>
     </div>
   );
 }

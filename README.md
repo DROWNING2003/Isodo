@@ -152,6 +152,7 @@ make docs
 - [MVP 验收记录](docs/validation/unified-agent-demo-20261026.md)
 - [统一 API 规格](specs/unified-sandbox-api.md) · [目录职责](specs/directory-responsibilities.md)
 - [API Key 与 Python HTTP 预览指南](docs-site/content/docs/guides/http-port-preview.mdx)
+- [GitHub MCP 市场与 OAuth](docs/github-mcp-market.md) · [MCP 验收记录](docs/validation/github-mcp-market-20261102.md)
 - [安全连接](docs/secure-connections.md) · [文档站开发](docs-site/README.md)
 - [参赛要求与交付核对](docs/competition-requirements.md)
 

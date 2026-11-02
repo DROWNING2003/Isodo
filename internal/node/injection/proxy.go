@@ -25,15 +25,16 @@ import (
 // tunnelled untouched; matching hosts are terminated with a locally issued
 // certificate so authentication headers can be added outside the guest.
 type Proxy struct {
-	dial      func(context.Context, string, string) (net.Conn, error)
-	sandboxID string
-	token     string
-	ca        *CA
-	listener  net.Listener
-	server    *http.Server
-	rules     atomic.Pointer[[]Rule]
-	transport *http.Transport
-	logger    *slog.Logger
+	mcpHandler func(string, http.ResponseWriter, *http.Request)
+	dial       func(context.Context, string, string) (net.Conn, error)
+	sandboxID  string
+	token      string
+	ca         *CA
+	listener   net.Listener
+	server     *http.Server
+	rules      atomic.Pointer[[]Rule]
+	transport  *http.Transport
+	logger     *slog.Logger
 
 	closed       atomic.Bool
 	statsMu      sync.Mutex
@@ -150,6 +151,13 @@ func (p *Proxy) record(host, path, rule string) {
 }
 
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	// Only the sandbox-scoped vsock/loopback channel reaches this origin-form
+	// endpoint. It never resolves DNS or opens another host listener.
+	if !r.URL.IsAbs() && r.URL.Path == "/isodo-mcp/github" && p.mcpHandler != nil {
+		p.mcpHandler(p.sandboxID, w, r)
+		return
+	}
+
 	expected := "Basic " + base64.StdEncoding.EncodeToString([]byte("isodo:"+p.token))
 	if subtle.ConstantTimeCompare([]byte(r.Header.Get("Proxy-Authorization")), []byte(expected)) != 1 {
 		w.Header().Set("Proxy-Authenticate", `Basic realm="isodo-sandbox"`)

@@ -214,10 +214,14 @@ function RootRouteView() {
             {primaryEnvironmentAuthenticated ? <AuthenticatedTracingBootstrap /> : null}
             <ConfirmDialogHost />
             <SlowRpcRequestToastCoordinator />
-            {!pathname.startsWith("/sandboxes") && pathname !== "/settings/sandbox" ? (
+            {!pathname.startsWith("/sandboxes") &&
+            pathname !== "/settings/sandbox" &&
+            pathname !== "/mcp-market" ? (
               <HostedStaticEnvironmentBootstrap />
             ) : null}
-            {!pathname.startsWith("/sandboxes") && pathname !== "/settings/sandbox" ? (
+            {!pathname.startsWith("/sandboxes") &&
+            pathname !== "/settings/sandbox" &&
+            pathname !== "/mcp-market" ? (
               <SandboxEnvironmentSync />
             ) : null}
             {primaryEnvironmentAuthenticated ? (

@@ -286,7 +286,7 @@ function SandboxWorkspaceSidebar({
               ["files", "文件", FileIcon],
               ["connections", "安全连接", PlugIcon],
               ["skills", "Skill", SparklesIcon],
-              ["mcp", "MCP", NetworkIcon],
+              ["mcp", "MCP 市场", NetworkIcon],
               ["snapshots", "快照", LayersIcon],
               ["security", "安全", ShieldCheckIcon],
             ] as const
@@ -294,20 +294,25 @@ function SandboxWorkspaceSidebar({
             <SidebarMenuItem key={pane}>
               <SidebarMenuButton
                 isActive={activePane === pane}
+                render={pane === "mcp" ? <Link to="/mcp-market" /> : undefined}
                 aria-label={label}
                 disabled={
-                  pane === "files"
-                    ? !onOpenFiles
-                    : pane === "connections"
-                      ? !onOpenConnections
-                      : true
+                  pane === "mcp"
+                    ? false
+                    : pane === "files"
+                      ? !onOpenFiles
+                      : pane === "connections"
+                        ? !onOpenConnections
+                        : true
                 }
                 title={
-                  pane === "files"
-                    ? "浏览当前任务的工作文件"
-                    : pane === "connections"
-                      ? "管理当前沙箱的安全连接"
-                      : "尚未接入"
+                  pane === "mcp"
+                    ? "浏览 MCP 市场和账号收藏"
+                    : pane === "files"
+                      ? "浏览当前任务的工作文件"
+                      : pane === "connections"
+                        ? "管理当前沙箱的安全连接"
+                        : "尚未接入"
                 }
                 onClick={
                   pane === "files"
@@ -614,9 +619,14 @@ export function CloudSidebar() {
             </SidebarMenuButton>
           </SidebarMenuItem>
           <SidebarMenuItem>
-            <SidebarMenuButton disabled aria-label="MCP" title="暂未开放">
+            <SidebarMenuButton
+              aria-label="MCP 市场"
+              render={<Link to="/mcp-market" />}
+              isActive={pathname === "/mcp-market"}
+              onClick={() => setOpenMobile(false)}
+            >
               <NetworkIcon />
-              MCP
+              MCP 市场
             </SidebarMenuButton>
           </SidebarMenuItem>
         </SidebarMenu>

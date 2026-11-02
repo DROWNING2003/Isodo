@@ -59,10 +59,17 @@ type Rule struct {
 }
 
 // SandboxConfig is the persisted rule set for one sandbox.
+type MCPBinding struct {
+	ID         string `json:"id"`
+	MarketID   string `json:"market_id"`
+	Capability string `json:"capability"`
+}
+
 type SandboxConfig struct {
-	Rules     []Rule    `json:"rules"`
-	UpdatedAt time.Time `json:"updated_at"`
-	Enabled   bool      `json:"enabled"`
+	MCP       []MCPBinding `json:"mcp,omitempty"`
+	Rules     []Rule       `json:"rules"`
+	UpdatedAt time.Time    `json:"updated_at"`
+	Enabled   bool         `json:"enabled"`
 }
 
 // View strips plaintext material for API/UI responses.
@@ -75,6 +82,7 @@ func (r Rule) View() Rule {
 // ConfigView strips all plaintext material.
 func (c SandboxConfig) View() SandboxConfig {
 	view := c
+	view.MCP = nil
 	view.Rules = make([]Rule, 0, len(c.Rules))
 	for _, rule := range c.Rules {
 		view.Rules = append(view.Rules, rule.View())

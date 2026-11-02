@@ -16,6 +16,7 @@ import (
 
 	"github.com/DROWNING2003/Isodo/internal/control/auth"
 	"github.com/DROWNING2003/Isodo/internal/control/injection"
+	"github.com/DROWNING2003/Isodo/internal/control/mcpmarket"
 	"github.com/DROWNING2003/Isodo/internal/control/orchestrator"
 	"github.com/DROWNING2003/Isodo/internal/control/postgres"
 	"github.com/DROWNING2003/Isodo/internal/control/preview"
@@ -127,7 +128,13 @@ func run(logger *slog.Logger) error {
 	if nodeClient != nil {
 		injectionHandler.SetRuntimeRevoker(nodeClient)
 	}
-	publicHandler := httpapi.NewHandlerWithInjections(web, auth.NewAPIKeyHandler(store), sandboxHandler, access, injectionHandler, template.NewHandler(store))
+	var mcpRuntime mcpmarket.Runtime
+	if nodeClient != nil {
+		mcpRuntime = nodeClient
+	}
+	mcpHandler := mcpmarket.New(store.Pool(), sealer, mcpmarket.Config{ClientID: os.Getenv("ISODO_GITHUB_OAUTH_CLIENT_ID"), ClientSecret: os.Getenv("ISODO_GITHUB_OAUTH_CLIENT_SECRET"), RedirectURI: os.Getenv("ISODO_GITHUB_OAUTH_REDIRECT_URI")}, mcpRuntime)
+	publicHandler := httpapi.NewHandlerWithMCP(web, auth.NewAPIKeyHandler(store), sandboxHandler, access, injectionHandler, mcpHandler, template.NewHandler(store))
+	publicHandler = mcpHandler.Wrap(publicHandler, access)
 	additionalHandlers := make(map[string]http.Handler)
 	for _, origin := range additionalOrigins {
 		site, err := url.Parse(origin)
@@ -139,7 +146,7 @@ func run(logger *slog.Logger) error {
 			return fmt.Errorf("configure additional web origin: %w", err)
 		}
 		extraAccess := &auth.Access{Bearer: casdoor, Keys: store, Web: extraWeb}
-		additionalHandlers[site.Host] = httpapi.NewHandlerWithInjections(extraWeb, auth.NewAPIKeyHandler(store), sandboxHandler, extraAccess, injectionHandler, template.NewHandler(store))
+		additionalHandlers[site.Host] = mcpHandler.Wrap(httpapi.NewHandlerWithMCP(extraWeb, auth.NewAPIKeyHandler(store), sandboxHandler, extraAccess, injectionHandler, mcpHandler, template.NewHandler(store)), extraAccess)
 	}
 	publicHandler = routeWebHosts(publicHandler, additionalHandlers)
 	if publisher != nil {
