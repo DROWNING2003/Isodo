@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { isodoFetch } from "../../api/transport";
 import {
   listMCPCatalog,
+  listSandboxMCPBindings,
   type MCPCatalogEntry,
   bindSandboxMCP,
   unbindSandboxMCP,
@@ -119,4 +120,14 @@ export function useMCPOAuth() {
     }
   };
   return { connect, cancel, pending, error };
+}
+
+/** Reapply existing bindings after an explicit Agent config replacement. */
+export async function restoreBoundMCP(sandboxId: string): Promise<void> {
+  const bindings = await listSandboxMCPBindings(sandboxId);
+  for (const binding of bindings.items) {
+    const result = await syncSandboxMCP(sandboxId, binding.market_mcp_id);
+    if (result.sync_status !== "applied")
+      throw new Error("Agent 配置已保存，但 MCP 配置恢复失败，请在安全连接中重新应用。");
+  }
 }

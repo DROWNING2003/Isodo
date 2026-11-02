@@ -1,3 +1,4 @@
+import { restoreBoundMCP } from "./mcpMarket";
 import { SandboxMCPBindings } from "./MCPMarketPage";
 import { TemporaryAgentDialog, type TemporaryAgent } from "./TemporaryAgentDialog";
 import { useEffect, useState } from "react";
@@ -134,6 +135,10 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
         write,
         onStage: setStage,
       });
+      if (!localRuntime.record && (selection.agentIds.length || nextAgents.length)) {
+        setStage("正在恢复已绑定 MCP 配置…");
+        await restoreBoundMCP(sandboxId);
+      }
       await saveSandboxCredentialSelection(sandboxId, selection, configs, {
         temporaryAgents: nextAgents,
         oneOff: nextOneOff,
