@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"io"
+	"maps"
 	"strconv"
 	"time"
 
@@ -110,13 +111,25 @@ func (s *CHVServer) RunCommand(ctx context.Context, request *wrapperspb.BytesVal
 	// request_id. Reusing the key with a different argv/env/timeout will be
 	// rejected by the Guest's existing idempotency conflict check.
 	requestID := guestCommandRequestID(input.SandboxID, input.Generation, record.BootID, record.GuestEpoch, input.Key)
+	environment := input.Command.Env
+	if record.EgressAllowed && s.config.NetworkBridge == "" {
+		if s.injections == nil {
+			return nil, status.Error(codes.FailedPrecondition, "sandbox egress is unavailable")
+		}
+		defaults, err := s.chvProxyEnvironment(input.SandboxID)
+		if err != nil {
+			return nil, status.Error(codes.Unavailable, "sandbox proxy environment unavailable")
+		}
+		environment = defaults
+		maps.Copy(environment, input.Command.Env)
+	}
 	timeout := uint32(input.Command.TimeoutSeconds)
 	start := &guestv1.StartProcessRequest{
 		Identity:              identity,
 		RequestId:             requestID,
 		Command:               &guestv1.Command{Argv: input.Command.Argv},
 		Cwd:                   &input.Command.Cwd,
-		Env:                   input.Command.Env,
+		Env:                   environment,
 		CommandTimeoutSeconds: &timeout,
 	}
 	process, err := guest.StartProcess(ctx, start)
