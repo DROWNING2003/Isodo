@@ -69,3 +69,17 @@ func TestCommandKeyValidation(t *testing.T) {
 		}
 	}
 }
+
+func TestGuestCommandRequestIDIsScopedToCurrentRuntime(t *testing.T) {
+	id := "f323e70d-cd11-4a02-a245-6b4ed2ce1e31"
+	first := guestCommandRequestID(id, 2, "boot-1", "epoch-1", "client-request")
+	if first != guestCommandRequestID(id, 2, "boot-1", "epoch-1", "client-request") {
+		t.Fatal("same key and runtime must deduplicate")
+	}
+	if first == guestCommandRequestID(id, 2, "boot-2", "epoch-1", "client-request") ||
+		first == guestCommandRequestID(id, 2, "boot-1", "epoch-2", "client-request") ||
+		first == guestCommandRequestID(id, 3, "boot-1", "epoch-1", "client-request") ||
+		first == guestCommandRequestID(id, 2, "boot-1", "epoch-1", "client-request-other") {
+		t.Fatal("different key or runtime must not reuse execution ID")
+	}
+}
