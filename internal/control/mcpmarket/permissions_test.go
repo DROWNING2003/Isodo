@@ -57,7 +57,7 @@ func TestMCPRuntimeRolePermissions(t *testing.T) {
 	if err = tx.QueryRow(t.Context(), `SELECT has_table_privilege(current_user,'mcp_catalog','INSERT')`).Scan(&catalogWrite); err != nil || catalogWrite {
 		t.Fatal("runtime can mutate catalog")
 	}
-	for _, table := range []string{"mcp_favorites", "mcp_oauth_connections", "mcp_oauth_transactions", "mcp_sandbox_bindings", "sandbox_port_previews"} {
+	for _, table := range []string{"mcp_favorites", "mcp_oauth_connections", "mcp_oauth_transactions", "mcp_sandbox_bindings", "sandbox_port_previews", "mcp_custom_servers", "mcp_custom_bindings"} {
 		for _, action := range []string{"SELECT", "INSERT", "UPDATE", "DELETE"} {
 			var allowed bool
 			if err = tx.QueryRow(t.Context(), `SELECT has_table_privilege(current_user,$1,$2)`, table, action).Scan(&allowed); err != nil || !allowed {

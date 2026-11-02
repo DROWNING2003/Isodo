@@ -47,6 +47,22 @@ func TestCodexMCPMergePreservesConfigAndRejectsSymlinks(t *testing.T) {
 	if strings.Count(string(data), "[mcp_servers.isodo_github]") != 1 {
 		t.Fatal("duplicate section")
 	}
+	const custom = "custom-11111111-1111-4111-8111-111111111111"
+	if err = run(`["github","` + custom + `"]`); err != nil {
+		t.Fatal(err)
+	}
+	data, _ = os.ReadFile(path)
+	if !strings.Contains(string(data), "/isodo-mcp/"+custom) || !strings.Contains(string(data), "[mcp_servers.isodo_github]") {
+		t.Fatal("mixed MCP config missing")
+	}
+	before := string(data)
+	if run(`["../escape"]`) == nil {
+		t.Fatal("unsafe MCP identifier accepted")
+	}
+	data, _ = os.ReadFile(path)
+	if string(data) != before {
+		t.Fatal("failed merge modified configuration")
+	}
 	if err = run("false"); err != nil {
 		t.Fatal(err)
 	}

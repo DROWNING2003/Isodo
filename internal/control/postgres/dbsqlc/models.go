@@ -56,6 +56,30 @@ type McpCatalog struct {
 	AuthKind    string
 }
 
+type McpCustomBinding struct {
+	SandboxBindingID pgtype.UUID
+	TenantID         pgtype.UUID
+	SandboxID        pgtype.UUID
+	CustomServerID   pgtype.UUID
+	CapabilityHash   []byte
+	SyncStatus       string
+}
+
+type McpCustomServer struct {
+	ID          pgtype.UUID
+	TenantID    pgtype.UUID
+	Name        string
+	Description string
+	Endpoint    string
+	AuthKind    string
+	Nonce       []byte
+	Ciphertext  []byte
+	Tools       []byte
+	Status      string
+	Version     int64
+	CreatedAt   pgtype.Timestamptz
+}
+
 type McpFavorite struct {
 	TenantID    pgtype.UUID
 	MarketMcpID string

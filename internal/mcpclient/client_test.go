@@ -70,3 +70,39 @@ func TestNoCredentialRedirect(t *testing.T) {
 		}
 	}
 }
+
+func TestCustomNoAuthenticationAndAdvertisedTools(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if _, exists := r.Header["Authorization"]; exists {
+			t.Error("no-auth MCP received an Authorization header")
+		}
+		var msg struct {
+			ID     int    `json:"id"`
+			Method string `json:"method"`
+		}
+		json.NewDecoder(r.Body).Decode(&msg)
+		if msg.Method == "initialize" {
+			fmt.Fprintf(w, `{"jsonrpc":"2.0","id":%d,"result":{"protocolVersion":%q}}`, msg.ID, Protocol)
+			return
+		}
+		if msg.Method == "notifications/initialized" {
+			w.WriteHeader(202)
+			return
+		}
+		fmt.Fprintf(w, `{"jsonrpc":"2.0","id":%d,"result":{"tools":[{"name":"custom_echo","inputSchema":{}}]}}`, msg.ID)
+	}))
+	defer server.Close()
+	custom := Session{Client: server.Client(), Endpoint: server.URL, CustomTools: true}
+	if err := custom.Initialize(t.Context()); err != nil {
+		t.Fatal(err)
+	}
+	tools, err := custom.Tools(t.Context())
+	if err != nil || len(tools) != 1 || tools[0].Name != "custom_echo" {
+		t.Fatalf("custom discovery: %v %v", tools, err)
+	}
+	github := Session{Client: server.Client(), Endpoint: server.URL}
+	tools, err = github.Tools(t.Context())
+	if err != nil || len(tools) != 0 {
+		t.Fatal("custom tools bypassed GitHub allowlist")
+	}
+}

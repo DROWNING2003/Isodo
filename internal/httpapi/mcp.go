@@ -3,6 +3,7 @@ package httpapi
 import (
 	api "github.com/DROWNING2003/Isodo/internal/api/public"
 	"github.com/DROWNING2003/Isodo/internal/control/mcpmarket"
+	openapi_types "github.com/oapi-codegen/runtime/types"
 	"net/http"
 )
 
@@ -83,4 +84,9 @@ func (h *MCPHandlers) CompleteMCPOAuth(w http.ResponseWriter, r *http.Request, _
 		return
 	}
 	h.Market.Callback(w, r)
+}
+
+func (h *MCPHandlers) CreateCustomMCP(w http.ResponseWriter, r *http.Request) { h.account(w, r) }
+func (h *MCPHandlers) DeleteCustomMCP(w http.ResponseWriter, r *http.Request, customID openapi_types.UUID) {
+	h.account(w, r)
 }

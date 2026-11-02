@@ -8,6 +8,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE
  TO :"app_role";
 -- PR #25 preview policies are also used by the Sandbox deletion trigger.
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE sandbox_port_previews TO :"app_role";
+GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE mcp_custom_servers, mcp_custom_bindings TO :"app_role";
 COMMIT;
 \else
 \echo 'app_role is required; no grants applied'

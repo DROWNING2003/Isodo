@@ -35,7 +35,9 @@ type Tool struct {
 type Session struct {
 	Client                       *http.Client
 	Endpoint, Token, ID, Version string
-	next                         int
+	// Custom services advertise their own tools; GitHub keeps its fixed allowlist.
+	CustomTools bool
+	next        int
 }
 type StatusError struct{ Status int }
 
@@ -58,7 +60,9 @@ func (s *Session) Request(ctx context.Context, method string, params any) (json.
 	if err != nil {
 		return nil, ErrProtocol
 	}
-	req.Header.Set("Authorization", "Bearer "+s.Token)
+	if s.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+s.Token)
+	}
 	req.Header.Set("Accept", "application/json, text/event-stream")
 	req.Header.Set("Content-Type", "application/json")
 	if s.ID != "" {
@@ -172,7 +176,7 @@ func (s *Session) Tools(ctx context.Context) ([]Tool, error) {
 			return nil, ErrProtocol
 		}
 		for _, tool := range page.Tools {
-			if Allowed(tool.Name) {
+			if Allowed(tool.Name) || s.CustomTools {
 				tools = append(tools, tool)
 			}
 		}
@@ -198,7 +202,9 @@ func (s *Session) Close(ctx context.Context) {
 	if err != nil {
 		return
 	}
-	req.Header.Set("Authorization", "Bearer "+s.Token)
+	if s.Token != "" {
+		req.Header.Set("Authorization", "Bearer "+s.Token)
+	}
 	req.Header.Set("Mcp-Session-Id", s.ID)
 	req.Header.Set("MCP-Protocol-Version", s.Version)
 	client := *s.Client

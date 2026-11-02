@@ -39,6 +39,24 @@ func (e CreateTemplateVisibility) Valid() bool {
 	}
 }
 
+// Defines values for CustomMCPCreateAuthKind.
+const (
+	CustomMCPCreateAuthKindBearer CustomMCPCreateAuthKind = "bearer"
+	CustomMCPCreateAuthKindNone   CustomMCPCreateAuthKind = "none"
+)
+
+// Valid indicates whether the value is a known member of the CustomMCPCreateAuthKind enum.
+func (e CustomMCPCreateAuthKind) Valid() bool {
+	switch e {
+	case CustomMCPCreateAuthKindBearer:
+		return true
+	case CustomMCPCreateAuthKindNone:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ForkTemplateVisibility.
 const (
 	ForkTemplateVisibilityPrivate ForkTemplateVisibility = "private"
@@ -137,13 +155,37 @@ func (e MCPBindingSyncStatus) Valid() bool {
 
 // Defines values for MCPCatalogEntryAuthKind.
 const (
-	Oauth2 MCPCatalogEntryAuthKind = "oauth2"
+	MCPCatalogEntryAuthKindBearer MCPCatalogEntryAuthKind = "bearer"
+	MCPCatalogEntryAuthKindNone   MCPCatalogEntryAuthKind = "none"
+	MCPCatalogEntryAuthKindOauth2 MCPCatalogEntryAuthKind = "oauth2"
 )
 
 // Valid indicates whether the value is a known member of the MCPCatalogEntryAuthKind enum.
 func (e MCPCatalogEntryAuthKind) Valid() bool {
 	switch e {
-	case Oauth2:
+	case MCPCatalogEntryAuthKindBearer:
+		return true
+	case MCPCatalogEntryAuthKindNone:
+		return true
+	case MCPCatalogEntryAuthKindOauth2:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MCPCatalogEntrySource.
+const (
+	Custom MCPCatalogEntrySource = "custom"
+	Market MCPCatalogEntrySource = "market"
+)
+
+// Valid indicates whether the value is a known member of the MCPCatalogEntrySource enum.
+func (e MCPCatalogEntrySource) Valid() bool {
+	switch e {
+	case Custom:
+		return true
+	case Market:
 		return true
 	default:
 		return false
@@ -635,6 +677,18 @@ type CreateTemplate struct {
 // CreateTemplateVisibility defines model for CreateTemplate.Visibility.
 type CreateTemplateVisibility string
 
+// CustomMCPCreate defines model for CustomMCPCreate.
+type CustomMCPCreate struct {
+	AuthKind    CustomMCPCreateAuthKind `json:"auth_kind"`
+	Description *string                 `json:"description,omitempty"`
+	Endpoint    string                  `json:"endpoint"`
+	Name        string                  `json:"name"`
+	Token       *string                 `json:"token,omitempty"`
+}
+
+// CustomMCPCreateAuthKind defines model for CustomMCPCreate.AuthKind.
+type CustomMCPCreateAuthKind string
+
 // Error defines model for Error.
 type Error struct {
 	Error struct {
@@ -702,8 +756,9 @@ type InjectionRuleType string
 
 // MCPBinding defines model for MCPBinding.
 type MCPBinding struct {
+	CustomServerId    *openapi_types.UUID  `json:"custom_server_id,omitempty"`
 	MarketMcpId       string               `json:"market_mcp_id"`
-	OauthConnectionId string               `json:"oauth_connection_id"`
+	OauthConnectionId *string              `json:"oauth_connection_id,omitempty"`
 	SandboxBindingId  string               `json:"sandbox_binding_id"`
 	Status            MCPBindingStatus     `json:"status"`
 	SyncStatus        MCPBindingSyncStatus `json:"sync_status"`
@@ -723,6 +778,7 @@ type MCPBindingList struct {
 // MCPCatalogEntry defines model for MCPCatalogEntry.
 type MCPCatalogEntry struct {
 	AuthKind          MCPCatalogEntryAuthKind  `json:"auth_kind"`
+	CustomServerId    *openapi_types.UUID      `json:"custom_server_id,omitempty"`
 	Description       string                   `json:"description"`
 	Endpoint          string                   `json:"endpoint"`
 	Favorite          bool                     `json:"favorite"`
@@ -731,12 +787,16 @@ type MCPCatalogEntry struct {
 	OauthConfigured   bool                     `json:"oauth_configured"`
 	OauthConnectionId *string                  `json:"oauth_connection_id,omitempty"`
 	Provider          string                   `json:"provider"`
+	Source            *MCPCatalogEntrySource   `json:"source,omitempty"`
 	Status            MCPCatalogEntryStatus    `json:"status"`
 	Transport         MCPCatalogEntryTransport `json:"transport"`
 }
 
 // MCPCatalogEntryAuthKind defines model for MCPCatalogEntry.AuthKind.
 type MCPCatalogEntryAuthKind string
+
+// MCPCatalogEntrySource defines model for MCPCatalogEntry.Source.
+type MCPCatalogEntrySource string
 
 // MCPCatalogEntryStatus defines model for MCPCatalogEntry.Status.
 type MCPCatalogEntryStatus string
@@ -1106,6 +1166,9 @@ type CreateInjectionRuleJSONRequestBody = CreateInjectionRule
 // UpdateInjectionRuleJSONRequestBody defines body for UpdateInjectionRule for application/json ContentType.
 type UpdateInjectionRuleJSONRequestBody = PatchInjectionRule
 
+// CreateCustomMCPJSONRequestBody defines body for CreateCustomMCP for application/json ContentType.
+type CreateCustomMCPJSONRequestBody = CustomMCPCreate
+
 // CreateSandboxJSONRequestBody defines body for CreateSandbox for application/json ContentType.
 type CreateSandboxJSONRequestBody = CreateSandbox
 
@@ -1338,6 +1401,29 @@ type ClientInterface interface {
 	//
 	// Corresponds with GET /v1/mcp/connections/{marketID}/tools (the `ListMCPTools` operationId).
 	ListMCPTools(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateCustomMCPWithBody 添加账号私有 HTTPS MCP 并验证工具发现
+	//
+	// 仅登录会话；支持无认证和 Bearer Token。Token 仅加密保存在 Control，不返回或传入 Guest。只允许公网 HTTPS 443，拒绝重定向、内网与 DNS 重绑定。.
+	//
+	// Takes any type of body and a specified content type.
+	//
+	// Corresponds with POST /v1/mcp/custom (the `CreateCustomMCP` operationId).
+	CreateCustomMCPWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CreateCustomMCP 添加账号私有 HTTPS MCP 并验证工具发现
+	//
+	// 仅登录会话；支持无认证和 Bearer Token。Token 仅加密保存在 Control，不返回或传入 Guest。只允许公网 HTTPS 443，拒绝重定向、内网与 DNS 重绑定。.
+	//
+	// Takes a body of the `application/json` content type.
+	//
+	// Corresponds with POST /v1/mcp/custom (the `CreateCustomMCP` operationId).
+	CreateCustomMCP(ctx context.Context, body CreateCustomMCPJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DeleteCustomMCP 删除自己的私有 MCP 并撤销全部沙箱绑定
+	//
+	// Corresponds with DELETE /v1/mcp/custom/{customID} (the `DeleteCustomMCP` operationId).
+	DeleteCustomMCP(ctx context.Context, customID openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// ListMCPFavorites List account favorites
 	//
@@ -1986,6 +2072,59 @@ func (c *Client) StartMCPOAuth(ctx context.Context, marketID string, reqEditors 
 // Corresponds with GET /v1/mcp/connections/{marketID}/tools (the `ListMCPTools` operationId).
 func (c *Client) ListMCPTools(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewListMCPToolsRequest(c.Server, marketID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateCustomMCPWithBody 添加账号私有 HTTPS MCP 并验证工具发现
+//
+// 仅登录会话；支持无认证和 Bearer Token。Token 仅加密保存在 Control，不返回或传入 Guest。只允许公网 HTTPS 443，拒绝重定向、内网与 DNS 重绑定。.
+//
+// Takes any type of body and a specified content type.
+//
+// Corresponds with POST /v1/mcp/custom (the `CreateCustomMCP` operationId).
+func (c *Client) CreateCustomMCPWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateCustomMCPRequestWithBody(c.Server, contentType, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CreateCustomMCP 添加账号私有 HTTPS MCP 并验证工具发现
+//
+// 仅登录会话；支持无认证和 Bearer Token。Token 仅加密保存在 Control，不返回或传入 Guest。只允许公网 HTTPS 443，拒绝重定向、内网与 DNS 重绑定。.
+//
+// Takes a body of the `application/json` content type.
+//
+// Corresponds with POST /v1/mcp/custom (the `CreateCustomMCP` operationId).
+func (c *Client) CreateCustomMCP(ctx context.Context, body CreateCustomMCPJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCreateCustomMCPRequest(c.Server, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DeleteCustomMCP 删除自己的私有 MCP 并撤销全部沙箱绑定
+//
+// Corresponds with DELETE /v1/mcp/custom/{customID} (the `DeleteCustomMCP` operationId).
+func (c *Client) DeleteCustomMCP(ctx context.Context, customID openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDeleteCustomMCPRequest(c.Server, customID)
 	if err != nil {
 		return nil, err
 	}
@@ -3407,6 +3546,80 @@ func NewListMCPToolsRequest(server string, marketID string) (*http.Request, erro
 	}
 
 	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCreateCustomMCPRequest calls the generic CreateCustomMCP builder with application/json body
+func NewCreateCustomMCPRequest(server string, body CreateCustomMCPJSONRequestBody) (*http.Request, error) {
+	var bodyReader io.Reader
+	buf, err := json.Marshal(body)
+	if err != nil {
+		return nil, err
+	}
+	bodyReader = bytes.NewReader(buf)
+	return NewCreateCustomMCPRequestWithBody(server, "application/json", bodyReader)
+}
+
+// NewCreateCustomMCPRequestWithBody constructs an http.Request for the CreateCustomMCP method, with any body, and a specified content type
+func NewCreateCustomMCPRequestWithBody(server string, contentType string, body io.Reader) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/mcp/custom")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), body)
+	if err != nil {
+		return nil, err
+	}
+
+	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewDeleteCustomMCPRequest constructs an http.Request for the DeleteCustomMCP method
+func NewDeleteCustomMCPRequest(server string, customID openapi_types.UUID) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "customID", customID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: "uuid"})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/mcp/custom/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
 	if err != nil {
 		return nil, err
 	}
@@ -5393,6 +5606,31 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /v1/mcp/connections/{marketID}/tools (the `ListMCPTools` operationId).
 	ListMCPToolsWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*ListMCPToolsResponse, error)
 
+	// CreateCustomMCPWithBodyWithResponse 添加账号私有 HTTPS MCP 并验证工具发现
+	//
+	// 仅登录会话；支持无认证和 Bearer Token。Token 仅加密保存在 Control，不返回或传入 Guest。只允许公网 HTTPS 443，拒绝重定向、内网与 DNS 重绑定。.
+	//
+	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/mcp/custom (the `CreateCustomMCP` operationId).
+	CreateCustomMCPWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateCustomMCPResponse, error)
+
+	// CreateCustomMCPWithResponse 添加账号私有 HTTPS MCP 并验证工具发现
+	//
+	// 仅登录会话；支持无认证和 Bearer Token。Token 仅加密保存在 Control，不返回或传入 Guest。只允许公网 HTTPS 443，拒绝重定向、内网与 DNS 重绑定。.
+	//
+	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/mcp/custom (the `CreateCustomMCP` operationId).
+	CreateCustomMCPWithResponse(ctx context.Context, body CreateCustomMCPJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateCustomMCPResponse, error)
+
+	// DeleteCustomMCPWithResponse 删除自己的私有 MCP 并撤销全部沙箱绑定
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/mcp/custom/{customID} (the `DeleteCustomMCP` operationId).
+	DeleteCustomMCPWithResponse(ctx context.Context, customID openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteCustomMCPResponse, error)
+
 	// ListMCPFavoritesWithResponse List account favorites
 	//
 	// Returns a wrapper object for the known response body format(s).
@@ -6513,6 +6751,95 @@ func (r ListMCPToolsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r ListMCPToolsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CreateCustomMCPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON201 the response for an HTTP 201 `application/json` response
+	JSON201 *MCPCatalogEntry
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON201 returns the response for an HTTP 201 `application/json` response
+func (r CreateCustomMCPResponse) GetJSON201() *MCPCatalogEntry {
+	return r.JSON201
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r CreateCustomMCPResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CreateCustomMCPResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CreateCustomMCPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CreateCustomMCPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CreateCustomMCPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DeleteCustomMCPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r DeleteCustomMCPResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DeleteCustomMCPResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DeleteCustomMCPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DeleteCustomMCPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DeleteCustomMCPResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -8670,6 +8997,49 @@ func (c *ClientWithResponses) ListMCPToolsWithResponse(ctx context.Context, mark
 	return ParseListMCPToolsResponse(rsp)
 }
 
+// CreateCustomMCPWithBodyWithResponse 添加账号私有 HTTPS MCP 并验证工具发现
+//
+// 仅登录会话；支持无认证和 Bearer Token。Token 仅加密保存在 Control，不返回或传入 Guest。只允许公网 HTTPS 443，拒绝重定向、内网与 DNS 重绑定。.
+//
+// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/mcp/custom (the `CreateCustomMCP` operationId).
+func (c *ClientWithResponses) CreateCustomMCPWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateCustomMCPResponse, error) {
+	rsp, err := c.CreateCustomMCPWithBody(ctx, contentType, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateCustomMCPResponse(rsp)
+}
+
+// CreateCustomMCPWithResponse 添加账号私有 HTTPS MCP 并验证工具发现
+//
+// 仅登录会话；支持无认证和 Bearer Token。Token 仅加密保存在 Control，不返回或传入 Guest。只允许公网 HTTPS 443，拒绝重定向、内网与 DNS 重绑定。.
+//
+// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/mcp/custom (the `CreateCustomMCP` operationId).
+func (c *ClientWithResponses) CreateCustomMCPWithResponse(ctx context.Context, body CreateCustomMCPJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateCustomMCPResponse, error) {
+	rsp, err := c.CreateCustomMCP(ctx, body, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCreateCustomMCPResponse(rsp)
+}
+
+// DeleteCustomMCPWithResponse 删除自己的私有 MCP 并撤销全部沙箱绑定
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/mcp/custom/{customID} (the `DeleteCustomMCP` operationId).
+func (c *ClientWithResponses) DeleteCustomMCPWithResponse(ctx context.Context, customID openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteCustomMCPResponse, error) {
+	rsp, err := c.DeleteCustomMCP(ctx, customID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDeleteCustomMCPResponse(rsp)
+}
+
 // ListMCPFavoritesWithResponse List account favorites
 //
 // Returns a wrapper object for the known response body format(s).
@@ -9870,6 +10240,68 @@ func ParseListMCPToolsResponse(rsp *http.Response) (*ListMCPToolsResponse, error
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCreateCustomMCPResponse parses an HTTP response from a CreateCustomMCPWithResponse call
+func ParseCreateCustomMCPResponse(rsp *http.Response) (*CreateCustomMCPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CreateCustomMCPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 201:
+		var dest MCPCatalogEntry
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON201 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDeleteCustomMCPResponse parses an HTTP response from a DeleteCustomMCPWithResponse call
+func ParseDeleteCustomMCPResponse(rsp *http.Response) (*DeleteCustomMCPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DeleteCustomMCPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest Error
@@ -11270,6 +11702,12 @@ type ServerInterface interface {
 	// ListMCPTools Discover allowed upstream tools
 	// (GET /v1/mcp/connections/{marketID}/tools)
 	ListMCPTools(w http.ResponseWriter, r *http.Request, marketID string)
+	// CreateCustomMCP 添加账号私有 HTTPS MCP 并验证工具发现
+	// (POST /v1/mcp/custom)
+	CreateCustomMCP(w http.ResponseWriter, r *http.Request)
+	// DeleteCustomMCP 删除自己的私有 MCP 并撤销全部沙箱绑定
+	// (DELETE /v1/mcp/custom/{customID})
+	DeleteCustomMCP(w http.ResponseWriter, r *http.Request, customID openapi_types.UUID)
 	// ListMCPFavorites List account favorites
 	// (GET /v1/mcp/favorites)
 	ListMCPFavorites(w http.ResponseWriter, r *http.Request)
@@ -11764,6 +12202,46 @@ func (siw *ServerInterfaceWrapper) ListMCPTools(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListMCPTools(w, r, marketID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateCustomMCP operation middleware
+func (siw *ServerInterfaceWrapper) CreateCustomMCP(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateCustomMCP(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteCustomMCP operation middleware
+func (siw *ServerInterfaceWrapper) DeleteCustomMCP(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "customID" -------------
+	var customID openapi_types.UUID
+
+	err = runtime.BindStyledParameterWithOptions("simple", "customID", r.PathValue("customID"), &customID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "customID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteCustomMCP(w, r, customID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -13171,6 +13649,8 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	}
 
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/mcp/oauth/callback", wrapper.CompleteMCPOAuth)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/mcp/custom", wrapper.CreateCustomMCP)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/mcp/custom/{customID}", wrapper.DeleteCustomMCP)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/mcp/catalog", wrapper.ListMCPCatalog)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/mcp/catalog/{marketID}", wrapper.GetMCPCatalog)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/mcp/favorites", wrapper.ListMCPFavorites)

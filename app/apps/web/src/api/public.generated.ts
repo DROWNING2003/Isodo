@@ -33,6 +33,29 @@ type NonReadonly<T> = [T] extends [UnionToIntersection<T>] ? {
     : T[P];
 } : DistributeReadOnlyOverUnions<T>;
 
+export type CustomMCPCreateAuthKind = typeof CustomMCPCreateAuthKind[keyof typeof CustomMCPCreateAuthKind];
+
+
+export const CustomMCPCreateAuthKind = {
+  none: 'none',
+  bearer: 'bearer',
+} as const;
+
+export interface CustomMCPCreate {
+  /**
+     * @minLength 1
+     * @maxLength 80
+     */
+  name: string;
+  /** @maxLength 240 */
+  description?: string;
+  /** @maxLength 2048 */
+  endpoint: string;
+  auth_kind: CustomMCPCreateAuthKind;
+  /** @maxLength 4096 */
+  token?: string;
+}
+
 export type MCPCatalogEntryTransport = typeof MCPCatalogEntryTransport[keyof typeof MCPCatalogEntryTransport];
 
 
@@ -45,6 +68,16 @@ export type MCPCatalogEntryAuthKind = typeof MCPCatalogEntryAuthKind[keyof typeo
 
 export const MCPCatalogEntryAuthKind = {
   oauth2: 'oauth2',
+  none: 'none',
+  bearer: 'bearer',
+} as const;
+
+export type MCPCatalogEntrySource = typeof MCPCatalogEntrySource[keyof typeof MCPCatalogEntrySource];
+
+
+export const MCPCatalogEntrySource = {
+  market: 'market',
+  custom: 'custom',
 } as const;
 
 export type MCPCatalogEntryStatus = typeof MCPCatalogEntryStatus[keyof typeof MCPCatalogEntryStatus];
@@ -65,6 +98,8 @@ export interface MCPCatalogEntry {
   endpoint: string;
   transport: MCPCatalogEntryTransport;
   auth_kind: MCPCatalogEntryAuthKind;
+  source?: MCPCatalogEntrySource;
+  custom_server_id?: string;
   favorite: boolean;
   status: MCPCatalogEntryStatus;
   /** @nullable */
@@ -153,7 +188,8 @@ export const MCPBindingStatus = {
 export interface MCPBinding {
   sandbox_binding_id: string;
   market_mcp_id: string;
-  oauth_connection_id: string;
+  oauth_connection_id?: string;
+  custom_server_id?: string;
   sync_status: MCPBindingSyncStatus;
   status: MCPBindingStatus;
 }
@@ -838,6 +874,69 @@ export const completeMCPOAuth = async (params: CompleteMCPOAuthParams, options?:
   {
     ...options,
     method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getCreateCustomMCPUrl = () => {
+
+
+
+
+  return `/v1/mcp/custom`
+}
+
+/**
+ * 仅登录会话；支持无认证和 Bearer Token。Token 仅加密保存在 Control，不返回或传入 Guest。只允许公网 HTTPS 443，拒绝重定向、内网与 DNS 重绑定。
+ * @summary 添加账号私有 HTTPS MCP 并验证工具发现
+ */
+export const createCustomMCP = async (customMCPCreate: CustomMCPCreate, options?: Parameters<typeof isodoFetch>[1]): Promise<MCPCatalogEntry> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return isodoFetch<MCPCatalogEntry>(getCreateCustomMCPUrl(),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(customMCPCreate)
+  }
+);}
+
+
+
+export const getDeleteCustomMCPUrl = (customID: string,) => {
+
+
+
+
+  return `/v1/mcp/custom/${customID}`
+}
+
+/**
+ * @summary 删除自己的私有 MCP 并撤销全部沙箱绑定
+ */
+export const deleteCustomMCP = async (customID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<void> => {
+
+  return isodoFetch<void>(getDeleteCustomMCPUrl(customID),
+  {
+    ...options,
+    method: 'DELETE'
 
 
   }
