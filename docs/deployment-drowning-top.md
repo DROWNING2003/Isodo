@@ -217,3 +217,25 @@ sudo bash /Users/drowning/Desktop/qiniu/Isodo/scripts/setup-drowning-top-local-d
 该脚本建立独立 LaunchDaemon，仅监听 127.0.0.1:15353；通过 /etc/resolver/drowning.top 将 drowning.top 及子域映射为 10.210.10.32。其他域的 DNS 路径不变，不修改公司 DNS，不开放外部 DNS 端口，不关闭 TLS 验证。规则重启后保留，也覆盖未来的动态 Sandbox 子域；会覆盖本机对整个 drowning.top 域的解析。检测到其他用途的同名 resolver 或服务配置会停止。需用户输入管理员密码。完成后完全退出并重新打开 Arc，保持 VPN 连接，访问带 :18443 的 URL。
 
 移除：同一命令把 install 改为 remove；只移除带本脚本标记的 resolver 和 LaunchDaemon。
+
+
+## 文档服务与凭证库调整（2026-11-02）
+
+- 文档站入口：`https://docs.drowning.top:18443/docs`；Web 侧栏“文档”通过 `VITE_ISODO_DOCS_URL` 跳转此域名。
+- Linux Node.js 24 / Next.js standalone，独立 `isodo-docs.service`，DynamicUser、只读发布文件和独立 CacheDirectory；仅监听 `127.0.0.1:13000`，由现有独立 Isodo Nginx 代理。
+- 当前文档发布 `/opt/isodo/docs/releases/docs-20261102-v2`，`/opt/isodo/docs/current` 为原子软链接。发布包含 standalone、static、public 和独立公开 OpenAPI 文件。配置见 `deploy/drowning-top/isodo-docs.service`，发布步骤见 `docs-site/README.md`。
+- Web 发布 `/opt/isodo/web/releases/ui-docs-20261102`，凭证库移除旧 MCP 凭证区块，既有数据库记录未删除，MCP 市场入口保留。
+- Nginx 配置及旧 Web 指向备份在 `/opt/isodo/backups/before-docs-20261102/`；只平滑重载 Isodo Nginx，未重启 API、沙箱 Node 或操作 VM。
+- 首页已更新 Skill/MCP 验收边界，新增 Skill 使用指南。原生 Linux 构建与文档运行成功；Web 类型检查、生产构建及 15 项相关前端测试通过。Next 构建含已有 highlight 选择器 CSS 优化警告，不影响构建成功。
+- HTTPS 定向解析验收：`/docs`、`/docs/guides/skills`、`/docs/api-reference/endpoints/ListSkills`、`/api/search?query=Skill` 和 `/api/openapi/public` 均返回 200；公开 schema 包含 Skill 和自定义 MCP 接口。API 原有 `/healthz` 仍为 200。
+- 当前内置浏览器已实际打开文档域名，并验证凭证库不再显示旧区块、侧栏文档链接正确；这不表示所有客户端/服务器 DNS 均已配置。
+- 用户明确选择不改 DNS、先定向解析验收。内部 DNS 后续需要 `docs.drowning.top A 10.210.10.32`，没有将私网记录写入公网 DNS，也没有修改本机 hosts。
+
+定向验收命令：
+
+```bash
+curl --noproxy '*' --resolve docs.drowning.top:18443:10.210.10.32 \
+  --fail https://docs.drowning.top:18443/docs
+```
+
+回退时将 Web / docs 的 current 指向保留的上一个版本；文档目录切换后只重启 isodo-docs.service。Nginx 可从上述备份恢复，先 nginx -t 再 reload；无需回滚数据库。
