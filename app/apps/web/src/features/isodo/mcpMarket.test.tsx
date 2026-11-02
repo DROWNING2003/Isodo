@@ -1,8 +1,21 @@
 import { act, create } from "react-test-renderer";
-import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { useMCPOAuth } from "./mcpMarket";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
+import { restoreBoundMCP, useMCPOAuth } from "./mcpMarket";
 
-const mocks = vi.hoisted(() => ({ fetch: vi.fn(), external: vi.fn(), invalidate: vi.fn() }));
+const mocks = vi.hoisted(() => ({
+  bindings: vi.fn(),
+  sync: vi.fn(),
+  fetch: vi.fn(),
+  external: vi.fn(),
+  invalidate: vi.fn(),
+}));
+vi.mock("../../api/public.generated", () => ({
+  listMCPCatalog: vi.fn(),
+  listSandboxMCPBindings: mocks.bindings,
+  syncSandboxMCP: mocks.sync,
+  bindSandboxMCP: vi.fn(),
+  unbindSandboxMCP: vi.fn(),
+}));
 vi.mock("../../api/transport", () => ({ isodoFetch: mocks.fetch }));
 vi.mock("../../localApi", () => ({
   ensureLocalApi: () => ({ shell: { openExternal: mocks.external } }),
@@ -86,4 +99,16 @@ describe("GitHub MCP OAuth browser selection", () => {
     });
     expect(oauth.error).toBeNull();
   });
+});
+
+it("reapplies only existing bindings after Agent file replacement", async () => {
+  mocks.bindings.mockResolvedValue({ items: [{ market_mcp_id: "github" }] });
+  mocks.sync.mockResolvedValue({ sync_status: "applied" });
+  await restoreBoundMCP("test-sandbox");
+  expect(mocks.sync).toHaveBeenCalledWith("test-sandbox", "github");
+});
+it("reports partial success instead of claiming MCP survived a failed reapply", async () => {
+  mocks.bindings.mockResolvedValue({ items: [{ market_mcp_id: "github" }] });
+  mocks.sync.mockResolvedValue({ sync_status: "pending" });
+  await expect(restoreBoundMCP("test-sandbox")).rejects.toThrow("MCP 配置恢复失败");
 });

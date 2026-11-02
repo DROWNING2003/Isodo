@@ -148,7 +148,7 @@ Casdoor Compose 仅重建 casdoor service，origin 改为 https://auth.drowning.
 
 ## 远程专用 Web 与 Electron
 
-Web 构建：
+Web 构建：推荐在仓库根目录执行 `bash scripts/build-drowning-top-web.sh`，固定远程模式、预览域名及完整工作台路由，避免漏传构建变量。等价命令：
 
 ```bash
 cd app
