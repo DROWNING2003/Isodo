@@ -12,6 +12,10 @@ const fixture = vi.hoisted(() => ({
 vi.mock("./cloudAppTemplates", () => ({ loadCloudAppTemplates: fixture.templates }));
 vi.mock("@tanstack/react-router", () => ({ useNavigate: () => fixture.navigate }));
 vi.mock("../../env", () => ({ isElectron: true }));
+vi.mock("./mcpMarket", () => ({
+  useMCPMarket: () => ({ data: { items: [] } }),
+  useMCPOAuth: () => ({ pending: false, error: null, connect: vi.fn(), cancel: vi.fn() }),
+}));
 vi.mock("./auth", () => ({ useAuth: () => ({ status: fixture.authStatus }) }));
 vi.mock("../../state/use-atom-command", () => ({ useAtomCommand: () => fixture.pairing }));
 vi.mock("../../connection/onboarding", () => ({ connectPairing: Symbol("pairing") }));
@@ -49,6 +53,7 @@ vi.mock("./credentialDocuments", () => ({
   }),
 }));
 vi.mock("./agentConfigs", () => ({
+  AGENT_CONFIGS_STORAGE_KEY: "isodo-agent-configs-test",
   readAgentConfigs: () => [
     {
       id: "agent",
