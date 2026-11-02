@@ -81,6 +81,7 @@ func TestSandboxRunCommandAuthorizationAndValidation(t *testing.T) {
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
 			request := httptest.NewRequest(http.MethodPost, url, strings.NewReader(tc.body))
+			request.Header.Set("Idempotency-Key", "test-command-id")
 			if tc.token != "" {
 				request.Header.Set("Authorization", tc.token)
 			}
@@ -104,6 +105,7 @@ func TestSandboxRunCommandAuthorizationAndValidation(t *testing.T) {
 	item.ObservedState = "stopped"
 	store.items[otherSandboxID] = item
 	request := httptest.NewRequest(http.MethodPost, url, strings.NewReader(`{"argv":["/bin/echo"]}`))
+	request.Header.Set("Idempotency-Key", "test-command-id")
 	request.Header.Set("Authorization", "Bearer user-a")
 	response := httptest.NewRecorder()
 	mux.ServeHTTP(response, request)
