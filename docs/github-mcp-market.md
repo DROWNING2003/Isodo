@@ -77,7 +77,7 @@ ISODO_MCP_BROKER_URL=https://api.drowning.top:18443
 
 真实 T3 `CODEX_HOME` 为 `/workspace/.codex`。Node 仅合并自有 `mcp_servers.isodo_github` 段到 `config.toml`，保留模型与其他 MCP。使用标准库 tomllib 校验完整前后文档、目录 FD/O_NOFOLLOW 拒绝符号链接、文件锁、原子替换和私有备份；与手工同名配置冲突时拒绝覆盖。相同配置不重复写入备份。
 
-配置只含内部 URL、工具列表和无上游权限的占位符。绑定保存在 Node 加密存储，Stop/Start 保留；建立出站环境时恢复配置。运行中可在“安全连接”页添加、移除或“应用配置”。UI 明确提示重启当前 Codex 会话；尚未实现自动重启已有 Codex 会话的按钮，不能声称热加载已验证。撤销不依赖 Agent 重启。
+配置只含内部 URL、工具列表和无上游权限的占位符。绑定保存在 Node 加密存储，Stop/Start 保留；建立出站环境时恢复配置。运行中在“安全连接”页勾选或取消 MCP，卡片回显已启用、待启用、待停用或待同步状态。MCP、Agent、HTTP 凭证与临时配置统一点击右下角保存，弹窗编辑只更新待保存配置；GitHub 账号 OAuth 仍是独立账号授权。保存先撤销取消勾选的 MCP，再写入凭证与 Agent、应用新增 MCP 并恢复配置。多步调用不宣称数据库/Guest 原子事务；后续失败保留待保存选择，明确报告已完成步骤。UI 明确提示重启当前 Codex 会话；尚未实现自动重启已有 Codex 会话的按钮，不能声称热加载已验证。撤销不依赖 Agent 重启。
 
 旧静态 Header MCP 凭证仍保留在凭证库/API；创建选择区的 MCP 改为收藏目录。Agent 和 HTTP 凭证选择保持原有链路。
 

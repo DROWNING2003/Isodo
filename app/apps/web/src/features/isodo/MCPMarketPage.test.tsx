@@ -1,7 +1,17 @@
 import { act, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { MCPFavoriteFields, MCPMarketPage, SandboxMCPBindings } from "./MCPMarketPage";
+import {
+  MCPFavoriteFields,
+  MCPMarketPage,
+  SandboxMCPBindings,
+  useSandboxMCPSelection,
+} from "./MCPMarketPage";
+let selectionState: ReturnType<typeof useSandboxMCPSelection>;
+function BoundFields({ sandboxId }: { sandboxId: string }) {
+  selectionState = useSandboxMCPSelection(sandboxId);
+  return <SandboxMCPBindings state={selectionState} />;
+}
 const fixture = vi.hoisted(() => ({
   items: [] as {
     market_mcp_id: string;
@@ -123,30 +133,29 @@ it("shows an existing Sandbox binding as checked and saves unchecked as revocati
   ];
   fixture.bind.mockResolvedValue({ sync_status: "applied" });
   await act(async () => {
-    renderer = create(<SandboxMCPBindings sandboxId="sandbox-a" />);
+    renderer = create(<BoundFields sandboxId="sandbox-a" />);
   });
   expect(renderer.root.findByType("input").props.checked).toBe(true);
   await act(async () =>
     renderer.root.findByType("input").props.onChange({ target: { checked: false } }),
   );
   expect(fixture.bind).not.toHaveBeenCalled();
-  const save = renderer.root
-    .findAllByType("button")
-    .find((b) => b.children.includes("保存 MCP 配置"))!;
-  expect(save.props.disabled).toBe(false);
-  await act(async () => save.props.onClick());
+  expect(
+    renderer.root.findAllByType("button").some((b) => b.children.includes("保存 MCP 配置")),
+  ).toBe(false);
+  await act(async () => selectionState.revokeRemoved());
   expect(fixture.bind).toHaveBeenCalledWith("sandbox-a", "github", "DELETE");
 });
 it("does not carry an unsaved selection to a different Sandbox", async () => {
   fixture.items = [github];
   fixture.bindings = [];
   await act(async () => {
-    renderer = create(<SandboxMCPBindings sandboxId="sandbox-a" />);
+    renderer = create(<BoundFields sandboxId="sandbox-a" />);
   });
   await act(async () =>
     renderer.root.findByType("input").props.onChange({ target: { checked: true } }),
   );
-  await act(async () => renderer.update(<SandboxMCPBindings sandboxId="sandbox-b" />));
+  await act(async () => renderer.update(<BoundFields sandboxId="sandbox-b" />));
   expect(renderer.root.findByType("input").props.checked).toBe(false);
   expect(fixture.bind).not.toHaveBeenCalled();
 });

@@ -131,18 +131,29 @@ export function MCPMarketPage() {
   );
 }
 
+function bindingSummary(binding: MCPBinding | undefined, selected: boolean): string {
+  if (!binding) return selected ? "待启用" : "未启用";
+  if (!selected) return "待停用";
+  return binding.sync_status === "applied" ? "已启用" : "配置待同步，保存以重试";
+}
+
 export function MCPFavoriteFields({
   value,
   onChange,
   disabled = false,
+  bindings,
 }: {
   value: string[];
   onChange: (ids: string[]) => void;
   disabled?: boolean;
+  bindings?: readonly MCPBinding[];
 }) {
   const market = useMCPMarket();
   const oauth = useMCPOAuth();
-  const favorites = (market.data?.items ?? []).filter((item) => item.favorite);
+  const favorites = (market.data?.items ?? []).filter(
+    (item) =>
+      item.favorite || bindings?.some((binding) => binding.market_mcp_id === item.market_mcp_id),
+  );
   return (
     <div className="grid gap-2">
       <h3 className="text-sm font-medium">MCP</h3>
@@ -167,7 +178,9 @@ export function MCPFavoriteFields({
             aria-label={`启用 ${item.name} MCP`}
             type="checkbox"
             checked={value.includes(item.market_mcp_id)}
-            disabled={disabled || item.status !== "connected"}
+            disabled={
+              disabled || (item.status !== "connected" && !value.includes(item.market_mcp_id))
+            }
             onChange={(e) =>
               onChange(
                 e.target.checked
@@ -180,6 +193,12 @@ export function MCPFavoriteFields({
             {item.name}
             <span className="block text-xs text-muted-foreground">
               GitHub 官方 MCP · {mcpStatus(item.status)}
+              {bindings
+                ? ` · ${bindingSummary(
+                    bindings.find((binding) => binding.market_mcp_id === item.market_mcp_id),
+                    value.includes(item.market_mcp_id),
+                  )}`
+                : null}
             </span>
           </span>
           {item.status !== "connected" ? (
@@ -211,128 +230,82 @@ export function MCPFavoriteFields({
   );
 }
 
-export function SandboxMCPBindings({ sandboxId }: { sandboxId: string }) {
+export function useSandboxMCPSelection(sandboxId: string, enabled = true) {
   const [draft, setDraft] = useState<{ scope: string; ids: string[] } | null>(null);
-  const [pending, setPending] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
   const auth = useAuth();
   const bindings = useQuery({
     queryKey: [...mcpKey, "bindings", getAuthGeneration(), sandboxId],
-    enabled: auth.status === "authenticated",
+    enabled: enabled && auth.status === "authenticated",
     queryFn: () =>
       isodoFetch<{ items: MCPBinding[] }>(`/v1/sandboxes/${encodeURIComponent(sandboxId)}/mcp`),
   });
   const scope = `${getAuthGeneration()}:${sandboxId}`;
-  const boundIds = bindings.data?.items.map((item) => item.market_mcp_id) ?? [];
+  const items = bindings.data?.items ?? [];
+  const boundIds = items.map((item) => item.market_mcp_id);
   const ids = draft?.scope === scope ? draft.ids : boundIds;
   const changed =
     ids.some((id) => !boundIds.includes(id)) || boundIds.some((id) => !ids.includes(id));
-  const save = async () => {
-    setPending(true);
-    setNotice(null);
+  const update = async (changes: readonly (readonly [string, "PUT" | "DELETE" | "POST"])[]) => {
     try {
-      const changes = [
-        ...boundIds.filter((id) => !ids.includes(id)).map((id) => [id, "DELETE"] as const),
-        ...ids.filter((id) => !boundIds.includes(id)).map((id) => [id, "PUT"] as const),
-      ];
-      let unapplied = false;
       for (const [id, method] of changes) {
         if (`${getAuthGeneration()}:${sandboxId}` !== scope)
           throw new Error("账号已切换，请重新加载");
         const result = await bindMCP(sandboxId, id, method);
-        unapplied ||= result.sync_status !== "applied";
+        if (result.sync_status !== "applied")
+          throw new Error(result.message ?? "MCP 绑定已保存，配置尚未同步，请重新保存重试。");
       }
-      await bindings.refetch();
-      setDraft(null);
-      setNotice(
-        unapplied
-          ? "绑定已保存，配置尚未应用，请重新应用。"
-          : "MCP 配置已保存。新启动的 Codex 会话将加载配置；撤销立即生效。",
-      );
-    } catch (cause) {
-      await bindings.refetch();
-      setNotice(cause instanceof Error ? cause.message : "MCP 保存失败，请重试");
+      return changes.length;
     } finally {
-      setPending(false);
+      if (changes.length) await bindings.refetch({ throwOnError: true });
     }
   };
-  const apply = async (id: string, method: "PUT" | "DELETE" | "POST") => {
-    setPending(true);
-    setNotice(null);
-    try {
-      const result = await bindMCP(sandboxId, id, method);
-      await bindings.refetch();
-      setDraft(null);
-      setNotice(
-        result.sync_status === "applied"
-          ? "配置已应用。请重启当前 Codex 会话以加载；撤销会立即阻止调用。"
-          : (result.message ?? "绑定已保存，配置尚未应用，请重试。"),
-      );
-    } catch (cause) {
-      setNotice(cause instanceof Error ? cause.message : "MCP 操作失败");
-    } finally {
-      setPending(false);
-    }
+  return {
+    items,
+    ids,
+    changed,
+    loading: bindings.isLoading,
+    failed: bindings.isError,
+    setIds: (next: string[]) => setDraft({ scope, ids: next }),
+    refetch: () => bindings.refetch({ throwOnError: true }),
+    resetDraft: () => setDraft(null),
+    revokeRemoved: () =>
+      update(boundIds.filter((id) => !ids.includes(id)).map((id) => [id, "DELETE"] as const)),
+    applyAdded: () =>
+      update(
+        ids.flatMap<readonly [string, "PUT" | "POST"]>((id) => {
+          const existing = items.find((item) => item.market_mcp_id === id);
+          return !existing
+            ? [[id, "PUT"] as const]
+            : existing.sync_status !== "applied"
+              ? [[id, "POST"] as const]
+              : [];
+        }),
+      ),
   };
+}
+
+export function SandboxMCPBindings({
+  state,
+  disabled = false,
+}: {
+  state: ReturnType<typeof useSandboxMCPSelection>;
+  disabled?: boolean;
+}) {
   return (
-    <section className="grid gap-3 rounded-xl border border-border p-4">
+    <section className="grid gap-3">
       <MCPFavoriteFields
-        value={ids}
-        onChange={(next) => setDraft({ scope, ids: next })}
-        disabled={pending || bindings.isLoading || bindings.isError}
+        value={state.ids}
+        onChange={state.setIds}
+        bindings={state.items}
+        disabled={disabled || state.loading || state.failed}
       />
-      <Button
-        type="button"
-        disabled={pending || bindings.isLoading || bindings.isError || !changed}
-        onClick={() => void save()}
-      >
-        {pending ? "正在保存…" : "保存 MCP 配置"}
-      </Button>
-      {changed ? (
-        <p role="status" className="text-sm text-muted-foreground">
-          有未保存的 MCP 更改。
-        </p>
-      ) : null}
-      {bindings.isError ? (
+      {state.failed ? (
         <p role="alert">
-          绑定读取失败。<button onClick={() => void bindings.refetch()}>重新加载</button>
+          MCP 读取失败。
+          <button type="button" onClick={() => void state.refetch().catch(() => {})}>
+            重新加载
+          </button>
         </p>
-      ) : null}
-      {bindings.data?.items.map((item) => (
-        <div key={item.sandbox_binding_id} className="flex flex-wrap items-center gap-2 text-sm">
-          <span>
-            GitHub · 已绑定沙箱 · {mcpStatus(item.status)} ·{" "}
-            {item.sync_status === "applied" ? "配置已应用" : "配置待应用"}
-          </span>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={pending}
-            onClick={() => void apply(item.market_mcp_id, "POST")}
-          >
-            应用配置
-          </Button>
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            disabled={pending}
-            onClick={() => void apply(item.market_mcp_id, "DELETE")}
-          >
-            移除
-          </Button>
-        </div>
-      ))}
-      {notice ? (
-        <div className="grid gap-2">
-          <p role="status" className="text-sm">
-            {notice}
-          </p>
-          <Link className="text-sm underline" to="/sandboxes/$sandboxId" params={{ sandboxId }}>
-            返回工作台，新建 Codex 任务加载配置
-          </Link>
-        </div>
       ) : null}
     </section>
   );
