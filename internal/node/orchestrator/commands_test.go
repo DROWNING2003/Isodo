@@ -2,11 +2,16 @@ package orchestrator
 
 import (
 	"context"
+	"net"
+	"time"
 	"encoding/json"
 	"testing"
 
 	"github.com/DROWNING2003/Isodo/internal/runtimecommands"
+	"google.golang.org/grpc"
 	"google.golang.org/grpc/codes"
+	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/test/bufconn"
 	"google.golang.org/grpc/status"
 	"google.golang.org/protobuf/types/known/wrapperspb"
 )
@@ -81,5 +86,35 @@ func TestGuestCommandRequestIDIsScopedToCurrentRuntime(t *testing.T) {
 		first == guestCommandRequestID(id, 3, "boot-1", "epoch-1", "client-request") ||
 		first == guestCommandRequestID(id, 2, "boot-1", "epoch-1", "client-request-other") {
 		t.Fatal("different key or runtime must not reuse execution ID")
+	}
+}
+
+func TestCommandRPCIsASeparateSingleMethodService(t *testing.T) {
+	listener := bufconn.Listen(1 << 20)
+	server := grpc.NewServer()
+	RegisterCommandRunner(server, &CHVServer{})
+	go func() { _ = server.Serve(listener) }()
+	defer server.Stop()
+
+	conn, err := grpc.NewClient("passthrough:///node-command-test",
+		grpc.WithTransportCredentials(insecure.NewCredentials()),
+		grpc.WithContextDialer(func(ctx context.Context, _ string) (net.Conn, error) {
+			return listener.DialContext(ctx)
+		}))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer conn.Close()
+
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	var reply wrapperspb.BytesValue
+	err = conn.Invoke(ctx, commandRunMethod, wrapperspb.Bytes([]byte(`{"sandbox_id":"invalid"}`)), &reply)
+	if status.Code(err) != codes.InvalidArgument {
+		t.Fatalf("Node Commands method was not registered: code=%v err=%v", status.Code(err), err)
+	}
+	// The old arbitrary Guest RPC tunnel is not part of this service's API.
+	if methods := server.GetServiceInfo()[commandRunnerServiceDesc.ServiceName].Methods; len(methods) != 1 || methods[0].Name != "RunCommand" {
+		t.Fatalf("unexpected Node Commands methods: %+v", methods)
 	}
 }
