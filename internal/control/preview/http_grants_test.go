@@ -66,7 +66,7 @@ func TestHTTPPreviewGrantIsolation(t *testing.T) {
 		{"legacy T3 token", p.mint(portPreviewSandboxID, 3000, time.Now().Add(time.Hour)), link.URL, 401},
 		{"wrong port", token, strings.Replace(link.URL, "3000-", "5173-", 1), 401},
 		{"wrong sandbox", token, strings.Replace(link.URL, portPreviewSandboxID, "a323e70d-cd11-4a02-a245-6b4ed2ce1e31", 1), 401},
-		{"reserved management", token, strings.Replace(link.URL, "3000-", "1024-", 1), 401},
+		{"reserved management", token, strings.Replace(link.URL, "3000-", "31024-", 1), 401},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			r := httptest.NewRequest("GET", tc.url, nil)

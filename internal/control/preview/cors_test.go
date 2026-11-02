@@ -18,7 +18,7 @@ func TestPreviewCookieBootstrapAndUpstreamCORS(t *testing.T) {
 		t.Fatal(err)
 	}
 	const id = "f323e70d-cd11-4a02-a245-6b4ed2ce1e31"
-	base, auth, err := p.Publish(id, 8080, upstream.URL+"/pair#token=one-time")
+	base, auth, err := p.Publish(id, 38080, upstream.URL+"/pair#token=one-time")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,7 +45,7 @@ func TestPreviewCookieBootstrapAndUpstreamCORS(t *testing.T) {
 		}
 	}
 	r = httptest.NewRequest(http.MethodGet, base+"__isodo/ready", nil)
-	r.AddCookie(&http.Cookie{Name: cookieName, Value: p.mint(id, 8080, time.Now().Add(-time.Minute))})
+	r.AddCookie(&http.Cookie{Name: cookieName, Value: p.mint(id, 38080, time.Now().Add(-time.Minute))})
 	w = httptest.NewRecorder()
 	handler.ServeHTTP(w, r)
 	if w.Code != http.StatusUnauthorized {
@@ -60,7 +60,7 @@ func TestPreviewPreflightAllowsOnlyConfiguredAppOrigin(t *testing.T) {
 	}
 	handler := p.Wrap(http.NotFoundHandler())
 	for _, origin := range []string{"http://app.isodo.localhost:5734", "http://evil.isodo.localhost:5734"} {
-		r := httptest.NewRequest(http.MethodOptions, "http://8080-f323e70d-cd11-4a02-a245-6b4ed2ce1e31.isodo.localhost/.well-known/t3/environment", nil)
+		r := httptest.NewRequest(http.MethodOptions, "http://38080-f323e70d-cd11-4a02-a245-6b4ed2ce1e31.isodo.localhost/.well-known/t3/environment", nil)
 		r.Header.Set("Origin", origin)
 		r.Header.Set("Access-Control-Request-Method", "GET")
 		r.Header.Set("Access-Control-Request-Headers", "authorization, content-type")
@@ -75,7 +75,7 @@ func TestPreviewPreflightAllowsOnlyConfiguredAppOrigin(t *testing.T) {
 		}
 	}
 	// A successful preflight must not authorize the resource itself.
-	r := httptest.NewRequest(http.MethodGet, "http://8080-f323e70d-cd11-4a02-a245-6b4ed2ce1e31.isodo.localhost/.well-known/t3/environment", nil)
+	r := httptest.NewRequest(http.MethodGet, "http://38080-f323e70d-cd11-4a02-a245-6b4ed2ce1e31.isodo.localhost/.well-known/t3/environment", nil)
 	r.Header.Set("Origin", "http://app.isodo.localhost:5734")
 	w := httptest.NewRecorder()
 	handler.ServeHTTP(w, r)

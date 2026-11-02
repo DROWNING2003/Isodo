@@ -3,6 +3,7 @@ package orchestrator
 import (
 	"context"
 	"errors"
+	"github.com/DROWNING2003/Isodo/internal/runtimeports"
 	"io"
 	"net"
 	"time"
@@ -151,7 +152,7 @@ func (s *CHVServer) RelayPort(stream grpc.BidiStreamingServer[nodev1.RelayFrame,
 // used by in-process validation and keeps the generation/liveness checks in
 // one place with the gRPC RelayPort implementation.
 func (s *CHVServer) RelayPortConn(ctx context.Context, sandboxID string, generation uint64, port uint16, service string) (net.Conn, error) {
-	if service != "t3" || port != 8080 || !canonicalUUID(sandboxID) {
+	if service != "t3" || port != runtimeports.Workbench || !canonicalUUID(sandboxID) {
 		return nil, errRelayInvalid
 	}
 	s.mu.Lock()
@@ -193,7 +194,7 @@ func (s *CHVServer) relayPortTarget(ctx context.Context, open *nodev1.RelayOpen)
 }
 
 func (s *CHVServer) validateHTTPPort(ctx context.Context, open *nodev1.RelayOpen) error {
-	if open.Service != "http-port" || !canonicalUUID(open.SandboxId) || open.Port == 0 || open.Port > 65535 || open.Port == 1024 || open.Port == 8080 || open.OwnershipGeneration == 0 || open.Revision == 0 || open.BootId == "" || open.GuestEpoch == "" {
+	if open.Service != "http-port" || !canonicalUUID(open.SandboxId) || open.Port == 0 || open.Port > 65535 || runtimeports.ReservedHTTP(open.Port) || open.OwnershipGeneration == 0 || open.Revision == 0 || open.BootId == "" || open.GuestEpoch == "" {
 		return errRelayInvalid
 	}
 	s.mu.Lock()

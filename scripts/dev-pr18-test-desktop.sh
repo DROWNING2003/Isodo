@@ -15,7 +15,7 @@ readonly TEST_API_ENV="/root/zkp/isodo-pr18-test/api.env"
 readonly WEB_PORT="5734"
 readonly WEB_ORIGIN="http://app.isodo.localhost:${WEB_PORT}"
 readonly PREVIEW_DOMAIN="isodo.localhost"
-readonly PREVIEW_PROBE_HOST="8080-00000000-0000-4000-8000-000000000000.${PREVIEW_DOMAIN}:${TEST_API_PORT}"
+readonly PREVIEW_PROBE_HOST="38080-00000000-0000-4000-8000-000000000000.${PREVIEW_DOMAIN}:${TEST_API_PORT}"
 
 readonly RUN_LOG="${TMPDIR:-/tmp}/isodo-pr18-test-$(date +%Y%m%d-%H%M%S)-$$.log"
 PROBE_BODY=""

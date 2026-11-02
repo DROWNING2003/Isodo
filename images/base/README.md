@@ -1,6 +1,8 @@
 # base 模板（内置 T3）
 
-`base` 是所有新沙箱的默认起点，T3、终端和文件能力属于基础能力；用途模板应从这个完整基础工件派生，而不是通过名称选择是否支持 T3。`images/linux-base` 仅构建底层 Guest OS；本目录在其之上加入 Node.js、T3 Server bundle 和 Codex/Claude CLI。镜像标签为 `isodo-base:0.1.0-dev`，系统模板正式名称为 `base`。T3 运行在 Guest `127.0.0.1:8080`，由 Node 的 `CreateSandboxAppLink` 通过 Vsock PortForward 暴露。
+当前开发版内部端口已迁移为 Guest 管理 31024、出站代理 31080、T3 38080；Node/Guest/镜像需要匹配升级。以下历史验证记录使用旧版端口，不能当作新端口完整镜像验收。见 [端口迁移说明](../../docs/runtime-service-ports.md)。
+
+`base` 是所有新沙箱的默认起点，T3、终端和文件能力属于基础能力；用途模板应从这个完整基础工件派生，而不是通过名称选择是否支持 T3。`images/linux-base` 仅构建底层 Guest OS；本目录在其之上加入 Node.js、T3 Server bundle 和 Codex/Claude CLI。镜像标签为 `isodo-base:0.1.0-dev`，系统模板正式名称为 `base`。T3 运行在 Guest `127.0.0.1:38080`，由 Node 的 `CreateSandboxAppLink` 通过 Vsock PortForward 暴露。
 
 ## 构建
 

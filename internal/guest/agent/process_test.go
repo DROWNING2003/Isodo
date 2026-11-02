@@ -8,6 +8,7 @@ import (
 	guestv1 "github.com/DROWNING2003/Isodo/internal/api/guest/v1"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
+	"google.golang.org/protobuf/proto"
 )
 
 func TestGuestProcessStartOutputAndDeduplication(t *testing.T) {
@@ -41,9 +42,9 @@ func TestGuestProcessStartOutputAndDeduplication(t *testing.T) {
 		t.Fatalf("retry started a second process: first=%s retry=%s", started.GetRef().GetExecutionId(), retried.GetRef().GetExecutionId())
 	}
 
-	conflict := *request
+	conflict := proto.Clone(request).(*guestv1.StartProcessRequest)
 	conflict.Command = &guestv1.Command{Argv: []string{"/bin/true"}}
-	if _, err := server.StartProcess(t.Context(), &conflict); status.Code(err) != codes.AlreadyExists {
+	if _, err := server.StartProcess(t.Context(), conflict); status.Code(err) != codes.AlreadyExists {
 		t.Fatalf("conflicting request ID error = %v, want AlreadyExists", err)
 	}
 

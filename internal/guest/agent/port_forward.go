@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/DROWNING2003/Isodo/internal/runtimeports"
 	"io"
 	"net"
 	"strings"
@@ -19,6 +20,9 @@ func validatePortForwardOpen(request *guestv1.PortForwardOpen) error {
 	}
 	if request.GetPort() == 0 || request.GetPort() > 65535 {
 		return status.Error(codes.InvalidArgument, "port forward port must be between 1 and 65535")
+	}
+	if request.GetService() == "http-port" && runtimeports.ReservedHTTP(request.GetPort()) {
+		return status.Error(codes.PermissionDenied, "runtime port is not an application HTTP port")
 	}
 	if strings.TrimSpace(request.GetService()) == "" || len(request.GetService()) > 128 {
 		return status.Error(codes.InvalidArgument, "port forward service is required")

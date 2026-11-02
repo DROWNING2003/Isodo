@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/DROWNING2003/Isodo/internal/runtimeports"
 	"log/slog"
 	"net"
 	"os"
@@ -47,7 +48,7 @@ func run(logger *slog.Logger) error {
 	case "tcp":
 		address := os.Getenv("ISODO_GUEST_LISTEN_ADDRESS")
 		if address == "" {
-			address = "127.0.0.1:1024"
+			address = fmt.Sprintf("127.0.0.1:%d", runtimeports.GuestAgent)
 		}
 		listener, err = net.Listen("tcp", address)
 		if err != nil {
@@ -68,7 +69,7 @@ func run(logger *slog.Logger) error {
 	guestv1.RegisterGuestServiceServer(server, guestServer)
 	serveErrors := make(chan error, 2)
 	if transport == "vsock" {
-		proxyListener, err := net.Listen("tcp", "127.0.0.1:1080")
+		proxyListener, err := net.Listen("tcp", fmt.Sprintf("127.0.0.1:%d", runtimeports.GuestEgress))
 		if err != nil {
 			return fmt.Errorf("listen for Guest egress proxy: %w", err)
 		}

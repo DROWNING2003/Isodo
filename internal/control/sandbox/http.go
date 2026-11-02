@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/DROWNING2003/Isodo/internal/runtimeports"
 	"github.com/google/uuid"
 	"io"
 	"net/http"
@@ -318,7 +319,7 @@ func (h *Handler) GetSandboxApp(w http.ResponseWriter, r *http.Request, id strin
 		return
 	}
 	if h.publisher != nil {
-		_, pairingURL, err := h.publisher.Publish(id, 8080, appURL)
+		_, pairingURL, err := h.publisher.Publish(id, runtimeports.Workbench, appURL)
 		if err != nil {
 			writeError(w, http.StatusBadGateway, "INVALID_SANDBOX_APP_LINK", "The sandbox application link could not be published.")
 			return
@@ -369,7 +370,7 @@ func (h *Handler) CreateSandboxAppLink(w http.ResponseWriter, r *http.Request, i
 	baseURL := base.String()
 	pairingURL := parsed.String()
 	if h.publisher != nil {
-		publishedBase, publishedPairing, publishErr := h.publisher.Publish(id, 8080, appURL)
+		publishedBase, publishedPairing, publishErr := h.publisher.Publish(id, runtimeports.Workbench, appURL)
 		if publishErr != nil {
 			writeError(w, http.StatusBadGateway, "INVALID_SANDBOX_APP_LINK", "The sandbox application link could not be published.")
 			return

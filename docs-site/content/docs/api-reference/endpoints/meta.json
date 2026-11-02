@@ -10,6 +10,8 @@
     "StartSandbox",
     "StopSandbox",
     "CreateSandboxPreview",
+    "GetSandboxPortPreview",
+    "SetSandboxPortPreview",
     "RunSandboxCommand",
     "---应用访问---",
     "GetSandboxApp",

@@ -49,7 +49,7 @@ func TestCHVEgressBridgeInjectsAndRejectsStaleRuntime(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer os.RemoveAll(directory)
-	path := filepath.Join(directory, "vsock_1080")
+	path := filepath.Join(directory, "vsock_31080")
 	var active atomic.Bool
 	active.Store(true)
 	bridge, err := startEgressBridge(t.Context(), path, manager.ProxyPort("sandbox"), active.Load)

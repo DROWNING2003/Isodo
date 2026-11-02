@@ -30,12 +30,12 @@ func TestPublishAuthenticateAndProxy(t *testing.T) {
 		t.Fatal(err)
 	}
 	const sandboxID = "f323e70d-cd11-4a02-a245-6b4ed2ce1e31"
-	nodeURL := "http://8080-" + sandboxID + ".localhost:" + backendURL.Port() + "/pair#token=pair-token"
-	base, pairing, err := publisher.Publish(sandboxID, 8080, nodeURL)
+	nodeURL := "http://38080-" + sandboxID + ".localhost:" + backendURL.Port() + "/pair#token=pair-token"
+	base, pairing, err := publisher.Publish(sandboxID, 38080, nodeURL)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if base != "http://8080-"+sandboxID+".localhost:43123/" {
+	if base != "http://38080-"+sandboxID+".localhost:43123/" {
 		t.Fatalf("base = %q", base)
 	}
 	parsed, err := url.Parse(pairing)
@@ -50,7 +50,7 @@ func TestPublishAuthenticateAndProxy(t *testing.T) {
 	handler := publisher.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
 		http.Error(w, "unexpected fallthrough", http.StatusTeapot)
 	}))
-	host := "8080-" + sandboxID + ".localhost:43123"
+	host := "38080-" + sandboxID + ".localhost:43123"
 
 	authRequest := httptest.NewRequest(http.MethodGet, "http://"+host+authPrefix+token+"?next=/pair", nil)
 	authResponse := httptest.NewRecorder()
@@ -86,14 +86,14 @@ func TestPreviewRejectsMissingOrForeignCredential(t *testing.T) {
 	const sandboxID = "f323e70d-cd11-4a02-a245-6b4ed2ce1e31"
 	handler := publisher.Wrap(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {}))
 	response := httptest.NewRecorder()
-	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "http://8080-"+sandboxID+".localhost:43123/", nil))
+	handler.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "http://38080-"+sandboxID+".localhost:43123/", nil))
 	if response.Code != http.StatusUnauthorized {
 		t.Fatalf("status = %d", response.Code)
 	}
 
-	otherToken := publisher.mint("f323e70d-cd11-4a02-a245-000000000000", 8080, time.Now().Add(time.Minute))
+	otherToken := publisher.mint("f323e70d-cd11-4a02-a245-000000000000", 38080, time.Now().Add(time.Minute))
 	response = httptest.NewRecorder()
-	request := httptest.NewRequest(http.MethodGet, "http://8080-"+sandboxID+".localhost:43123/", nil)
+	request := httptest.NewRequest(http.MethodGet, "http://38080-"+sandboxID+".localhost:43123/", nil)
 	request.AddCookie(&http.Cookie{Name: cookieName, Value: otherToken})
 	handler.ServeHTTP(response, request)
 	if response.Code != http.StatusUnauthorized {
@@ -141,7 +141,7 @@ func TestPreviewRelayDialsNodeWithoutLocalTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	const sandboxID = "7f0f1f64-9b3c-4c0f-8a9e-0d1e2f3a4b5c"
-	_, pairing, err := publisher.Publish(sandboxID, 8080, "http://8080-"+sandboxID+".localhost:9999/pair#token=relay-token")
+	_, pairing, err := publisher.Publish(sandboxID, 38080, "http://38080-"+sandboxID+".localhost:9999/pair#token=relay-token")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,7 +150,7 @@ func TestPreviewRelayDialsNodeWithoutLocalTarget(t *testing.T) {
 		t.Fatal(err)
 	}
 	token := strings.TrimPrefix(parsed.Path, authPrefix)
-	host := "8080-" + sandboxID + ".localhost:43123"
+	host := "38080-" + sandboxID + ".localhost:43123"
 	auth := httptest.NewRequest(http.MethodGet, "http://"+host+authPrefix+token+"?next=/pair", nil)
 	authResponse := httptest.NewRecorder()
 	publisher.Wrap(http.NotFoundHandler()).ServeHTTP(authResponse, auth)
@@ -189,7 +189,7 @@ func TestPreviewRelaySurvivesPublisherRestartForExistingPairing(t *testing.T) {
 		t.Fatal(err)
 	}
 	const sandboxID = "4e59eb96-35e9-4f22-88d9-2a3f4097b62a"
-	_, pairing, err := firstPublisher.Publish(sandboxID, 8080, "http://8080-"+sandboxID+".localhost:9999/pair#token=relay-token")
+	_, pairing, err := firstPublisher.Publish(sandboxID, 38080, "http://38080-"+sandboxID+".localhost:9999/pair#token=relay-token")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -202,7 +202,7 @@ func TestPreviewRelaySurvivesPublisherRestartForExistingPairing(t *testing.T) {
 		t.Fatal(err)
 	}
 	handler := secondPublisher.Wrap(http.NotFoundHandler())
-	host := "8080-" + sandboxID + ".localhost:43123"
+	host := "38080-" + sandboxID + ".localhost:43123"
 
 	auth := httptest.NewRequest(http.MethodGet, "http://"+host+parsed.EscapedPath()+"?next=/pair", nil)
 	authResponse := httptest.NewRecorder()
@@ -226,11 +226,11 @@ func TestHTTPSPublicPortAndCrossSiteCookie(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	base, pairing, err := p.Publish("f323e70d-cd11-4a02-a245-6b4ed2ce1e31", 8080, "http://127.0.0.1:12345/pair#token=secret")
+	base, pairing, err := p.Publish("f323e70d-cd11-4a02-a245-6b4ed2ce1e31", 38080, "http://127.0.0.1:12345/pair#token=secret")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if base != "https://8080-f323e70d-cd11-4a02-a245-6b4ed2ce1e31.drowning.top:18443/" {
+	if base != "https://38080-f323e70d-cd11-4a02-a245-6b4ed2ce1e31.drowning.top:18443/" {
 		t.Fatalf("base=%s", base)
 	}
 	u, _ := url.Parse(pairing)
@@ -286,7 +286,7 @@ func TestAdditionalWebOrigin(t *testing.T) {
 	}
 	h := p.Wrap(http.NotFoundHandler())
 	for _, origin := range []string{"https://web.drowning.top:18443", "https://evil.drowning.top:18443"} {
-		r := httptest.NewRequest("OPTIONS", "https://8080-f323e70d-cd11-4a02-a245-6b4ed2ce1e31.drowning.top:18443/", nil)
+		r := httptest.NewRequest("OPTIONS", "https://38080-f323e70d-cd11-4a02-a245-6b4ed2ce1e31.drowning.top:18443/", nil)
 		r.Header.Set("Origin", origin)
 		r.Header.Set("Access-Control-Request-Method", "POST")
 		w := httptest.NewRecorder()

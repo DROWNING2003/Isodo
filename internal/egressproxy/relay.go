@@ -4,12 +4,13 @@ package egressproxy
 
 import (
 	"context"
+	"github.com/DROWNING2003/Isodo/internal/runtimeports"
 	"io"
 	"net"
 	"sync"
 )
 
-const Port = 1080
+const Port = runtimeports.GuestEgress
 const maxConnections = 128
 
 type Dial func(context.Context) (net.Conn, error)

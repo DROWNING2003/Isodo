@@ -1,5 +1,7 @@
 # T3 云端运行时：模块、边界与验证
 
+当前开发版内部服务端口已迁移到 31024 / 31080 / 38080，需匹配升级 Node、Guest 与镜像；下方历史验证使用旧版本。详见[端口说明](runtime-service-ports.md)。
+
 状态：2026-10-25。本文描述当前代码实际具备的本地/云端 T3 链路、已验证证据和明确未实现的能力。运行步骤见 [cloud-t3 runbook](runbooks/cloud-t3.md)，协议细节见 [sandbox-endpoints](../specs/sandbox-endpoints.md)。
 
 ## 目标与范围
@@ -10,7 +12,7 @@
 
 - 本地 Lima 沙箱：Guest Ready 后启动 T3，沙箱卡片进入配对登录。
 - 云端 CHV 沙箱：不可变 `t3-base` 模板、独立 rootfs/workspace、Guest Agent、T3 Server + Web client、Codex/Claude CLI。
-- 云端应用链接：`POST /v1/sandboxes/{sandboxID}/app-link` 返回带 pairing fragment 的 URL；Preview Gateway 用 host-scoped signed cookie 把浏览器反代到 Node relay，再到 Guest `127.0.0.1:8080`。
+- 云端应用链接：`POST /v1/sandboxes/{sandboxID}/app-link` 返回带 pairing fragment 的 URL；Preview Gateway 用 host-scoped signed cookie 把浏览器反代到 Node relay，再到 Guest `127.0.0.1:38080`。
 - 生命周期：Create/Stop/Start/Delete 的 Node 后端语义；Stop 保盘，Start 冷启动并产生新 boot ID/guest epoch。
 - T3 capability：app-link 返回 `["terminal","files"]`；pairing credential 的 scopes 含 `terminal:operate`。
 
@@ -26,7 +28,7 @@
 | Node Orchestrator | `internal/node/orchestrator` | CHV 生命周期、journal、容量、app relay、Guest 连接 | 只信任本机 CHV API socket |
 | Template Runtime | `internal/node/templatebuilder` | 校验模板、复制实例盘、启动 CHV、Guest Ready、BindRuntime、Restart | 实例盘不可复用给其他 Sandbox |
 | Guest Agent | `internal/guest/agent`, `internal/api/guest/v1` | Exec · PTY · Files · PortForward | 不持有 CHV 控制权或平台长期凭证 |
-| T3 | `images/t3-base` | Node 24 + T3 Server/Web + CLI，监听 Guest `127.0.0.1:8080` | 以 uid 1000 运行，不读取宿主秘密 |
+| T3 | `images/t3-base` | Node 24 + T3 Server/Web + CLI，监听 Guest `127.0.0.1:38080` | 以 uid 1000 运行，不读取宿主秘密 |
 | Preview Gateway | `internal/control/preview` | signed token、cookie、host 路由、反代 | 不把 token 发到上游；上游 cookie 保留 |
 | Registry | `internal/templateartifact`, `scripts/publish-t3-template.sh` | 不可变模板 artifact 的 S3/DB 发布 | 发布失败不能伪装成 Ready |
 
@@ -41,11 +43,11 @@ Control API ── sandbox.Handler ── appLinkIssuer (Node client)
   │                                      ▼
   │                              Node CHVServer
   │                                ├─ loopback appRelay (127.0.0.1)
-  │                                ├─ Vsock PortForward → Guest 127.0.0.1:8080
+  │                                ├─ Vsock PortForward → Guest 127.0.0.1:38080
   │                                └─ pairing CLI → fragment token
   ▼
 preview.Publisher
-  ├─ public URL  http://8080-<id>.localhost:<api-port>/
+  ├─ public URL  http://38080-<id>.localhost:<api-port>/
   └─ pairing URL .../_isodo/auth/<signed>?next=/pair#token=...
   ▼
 Browser ── /_isodo/auth/... ── Set-Cookie isodo_preview (host-scoped)

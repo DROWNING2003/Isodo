@@ -5,6 +5,7 @@ import (
 	"crypto/rand"
 	"encoding/hex"
 	"errors"
+	"github.com/DROWNING2003/Isodo/internal/runtimeports"
 	"os"
 	"strconv"
 	"strings"
@@ -20,7 +21,7 @@ import (
 const (
 	ProtocolMajor = 1
 	ProtocolMinor = 0
-	VsockPort     = 1024
+	VsockPort     = runtimeports.GuestAgent
 )
 
 type Identity struct {

@@ -49,7 +49,7 @@ func TestWaitReadyTCPUsesLoopbackGuestAgent(t *testing.T) {
 }
 
 func TestNewTCPClientConnRejectsNonLoopbackAddress(t *testing.T) {
-	if _, err := NewTCPClientConn("192.0.2.10:1024"); err == nil {
+	if _, err := NewTCPClientConn("192.0.2.10:31024"); err == nil {
 		t.Fatal("NewTCPClientConn accepted a non-loopback host address")
 	}
 }
@@ -156,7 +156,7 @@ func startHandshakeServer(t *testing.T, acknowledgement, payload string) string 
 		}
 		defer conn.Close()
 		line, err := bufio.NewReader(conn).ReadString('\n')
-		if err != nil || line != "CONNECT 1024\n" {
+		if err != nil || line != "CONNECT 31024\n" {
 			return
 		}
 		if _, err := io.WriteString(conn, acknowledgement+"\n"+payload); err != nil {

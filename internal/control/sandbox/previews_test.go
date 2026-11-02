@@ -44,6 +44,8 @@ func (previewTestAuth) Authenticate(ctx context.Context, s string) (auth.Identit
 }
 func TestCreateHTTPPreviewOwnershipAndLifecycle(t *testing.T) {
 	store := newMemoryStore()
+	_, _ = store.SetPortPreview(t.Context(), "tenant-a", otherSandboxID, 3000, "private")
+	_, _ = store.SetPortPreview(t.Context(), "tenant-a", otherSandboxID, 5173, "private")
 	item := store.items[otherSandboxID]
 	item.ObservedState, item.DesiredState = "running", "running"
 	item.NodeID, item.Revision, item.OwnershipGeneration = "node-a", "1", 7
@@ -66,8 +68,8 @@ func TestCreateHTTPPreviewOwnershipAndLifecycle(t *testing.T) {
 		{"execute key", "Bearer executor", `{"port":3000}`, 403},
 		{"cross tenant", "Bearer user-b", `{"port":3000}`, 404},
 		{"anonymous", "", `{"port":3000}`, 401},
-		{"management", "Bearer user-a", `{"port":1024}`, 400},
-		{"workbench", "Bearer user-a", `{"port":8080}`, 400},
+		{"management", "Bearer user-a", `{"port":31024}`, 400},
+		{"workbench", "Bearer user-a", `{"port":38080}`, 400},
 		{"overflow", "Bearer user-a", `{"port":65536}`, 400},
 		{"unknown host", "Bearer user-a", `{"port":3000,"host":"127.0.0.1"}`, 400},
 	} {

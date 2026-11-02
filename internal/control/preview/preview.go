@@ -64,11 +64,14 @@ type Publisher struct {
 	additionalAppOrigins []string
 	ttl                  time.Duration
 
-	httpAuthorize HTTPAuthorizer
-	httpRelay     HTTPRelay
-	relay         RelayDialer
-	mu            sync.RWMutex
-	targets       map[string]*url.URL
+	httpAccess      HTTPAccessResolver
+	publicAdmission publicAdmission
+	httpStreams     httpStreams
+	httpAuthorize   HTTPAuthorizer
+	httpRelay       HTTPRelay
+	relay           RelayDialer
+	mu              sync.RWMutex
+	targets         map[string]*url.URL
 }
 
 type claims struct {
@@ -207,7 +210,7 @@ func (p *Publisher) target(sandboxID string) (*url.URL, bool) {
 	return target, ok
 }
 
-// Wrap serves authenticated preview hosts and passes every other request to next.
+// Wrap serves policy-controlled HTTP ports and authenticated T3 previews.
 func (p *Publisher) Wrap(next http.Handler) http.Handler {
 	if p == nil {
 		return next

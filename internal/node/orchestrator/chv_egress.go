@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/DROWNING2003/Isodo/internal/runtimeports"
 	"net"
 	"net/url"
 	"os"
@@ -119,7 +120,7 @@ func (s *CHVServer) configureCHVEgress(ctx context.Context, record sandboxRecord
 		if err != nil {
 			return err
 		}
-		parsed.Host = "127.0.0.1:1080"
+		parsed.Host = fmt.Sprintf("127.0.0.1:%d", runtimeports.GuestEgress)
 		environment[key] = parsed.String()
 	}
 	environment["NODE_USE_ENV_PROXY"] = "1"
@@ -130,7 +131,7 @@ func (s *CHVServer) configureCHVEgress(ctx context.Context, record sandboxRecord
 	if err != nil {
 		return err
 	}
-	binding, err := startEgressBridge(s.ctx, instance.VsockSocket()+"_1080", s.injections.ProxyPort(record.SandboxID), func() bool {
+	binding, err := startEgressBridge(s.ctx, fmt.Sprintf("%s_%d", instance.VsockSocket(), runtimeports.GuestEgress), s.injections.ProxyPort(record.SandboxID), func() bool {
 		s.mu.Lock()
 		defer s.mu.Unlock()
 		current, ok := s.journal.getSandbox(record.SandboxID)

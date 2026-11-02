@@ -507,7 +507,7 @@ paths:
     post:
       operationId: CreateSandboxPreview
       summary: Authorize a sandbox HTTP port preview
-      description: Requires a running remote CHV sandbox and sandboxes:preview for API keys. Returns a five-minute bearer capability bound to the account, port and current Guest runtime. Open authorization_url in a browser to exchange its fragment for a host-only cookie. Stop, Start, Delete or reassignment invalidates it. Ports 1024 and 8080 are reserved. The URL alone grants no access.
+      description: Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
       tags: [Previews]
       security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
       requestBody:
@@ -522,18 +522,62 @@ paths:
                 port: {type: integer, minimum: 1, maximum: 65535}
       responses:
         "201":
-          description: A short-lived preview authorization link. Treat authorization_url as a secret.
+          description: Public ports return a directly accessible url. Private ports additionally return a short-lived authorization_url and expires_at; treat authorization_url as a secret.
           content:
             application/json:
               schema:
                 type: object
-                required: [url, authorization_url, expires_at]
+                required: [url, visibility]
                 properties:
+                  visibility: {type: string, enum: [public, private]}
                   url: {type: string, format: uri}
                   authorization_url: {type: string, format: uri}
                   expires_at: {type: string, format: date-time}
         default:
           description: Authentication, port validation or runtime error.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/sandboxes/{sandboxID}/previews/{port}:
+    parameters:
+      - {name: sandboxID, in: path, required: true, schema: {type: string}}
+      - {name: port, in: path, required: true, schema: {type: integer, minimum: 1, maximum: 65535}}
+    get:
+      operationId: GetSandboxPortPreview
+      summary: Get a sandbox HTTP port visibility
+      description: Requires ownership and sandboxes:read. Unconfigured ports default to public. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited.
+      tags: [Previews]
+      security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
+      responses:
+        "200":
+          description: Current persisted policy or the public default.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PortPreviewPolicy"}
+        default:
+          description: Request, ownership or storage error.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+    put:
+      operationId: SetSandboxPortPreview
+      summary: Change a sandbox HTTP port visibility
+      description: Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+      tags: [Previews]
+      security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/PortPreviewPolicy"}
+      responses:
+        "200":
+          description: Persisted policy.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/PortPreviewPolicy"}
+        default:
+          description: Request, ownership or storage error.
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
@@ -1009,6 +1053,12 @@ components:
       in: header
       name: X-API-Key
   schemas:
+    PortPreviewPolicy:
+      type: object
+      additionalProperties: false
+      required: [visibility]
+      properties:
+        visibility: {type: string, enum: [public, private], default: public}
     FileWriteResult:
       type: object
       required: [path, bytes, sha256]
