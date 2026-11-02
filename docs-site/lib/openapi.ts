@@ -6,4 +6,5 @@ export const openapi = createOpenAPI({
     public: path.resolve(process.cwd(), '../api/openapi/openapi-public.yaml'),
   },
   includeDocument: false,
+  proxyUrl: "/api/playground",
 });

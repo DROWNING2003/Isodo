@@ -4,6 +4,7 @@ import { preload } from 'react-dom';
 import { createOpenAPIPage } from 'fumadocs-openapi/ui';
 
 export const OpenAPIPage = createOpenAPIPage({
+  playground: { fetchOptions: { proxyForwardCookie: false } },
   async loadDocument(id) {
     const url = `/api/openapi/${encodeURIComponent(id)}`;
     if (typeof window === 'undefined') {

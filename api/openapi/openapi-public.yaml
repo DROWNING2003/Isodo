@@ -3,6 +3,9 @@ info:
   title: Isodo Public API
   version: 0.1.0
   description: Sandbox APIs support sessions, Casdoor bearer tokens and scoped API keys. MCP account operations require interactive account authentication; the one-time OAuth callback is browser-facing.
+servers:
+  - url: https://api.drowning.top:18443
+    description: Isodo hosted HTTPS API
 paths:
   /v1/skills:
     get:
