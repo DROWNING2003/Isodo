@@ -224,15 +224,6 @@ func requestBindRuntime(ctx context.Context, socketPath string, expected *guestv
 	})
 }
 
-// DialVsock opens one raw Guest management stream. Only trusted Node code may
-// use this; never expose the CHV socket path or the Guest port to clients.
-func DialVsock(ctx context.Context, socketPath string) (net.Conn, error) {
-	if socketPath == "" {
-		return nil, errors.New("guest vsock socket path is required")
-	}
-	return dialVsock(ctx, socketPath)
-}
-
 // NewVsockClientConn connects through a Node-private CHV Unix relay. Callers own Close.
 func NewVsockClientConn(socketPath string) (*grpc.ClientConn, error) {
 	if socketPath == "" {
