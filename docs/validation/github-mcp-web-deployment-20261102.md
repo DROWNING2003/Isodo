@@ -48,7 +48,7 @@ Web 相关 28 文件、153 项测试通过；Web TypeScript 检查、生产构�
 - 真实解绑后 Guest MCP initialize 返回 HTTP 403（0.114s），Node 路径立即拒绝。
 - 有限扫描 5500 个 Guest Codex/Isodo 文件（单文件上限 2 MiB）未命中 GitHub token 特征，模型与 MCP 配置均使用占位符。这不是对所有进程/文件的完整 Secret 审计。
 - 首个 E2E Sandbox 为后续 Desktop 验证保留，尚未删除；不记为清理完成。
-- Web 完成后再验证 Desktop，遵循用户顺序。
+- 已按 Web→Desktop 顺序完成远程工作台和统一保存的基础接线验收；未验证安装包发布、Desktop 重新发起 OAuth 或完整 Electron 自动化。
 
 下一步性能改进：部署时预热已校验模板缓存；UI 展示下载、校验、磁盘、Guest、工作台阶段；进一步测量发布后冷校验而不是降低完整性校验。
 
@@ -61,3 +61,23 @@ Web 相关 28 文件、153 项测试通过；Web TypeScript 检查、生产构�
 根据真实页面反馈，去掉 MCP 区块独立保存按钮、重复绑定列表和常驻成功说明，绑定状态直接放在服务卡片。统一使用右下角保存入口；MCP/Agent/HTTP 选择及临时配置修改都先暂存。保存优先撤销 MCP，再应用凭证、Agent 和新增 MCP。失败不会继续授予新 MCP 权限，保留待保存选择并报告部分成功；成功消息五秒收起。
 
 回归覆盖统一入口、撤销优先、后续失败不新增授权、临时 Agent 仅全局保存后落盘、回显与跨 Sandbox 草稿隔离。没有改变 Control、Node、Guest 的权限或身份检查。
+
+## 最终线上 UI 与权限验收（18:26 CST）
+
+代码 PR #30 已合并并发布 Web，静态版本 `0c53438`。专用 Sandbox 仍为 `93e00130-b7db-448c-b809-d4a1d564ec94`，没有重建 VM。
+
+| 测试 | 结果与耗时 |
+| --- | --- |
+| Web 取消 GitHub 勾选但不保存 | 卡片显示待停用；Guest initialize 仍 HTTP 200，0.150s |
+| 点击唯一右下角保存 | 撤销先执行，Guest initialize HTTP 403，0.125s |
+| 隔离 Desktop 连接同一远程 CHV | PASS，实际原生 Electron 窗口进入云端任务界面 |
+| Desktop 安全连接读取 | PASS，能看到 Web 已保存的未启用状态 |
+| Desktop 勾选并统一保存 | PASS，卡片显示已连接/已启用，Agent 同时保留 |
+| Guest 再次 initialize | HTTP 200，0.142s |
+| Web 刷新回显 Desktop 保存 | PASS，GitHub 勾选、已启用，只有右下角一个保存入口 |
+
+截图：本机 `/tmp/isodo-web-unified-save.png`、`/tmp/isodo-desktop-unified-save.png`。自动化：相关 Web 28 文件、159 项测试、TypeScript、生产构建与 diff 检查通过。macOS GitHub Actions 仍排队，不能当作安装包验收成功。
+
+Desktop 使用独立 userData `/tmp/isodo-mcp-e2e-profile` 和本轮构建的 Electron main/preload，复制 Electron bundle 仅为区分其他开发实例；未覆盖用户原有 App 或 Profile，没有创建本地 VM。它是开发实例验收，不是正式安装包验收。实际 Codex MCP 调用仍是前述公开 Commands API 驱动的 Guest CLI，不冒充从 Desktop 聊天框发起的 Agent 任务。
+
+临时 Runtime API Key 已撤销，服务器 0600 明文文件已删除。缓存性能对照沙箱已删除并确认 VM 目录清理。主测试沙箱因用户正在页面使用而保留，GitHub OAuth/收藏和已授权 MCP 绑定保留，不把此项列为全部资源清理成功。
