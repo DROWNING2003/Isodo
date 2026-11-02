@@ -8,6 +8,7 @@ import (
 
 	nodev1 "github.com/DROWNING2003/Isodo/internal/api/node/v1"
 	"github.com/DROWNING2003/Isodo/internal/control/auth"
+	publicapi "github.com/DROWNING2003/Isodo/internal/api/public"
 	"google.golang.org/grpc/codes"
 	"github.com/DROWNING2003/Isodo/internal/runtimecommands"
 	"google.golang.org/grpc/status"
@@ -33,7 +34,7 @@ func (h *Handler) SetCommandRunner(runner CommandRunner) {
 
 // RunSandboxCommand is the public, authenticated Runtime API. The only command
 // executor is the sandbox Guest Agent reached through a fenced Node relay.
-func (h *Handler) RunSandboxCommand(w http.ResponseWriter, r *http.Request, sandboxID string) {
+func (h *Handler) RunSandboxCommand(w http.ResponseWriter, r *http.Request, sandboxID string, _ publicapi.RunSandboxCommandParams) {
 	target, ok := h.resolveRuntimeTarget(w, r, sandboxID, false)
 	if !ok {
 		return
