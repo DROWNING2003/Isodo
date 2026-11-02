@@ -2,6 +2,8 @@
 
 远程 CHV 沙箱中的 HTTP 服务可通过 `https://<port>-<sandboxID>.<preview-domain>/` 访问。外部入口配置为 18443 时，地址包含 `:18443`；该端口与 Guest 内部端口无关。Guest 管理端口 1024、工作台端口 8080 不允许使用此入口。
 
+完整的客户端脚本与排错见[开发者指南](../docs-site/content/docs/guides/http-port-preview.mdx)。
+
 ## 使用
 
 在运行中的沙箱内启动服务，例如：
@@ -54,7 +56,7 @@ Vite 应在 Guest 里运行，并允许生成的完整预览主机名，例如�
 
 先升级数据库到 migration 0014，再部署匹配的新 Node 和 API。新 Node 支持 RelayOpen 的 revision/boot_id/guest_epoch 字段；Gateway 要求 Node 在校验后回传完整 fencing 确认帧，旧 Node 缺少确认时拒绝转发 HTTP 内容。部署仍需配套升级 Node/API。Lima 暂不启用通用预览；Public API 合同和 RelayOpen 字段可供后续适配复用。原有 T3 8080 路径保持独立。
 
-此 PR 的验收使用独立目录及新建 RAM-root CHV VM，没有部署到现有生产 Node、VM、Nginx。
+2026-11-02，已在 jfcs1024 演示环境升级 Node/API 和数据库 scope 约束，部署版本 `78c513d`。已备份原配置、Node journal 和数据库；未修改 Nginx。真实账号的临时 API Key 通过公开 API 创建新 CHV 沙箱，启动 Python 3.10.12 HTTP 服务并取得预览；HTTPS 入口与真实浏览器授权跳转、页面显示均通过。此结果与下面使用内存 Store 的隔离测试分别记录。
 
 ## 验证
 
@@ -75,4 +77,4 @@ ISODO_GUEST_MODULES=/path/to/matching/vsock/modules \
 
 脚本构建当前 Guest 和仅绑定 Guest loopback 的 HTTP 测试程序，并启动一台无 NIC 的独立 VM。测试覆盖 Public API 签发、真实 mTLS Node 客户端/服务端、Guest PortForward、3000/5173/8000 GET/POST、SSE flush、WebSocket 帧、活跃连接撤销、真实 VM shutdown/delete/reboot 后旧授权拒绝。Control 账号及生命周期 Store 使用内存夹具；不经过生产数据库、worker、Nginx、DNS 或浏览器 UI。PostgreSQL 权限存储另有隔离集成测试。
 
-该测试运行 HTTP/WebSocket 夹具，不运行 Python、Vite 构建器或 Electron；真实浏览器授权跳转和完整 Vite 页面 HMR 需在部署验收时补测。协议转发通过不等于这些完整应用已实测。
+隔离测试运行 HTTP/WebSocket 夹具，不运行 Python、Vite 构建器或 Electron。真实 Python 与浏览器授权已在上述演示部署中补测；完整 Vite 页面 HMR、Electron 及 worker 驱动的 Stop/Start/Delete 全部组合仍未验证。

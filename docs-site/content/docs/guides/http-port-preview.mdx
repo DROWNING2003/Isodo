@@ -1,0 +1,177 @@
+---
+title: 通过 API 预览 HTTP 服务
+description: 使用 API Key 创建远程沙箱，启动 Python HTTP 服务并获取浏览器预览链接。
+---
+
+# 通过 API 预览 HTTP 服务
+
+在远程 CHV 沙箱中运行 Web 服务后，可以通过 `https://<port>-<sandboxID>.<preview-domain>/` 访问。Control API 校验账号归属并签发短期授权，再通过 Node 和 Guest 转发到沙箱内的 loopback 端口。
+
+本指南串起两个公开接口：
+
+- [`POST /v1/sandboxes/{sandboxID}/commands/run`](/docs/api-reference/endpoints/RunSandboxCommand)：在 Guest 内执行命令。
+- [`POST /v1/sandboxes/{sandboxID}/previews`](/docs/api-reference/endpoints/CreateSandboxPreview)：申请指定端口的预览授权。
+
+## 准备 API Key 和环境
+
+API、Node 和客户端需更新到支持 Commands/Previews 的版本。在“开发者 → API 密钥”创建密钥，授予以下权限，并设置适合任务的过期时间；若看不到执行/预览勾选项，请先更新客户端：
+
+| 权限 | 用途 |
+| --- | --- |
+| `sandboxes:write` | 创建、启动、停止或删除所属沙箱 |
+| `sandboxes:read` | 查询沙箱是否已经运行 |
+| `sandboxes:execute` | 在 Guest 内执行程序，需单独授权 |
+| `sandboxes:preview` | 访问 Guest HTTP 服务，需单独授权 |
+
+如需查询可用模板，再增加 `templates:read`。读写权限不能替代命令执行或端口预览权限。API Key 明文只显示一次，数据库只保存摘要，无法从数据库还原旧密钥；丢失后请创建新密钥并撤销旧密钥。
+
+下面的配置对应当前演示环境。其他部署请替换 API 地址和 Ready 模板名称。密钥只输入到受信任终端，不写进源码、浏览器代码或脚本文件；不要开启 shell tracing。
+
+```bash
+export ISODO_API_BASE_URL='https://api.drowning.top:18443'
+export ISODO_TEMPLATE='base'
+read -rsp 'Isodo API Key: ' ISODO_API_KEY
+printf '\n'
+export ISODO_API_KEY
+```
+
+远程演示环境需要 VPN，并将 API 域名及 `<port>-<sandboxID>.drowning.top` 预览域名解析到部署入口。外部入口端口 `18443` 与 Guest 内部端口 `3000` 是两回事。优先使用管理员配置的内部 DNS；`curl --resolve` 只对那一次 curl 生效，不会配置浏览器解析。
+
+## 创建沙箱、启动 Python、取得链接
+
+以下 Python 3 脚本在客户端运行，只通过公开 API 操作沙箱。沙箱模板本身也需要安装 Python 3。服务启动参数为 `python3 -m http.server 3000 --bind 127.0.0.1 --directory /workspace/http-demo`。
+
+```python
+import json
+import os
+import time
+import urllib.request
+
+base = os.environ['ISODO_API_BASE_URL'].rstrip('/')
+key = os.environ['ISODO_API_KEY']
+
+
+def api(method, path, body=None, request_key=None):
+    headers = {'X-API-Key': key, 'Content-Type': 'application/json'}
+    if request_key:
+        headers['Idempotency-Key'] = request_key
+    request = urllib.request.Request(
+        base + path,
+        data=json.dumps(body).encode() if body is not None else None,
+        headers=headers,
+        method=method,
+    )
+    with urllib.request.urlopen(request, timeout=90) as response:
+        return json.load(response)
+
+
+sandbox = api('POST', '/v1/sandboxes', {
+    'name': 'python-http-demo',
+    'template': os.environ.get('ISODO_TEMPLATE', 'base'),
+})
+sandbox_id = sandbox['id']
+print('Sandbox:', sandbox_id)
+
+for _ in range(120):
+    sandbox = api('GET', f'/v1/sandboxes/{sandbox_id}')
+    action = sandbox.get('last_action') or {}
+    if action.get('status') == 'failed' or sandbox['observed_state'] == 'error':
+        raise RuntimeError(sandbox)
+    if sandbox['observed_state'] == 'running' and action.get('status') == 'succeeded':
+        break
+    time.sleep(1)
+else:
+    raise TimeoutError('Sandbox is not ready; query its state before retrying.')
+
+start_server = r'''
+import pathlib, subprocess, sys, time, urllib.request
+root = pathlib.Path('/workspace/http-demo')
+root.mkdir(parents=True, exist_ok=True)
+(root / 'index.html').write_text('<h1>Hello from an Isodo Python sandbox</h1>')
+with (root / 'http.log').open('ab') as log:
+    child = subprocess.Popen(
+        [sys.executable, '-m', 'http.server', '3000', '--bind', '127.0.0.1',
+         '--directory', str(root)],
+        stdin=subprocess.DEVNULL, stdout=log, stderr=subprocess.STDOUT,
+        start_new_session=True, close_fds=True,
+    )
+(root / 'http.pid').write_text(str(child.pid))
+for _ in range(30):
+    try:
+        with urllib.request.urlopen('http://127.0.0.1:3000/', timeout=1) as response:
+            assert response.status == 200
+        print('HTTP server ready on Guest 127.0.0.1:3000')
+        break
+    except OSError:
+        if child.poll() is not None:
+            raise RuntimeError((root / 'http.log').read_text())
+        time.sleep(0.1)
+else:
+    raise TimeoutError('HTTP server did not become ready')
+'''
+result = api('POST', f'/v1/sandboxes/{sandbox_id}/commands/run', {
+    'argv': ['python3', '-c', start_server],
+    'timeout_seconds': 20,
+}, request_key='http-demo-start-' + sandbox_id)
+if result.get('exit_code') != 0 or result.get('output_incomplete'):
+    raise RuntimeError(result)
+print(result['stdout'])
+
+preview = api('POST', f'/v1/sandboxes/{sandbox_id}/previews', {'port': 3000})
+print('Browser authorization URL:', preview['authorization_url'])
+print('Authorization expires at:', preview['expires_at'])
+```
+
+创建接口返回 `202` 表示已接受；脚本等待运行状态和当前操作成功后才执行命令。命令接口的 HTTP `200` 不代表程序成功，仍需检查 `exit_code` 和输出完整性。同一次命令请求重试时，复用相同 `Idempotency-Key` 和请求体；不要把同一个 key 用于不同命令。
+
+这里启动 HTTP 服务的进程留在 Guest 内，标准输出写入 Guest 文件，启动器完成后服务继续运行。新建沙箱的整段脚本重复执行会创建另一个沙箱；已有沙箱应复用它的 ID，不必重新创建。
+
+## 打开、续期与程序访问
+
+浏览器打开响应中的 **`authorization_url`**。页面从 URL 片段读取短期令牌，移除片段，通过同源 POST 换取 host-only、HttpOnly Cookie，再跳转到服务首页。只打开 `url` 不会自动获得权限。
+
+授权固定五分钟。到期后重新调用 `/previews`，打开新返回的授权链接；不需要重启 Python 服务或重建沙箱。停止、重启、删除、重新分配或 Guest 启动身份变化也会提前使旧授权失效，并关闭持续连接。
+
+程序客户端可用预览响应进行请求：
+
+```python
+from urllib.parse import urlsplit
+
+preview = api('POST', f'/v1/sandboxes/{sandbox_id}/previews', {'port': 3000})
+request = urllib.request.Request(preview['url'], headers={
+    'X-Isodo-Preview-Token': urlsplit(preview['authorization_url']).fragment,
+})
+with urllib.request.urlopen(request, timeout=10) as response:
+    print(response.status, response.read().decode())
+```
+
+预览令牌只授予这个账号、沙箱当前运行实例和端口的短期访问权。它是 bearer capability；拿到完整授权链接的人可以在有效期内使用它。不要将 API Key 当成预览令牌，也不要把授权链接放入公开文档、Issue、日志或录屏。
+
+完成演示后，通过 API 停止沙箱，释放运行资源并撤销预览：
+
+```python
+api('POST', f'/v1/sandboxes/{sandbox_id}/stop', {})
+```
+
+停止保留实例磁盘；需要彻底清理时，再按生命周期 API 删除沙箱。
+
+## 支持范围与排错
+
+支持普通 HTTP、WebSocket 和 SSE；Guest 服务应绑定 `127.0.0.1`，无需额外开放宿主端口。通用预览禁用 Guest 管理端口 `1024` 和工作台端口 `8080`。当前启用于远程 CHV，Lima 尚未启用。
+
+| 现象 | 检查项 |
+| --- | --- |
+| 浏览器 `NXDOMAIN` | VPN、内部 DNS、通配预览域名；此时请求尚未到达 Gateway |
+| API `404` | 是否部署了包含 Commands/Previews 的 API；沙箱不存在或不属于当前账号也返回 404 |
+| API `403` / `INSUFFICIENT_SCOPE` | Key 是否单独授予 `sandboxes:execute` 或 `sandboxes:preview` |
+| 预览 `401` | 是否打开了授权链接，令牌/Cookie 是否过期或属于其他端口 |
+| 预览 `403` | 运行身份是否已变化；Cookie 写请求及浏览器 WebSocket 是否精确同源 |
+| 预览 `502` | Guest 服务是否就绪、端口是否正确、Node 是否已升级并返回运行身份校验确认 |
+
+Vite 需要允许生成的预览 Host；外部 HTTPS 非标准端口可能还需设置 HMR 的 wss 协议及外部 clientPort。不要开放其他宿主端口绕过 Gateway。
+
+## 已验证范围
+
+2026-11-02，部署版本 `78c513d` 在 jfcs1024 上通过真实账号的临时 API Key 完成：Control worker 创建新 CHV 沙箱、Commands API 查询 Python 3.10.12 并启动 HTTP 服务、公开 HTTPS API 签发预览、Nginx → Gateway → mTLS Node → Guest 转发，以及真实浏览器授权跳转和页面显示。API Key 明文及短期授权 URL 不保存在文档中。
+
+独立 CHV 测试另覆盖 GET/POST、SSE flush、WebSocket、运行身份变化后的旧授权拒绝及活跃连接关闭。完整 Vite 页面 HMR、Electron E2E、生产 worker 驱动的 Stop/Start/Delete 全部组合仍需单独验收。
