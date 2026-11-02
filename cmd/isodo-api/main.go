@@ -87,6 +87,7 @@ func run(logger *slog.Logger) error {
 	if nodeClient != nil {
 		sandboxHandler.SetRuntime(nodeClient)
 		sandboxHandler.SetFiles(nodeClient)
+		sandboxHandler.SetCommandRunner(nodeClient)
 	}
 	var relay preview.RelayDialer
 	if nodeClient != nil && os.Getenv("ISODO_NODE_BACKEND") != "lima" {

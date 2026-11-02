@@ -86,6 +86,7 @@ type Store interface {
 
 type Handler struct {
 	files     *sandboxfiles.HTTP
+	commands  CommandRunner
 	runtime   RuntimeClient
 	store     Store
 	appLink   AppLinkIssuer

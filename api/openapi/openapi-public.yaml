@@ -501,6 +501,36 @@ paths:
           required: true
           schema:
             type: string
+  /v1/sandboxes/{sandboxID}/commands/run:
+    parameters:
+      - {name: sandboxID, in: path, required: true, schema: {type: string}}
+    post:
+      operationId: RunSandboxCommand
+      summary: Run a bounded non-interactive command inside a sandbox Guest
+      description: Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+      tags: [Commands]
+      security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
+      parameters:
+        - name: Idempotency-Key
+          in: header
+          required: true
+          schema: {type: string, minLength: 8, maxLength: 128}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/CommandRunRequest"}
+      responses:
+        "200":
+          description: Guest completed the command and returned its exit status.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/CommandRunResult"}
+        default:
+          description: Authentication, execution or runtime error.
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
   /v1/injection-rules:
     get:
       operationId: ListInjectionRules
@@ -986,6 +1016,26 @@ components:
           required: [injected]
           properties:
             injected: {type: integer, format: int64}
+    CommandRunRequest:
+      type: object
+      additionalProperties: false
+      required: [argv]
+      properties:
+        argv: {type: array, minItems: 1, maxItems: 256, items: {type: string}}
+        cwd: {type: string}
+        env: {type: object, additionalProperties: {type: string}}
+        timeout_seconds: {type: integer, minimum: 0, maximum: 300, default: 60}
+    CommandRunResult:
+      type: object
+      additionalProperties: false
+      required: [execution_id, stdout, stderr, exit_code, reason, output_incomplete]
+      properties:
+        execution_id: {type: string}
+        stdout: {type: string}
+        stderr: {type: string}
+        exit_code: {type: integer, format: int32, nullable: true}
+        reason: {type: string}
+        output_incomplete: {type: boolean}
     Error:
       type: object
       additionalProperties: false

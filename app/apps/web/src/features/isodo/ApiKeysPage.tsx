@@ -23,6 +23,7 @@ import { CloudPage } from "./CloudPages";
 const SCOPE_LABELS: Record<ApiKeyScope, string> = {
   "sandboxes:read": "沙箱读取",
   "sandboxes:write": "沙箱管理",
+  "sandboxes:execute": "命令执行",
   "templates:read": "模板读取",
   "templates:write": "模板管理",
 };
@@ -140,6 +141,7 @@ export function ApiKeysPage() {
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [name, setName] = useState("");
   const [expiresInDays, setExpiresInDays] = useState("30");
+  const [allowExecution, setAllowExecution] = useState(false);
   const [createdSecret, setCreatedSecret] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -173,9 +175,11 @@ export function ApiKeysPage() {
     setError(null);
     setCreating(true);
     try {
+      const scopes: ApiKeyScope[] = ["sandboxes:read", "sandboxes:write", "templates:read", "templates:write"];
+      if (allowExecution) scopes.push("sandboxes:execute");
       const { api_key, ...created } = await apiKeys.create({
         name,
-        scopes: ["sandboxes:read", "sandboxes:write", "templates:read", "templates:write"],
+        scopes,
         expires_at:
           expiresInDays === "never"
             ? null
@@ -185,6 +189,7 @@ export function ApiKeysPage() {
       setKeys((current) => [created, ...current]);
       setCopied(false);
       setName("");
+      setAllowExecution(false);
       setShowCreateForm(false);
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "创建密钥失败");
@@ -308,6 +313,20 @@ export function ApiKeysPage() {
                     <option value="never">永不过期</option>
                   </select>
                   <ChevronDownIcon className="pointer-events-none absolute right-3 top-2.5 size-4 text-muted-foreground" />
+                </span>
+              </label>
+              <label className="flex items-start gap-3 text-sm">
+                <input
+                  type="checkbox"
+                  className="mt-0.5 size-4 rounded border-input"
+                  checked={allowExecution}
+                  onChange={(event) => setAllowExecution(event.target.checked)}
+                />
+                <span>
+                  <span className="block font-medium">允许执行沙箱内命令</span>
+                  <span className="block text-xs text-muted-foreground">
+                    额外授予 sandboxes:execute 权限，允许凭此密钥在所属沙箱内执行任意程序；默认关闭。
+                  </span>
                 </span>
               </label>
               {error && (

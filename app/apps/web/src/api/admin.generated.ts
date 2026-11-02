@@ -32,6 +32,7 @@ export type APIKeyScope = typeof APIKeyScope[keyof typeof APIKeyScope];
 export const APIKeyScope = {
   'sandboxes:read': 'sandboxes:read',
   'sandboxes:write': 'sandboxes:write',
+  'sandboxes:execute': 'sandboxes:execute',
   'templates:read': 'templates:read',
   'templates:write': 'templates:write',
 } as const;

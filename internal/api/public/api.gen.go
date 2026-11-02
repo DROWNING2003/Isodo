@@ -370,6 +370,24 @@ type BuildRecipe struct {
 	SourceBuildID string      `json:"source_build_id"`
 }
 
+// CommandRunRequest defines model for CommandRunRequest.
+type CommandRunRequest struct {
+	Argv           []string           `json:"argv"`
+	Cwd            *string            `json:"cwd,omitempty"`
+	Env            *map[string]string `json:"env,omitempty"`
+	TimeoutSeconds *int               `json:"timeout_seconds,omitempty"`
+}
+
+// CommandRunResult defines model for CommandRunResult.
+type CommandRunResult struct {
+	ExecutionId      string `json:"execution_id"`
+	ExitCode         *int32 `json:"exit_code"`
+	OutputIncomplete bool   `json:"output_incomplete"`
+	Reason           string `json:"reason"`
+	Stderr           string `json:"stderr"`
+	Stdout           string `json:"stdout"`
+}
+
 // CreateInjectionRule defines model for CreateInjectionRule.
 type CreateInjectionRule struct {
 	BaseUrl    *string            `json:"base_url,omitempty"`
@@ -689,6 +707,11 @@ type ListSandboxesParams struct {
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
+// RunSandboxCommandParams defines parameters for RunSandboxCommand.
+type RunSandboxCommandParams struct {
+	IdempotencyKey string `json:"Idempotency-Key"`
+}
+
 // MakeSandboxDirectoryJSONBody defines parameters for MakeSandboxDirectory.
 type MakeSandboxDirectoryJSONBody struct {
 	Parents *bool  `json:"parents,omitempty"`
@@ -749,6 +772,9 @@ type CreateSandboxJSONRequestBody = CreateSandbox
 
 // UpdateSandboxJSONRequestBody defines body for UpdateSandbox for application/json ContentType.
 type UpdateSandboxJSONRequestBody = PatchSandbox
+
+// RunSandboxCommandJSONRequestBody defines body for RunSandboxCommand for application/json ContentType.
+type RunSandboxCommandJSONRequestBody = CommandRunRequest
 
 // MakeSandboxDirectoryJSONRequestBody defines body for MakeSandboxDirectory for application/json ContentType.
 type MakeSandboxDirectoryJSONRequestBody MakeSandboxDirectoryJSONBody
@@ -824,6 +850,9 @@ type ServerInterface interface {
 	// CreateSandboxAppLink Create a sandbox application link
 	// (POST /v1/sandboxes/{sandboxID}/app-link)
 	CreateSandboxAppLink(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// RunSandboxCommand Run a bounded non-interactive command inside a sandbox Guest
+	// (POST /v1/sandboxes/{sandboxID}/commands/run)
+	RunSandboxCommand(w http.ResponseWriter, r *http.Request, sandboxID string, params RunSandboxCommandParams)
 	// MakeSandboxDirectory Create a workspace directory
 	// (POST /v1/sandboxes/{sandboxID}/directories)
 	MakeSandboxDirectory(w http.ResponseWriter, r *http.Request, sandboxID string)
@@ -1301,6 +1330,60 @@ func (siw *ServerInterfaceWrapper) CreateSandboxAppLink(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.CreateSandboxAppLink(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RunSandboxCommand operation middleware
+func (siw *ServerInterfaceWrapper) RunSandboxCommand(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params RunSandboxCommandParams
+
+	headers := r.Header
+
+	// ------------- Required header parameter "Idempotency-Key" -------------
+	if valueList, found := headers[http.CanonicalHeaderKey("Idempotency-Key")]; found {
+		var IdempotencyKey string
+		n := len(valueList)
+		if n != 1 {
+			siw.ErrorHandlerFunc(w, r, &TooManyValuesForParamError{ParamName: "Idempotency-Key", Count: n})
+			return
+		}
+
+		err = runtime.BindStyledParameterWithOptions("simple", "Idempotency-Key", valueList[0], &IdempotencyKey, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationHeader, Explode: false, Required: true, Type: "string", Format: ""})
+		if err != nil {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "Idempotency-Key", Err: err})
+			return
+		}
+
+		params.IdempotencyKey = IdempotencyKey
+
+	} else {
+		err := fmt.Errorf("Header parameter Idempotency-Key is required, but not found")
+		siw.ErrorHandlerFunc(w, r, &RequiredHeaderError{ParamName: "Idempotency-Key", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RunSandboxCommand(w, r, sandboxID, params)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2063,6 +2146,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/stop", wrapper.StopSandbox)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/app", wrapper.GetSandboxApp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/app-link", wrapper.CreateSandboxAppLink)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/commands/run", wrapper.RunSandboxCommand)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/injection-rules", wrapper.ListInjectionRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/injection-rules", wrapper.CreateInjectionRule)
 	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/injection-rules/{ruleID}", wrapper.DeleteInjectionRule)

@@ -25,42 +25,47 @@ func (h *Handler) runtimeTarget(w http.ResponseWriter, r *http.Request, id strin
 	return h.resolveRuntimeTarget(w, r, id, true)
 }
 func (h *Handler) resolveRuntimeTarget(w http.ResponseWriter, r *http.Request, id string, credentials bool) (*nodev1.SandboxTarget, bool) {
+	target, _, ok := h.resolveRuntimeTargetWithSandbox(w, r, id, credentials)
+	return target, ok
+}
+
+func (h *Handler) resolveRuntimeTargetWithSandbox(w http.ResponseWriter, r *http.Request, id string, credentials bool) (*nodev1.SandboxTarget, Sandbox, bool) {
 	identity, ok := auth.IdentityFromContext(r.Context())
 	if !ok || identity.TenantID == "" {
 		writeError(w, 401, "UNAUTHENTICATED", "Authentication is required.")
-		return nil, false
+		return nil, Sandbox{}, false
 	}
 	if credentials && identity.Credential == "api_key" {
 		writeError(w, 403, "SESSION_REQUIRED", "Credentials require an interactive session.")
-		return nil, false
+		return nil, Sandbox{}, false
 	}
 	if !sandboxIDPattern.MatchString(id) {
 		writeSandboxNotFound(w)
-		return nil, false
+		return nil, Sandbox{}, false
 	}
 	item, err := h.store.GetSandbox(r.Context(), identity.TenantID, id)
 	if errors.Is(err, ErrNotFound) {
 		writeSandboxNotFound(w)
-		return nil, false
+		return nil, Sandbox{}, false
 	}
 	if err != nil {
 		writeError(w, 503, "SANDBOX_UNAVAILABLE", "The sandbox could not be loaded.")
-		return nil, false
+		return nil, Sandbox{}, false
 	}
 	if item.Deletion != nil {
 		writeError(w, 409, "SANDBOX_DELETING", "The sandbox is being deleted.")
-		return nil, false
+		return nil, Sandbox{}, false
 	}
 	if h.runtime == nil {
 		writeError(w, 503, "SANDBOX_RUNTIME_UNAVAILABLE", "Sandbox runtime is not configured.")
-		return nil, false
+		return nil, Sandbox{}, false
 	}
 	revision, err := strconv.ParseUint(item.Revision, 10, 64)
 	if err != nil || revision == 0 || item.OwnershipGeneration == 0 || item.NodeID == "" || item.NodeID != h.runtime.NodeID() {
 		writeError(w, 409, "SANDBOX_NOT_ASSIGNED", "The sandbox does not have an available Node assignment.")
-		return nil, false
+		return nil, Sandbox{}, false
 	}
-	return &nodev1.SandboxTarget{SandboxId: id, OwnershipGeneration: item.OwnershipGeneration, Revision: revision}, true
+	return &nodev1.SandboxTarget{SandboxId: id, OwnershipGeneration: item.OwnershipGeneration, Revision: revision}, item, true
 }
 func runtimeError(w http.ResponseWriter, err error) {
 	code, message, httpStatus := "SANDBOX_RUNTIME_UNAVAILABLE", "Sandbox runtime could not apply this request.", 503

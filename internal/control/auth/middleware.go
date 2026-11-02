@@ -49,6 +49,10 @@ func Middleware(authenticator Authenticator, next http.Handler) http.Handler {
 			if r.Method == http.MethodGet || r.Method == http.MethodHead {
 				scope = resource + ":read"
 			}
+			if r.Method == http.MethodPost && strings.HasSuffix(r.URL.Path, "/commands/run") {
+				// Executing code is strictly stronger than managing Sandbox metadata.
+				scope = "sandboxes:execute"
+			}
 			if !slices.Contains(identity.Scopes, scope) {
 				writeAuthenticationError(w, ErrForbidden)
 				return

@@ -102,11 +102,11 @@ func parseAPIKey(raw string) (string, []byte, bool) {
 }
 
 func validScopes(scopes []string) bool {
-	if len(scopes) < 1 || len(scopes) > 4 {
+	if len(scopes) < 1 || len(scopes) > 5 {
 		return false
 	}
 	for i, scope := range scopes {
-		if !slices.Contains([]string{"sandboxes:read", "sandboxes:write", "templates:read", "templates:write"}, scope) {
+		if !slices.Contains([]string{"sandboxes:read", "sandboxes:write", "sandboxes:execute", "templates:read", "templates:write"}, scope) {
 			return false
 		}
 		if slices.Contains(scopes[:i], scope) {
