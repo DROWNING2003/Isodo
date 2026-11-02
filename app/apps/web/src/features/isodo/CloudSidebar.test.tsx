@@ -258,14 +258,13 @@ it("uses the local icon and shows actual allocated resources", async () => {
   expect(renderer!.root.findAllByProps({ "aria-label": "云端沙箱" })).toHaveLength(0);
 });
 
-it("keeps the Skills entry disabled in both account and sandbox sidebars", async () => {
+it("keeps account Skill and MCP market navigation out of the Agent workbench", async () => {
   await renderSidebar();
-  let skill = renderer!.root.findByProps({ "aria-label": "Skill", disabled: true });
-  expect(skill.props.onClick).toBeUndefined();
-  expect(renderer!.root.findByProps({ "aria-label": "MCP 市场" }).props.disabled).not.toBe(true);
+  expect(renderer!.root.findAllByProps({ "aria-label": "Skill" })).toHaveLength(0);
+  expect(renderer!.root.findAllByProps({ "aria-label": "MCP 市场" })).toHaveLength(0);
   fixture.pathname = "/sandboxes";
   await act(async () => renderer!.update(<CloudSidebar />));
-  skill = renderer!.root.findByProps({ "aria-label": "Skill", disabled: true });
+  const skill = renderer!.root.findByProps({ "aria-label": "Skill", disabled: true });
   expect(skill.props.onClick).toBeUndefined();
   expect(renderer!.root.findByProps({ "aria-label": "MCP 市场" }).props.disabled).toBeUndefined();
 });

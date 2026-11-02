@@ -27,6 +27,44 @@ paths:
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Error'}
+  /v1/mcp/custom:
+    post:
+      tags: [MCP]
+      operationId: CreateCustomMCP
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      summary: 添加账号私有 HTTPS MCP 并验证工具发现
+      description: 仅登录会话；支持无认证和 Bearer Token。Token 仅加密保存在 Control，不返回或传入 Guest。只允许公网 HTTPS 443，拒绝重定向、内网与 DNS 重绑定。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: '#/components/schemas/CustomMCPCreate'}
+      responses:
+        '201':
+          description: 已验证并保存私有 MCP
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/MCPCatalogEntry'}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+  /v1/mcp/custom/{customID}:
+    parameters:
+      - {name: customID, in: path, required: true, schema: {type: string, format: uuid}}
+    delete:
+      tags: [MCP]
+      operationId: DeleteCustomMCP
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      summary: 删除自己的私有 MCP 并撤销全部沙箱绑定
+      responses:
+        '204': {description: 已删除或已不存在}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
   /v1/mcp/catalog:
     get:
       operationId: ListMCPCatalog
@@ -1360,6 +1398,16 @@ components:
       name: X-API-Key
   schemas:
 
+    CustomMCPCreate:
+      type: object
+      additionalProperties: false
+      required: [name, endpoint, auth_kind]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 80}
+        description: {type: string, maxLength: 240}
+        endpoint: {type: string, format: uri, maxLength: 2048}
+        auth_kind: {type: string, enum: [none, bearer]}
+        token: {type: string, maxLength: 4096, writeOnly: true}
     MCPCatalogEntry:
       type: object
       required: [market_mcp_id, name, provider, description, endpoint, transport, auth_kind, favorite, status, oauth_configured]
@@ -1370,7 +1418,9 @@ components:
         description: {type: string}
         endpoint: {type: string}
         transport: {type: string, enum: [streamable-http]}
-        auth_kind: {type: string, enum: [oauth2]}
+        auth_kind: {type: string, enum: [oauth2, none, bearer]}
+        source: {type: string, enum: [market, custom]}
+        custom_server_id: {type: string, format: uuid}
         favorite: {type: boolean}
         status: {type: string, enum: [connected, expired, disconnected, failed]}
         oauth_connection_id: {type: string, nullable: true}
@@ -1417,11 +1467,12 @@ components:
         expires_at: {type: string, format: date-time}
     MCPBinding:
       type: object
-      required: [sandbox_binding_id, market_mcp_id, oauth_connection_id, sync_status, status]
+      required: [sandbox_binding_id, market_mcp_id, sync_status, status]
       properties:
         sandbox_binding_id: {type: string}
         market_mcp_id: {type: string}
         oauth_connection_id: {type: string}
+        custom_server_id: {type: string, format: uuid}
         sync_status: {type: string, enum: [pending, applied, failed]}
         status: {type: string, enum: [connected, expired, disconnected, failed]}
     MCPBindingList:

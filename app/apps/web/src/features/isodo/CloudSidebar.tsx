@@ -285,8 +285,6 @@ function SandboxWorkspaceSidebar({
             [
               ["files", "文件", FileIcon],
               ["connections", "安全连接", PlugIcon],
-              ["skills", "Skill", SparklesIcon],
-              ["mcp", "MCP 市场", NetworkIcon],
               ["snapshots", "快照", LayersIcon],
               ["security", "安全", ShieldCheckIcon],
             ] as const
@@ -294,25 +292,20 @@ function SandboxWorkspaceSidebar({
             <SidebarMenuItem key={pane}>
               <SidebarMenuButton
                 isActive={activePane === pane}
-                render={pane === "mcp" ? <Link to="/mcp-market" /> : undefined}
                 aria-label={label}
                 disabled={
-                  pane === "mcp"
-                    ? false
-                    : pane === "files"
-                      ? !onOpenFiles
-                      : pane === "connections"
-                        ? !onOpenConnections
-                        : true
+                  pane === "files"
+                    ? !onOpenFiles
+                    : pane === "connections"
+                      ? !onOpenConnections
+                      : true
                 }
                 title={
-                  pane === "mcp"
-                    ? "浏览 MCP 市场和账号收藏"
-                    : pane === "files"
-                      ? "浏览当前任务的工作文件"
-                      : pane === "connections"
-                        ? "管理当前沙箱的安全连接"
-                        : "尚未接入"
+                  pane === "files"
+                    ? "浏览当前任务的工作文件"
+                    : pane === "connections"
+                      ? "管理当前沙箱的安全连接"
+                      : "尚未接入"
                 }
                 onClick={
                   pane === "files"

@@ -94,3 +94,5 @@ OpenAPI 的 MCP 分组生成 Go/TypeScript 客户端和端点文档：catalog �
 参考：[GitHub remote server](https://github.com/github/github-mcp-server/blob/main/docs/remote-server.md)、[Host integration](https://github.com/github/github-mcp-server/blob/main/docs/host-integration.md)、[GitHub App 注册](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app)、[Codex MCP](https://developers.openai.com/codex/mcp/)。参考 AIofCage 的 discovery/PKCE、串行 refresh 和 Vault 边界，未照搬 DCR 必选、loopback callback 或 Colima 架构。
 
 Web 验收也可从现有 Web 页面发起授权：点击时同步创建空白浏览器窗口，完成发现后导航到固定 GitHub 授权页，避免异步操作被弹窗策略拦截。Electron 继续使用系统浏览器。
+
+自定义 HTTPS（无认证或 Bearer Token）、新版管理页和仓库访问配置见[自定义 MCP 指南](custom-mcp.md)。GitHub 固定只读链路保持独立。

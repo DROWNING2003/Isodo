@@ -9,6 +9,7 @@ import (
 	"errors"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/DROWNING2003/Isodo/internal/control/auth"
@@ -20,11 +21,12 @@ import (
 )
 
 type Handler struct {
-	pool    *pgxpool.Pool
-	sealer  *injection.Sealer
-	config  Config
-	http    *http.Client
-	runtime Runtime
+	pool       *pgxpool.Pool
+	sealer     *injection.Sealer
+	config     Config
+	http       *http.Client
+	runtime    Runtime
+	customHTTP *http.Client // tests may supply a fixture; production uses pinned public HTTPS.
 }
 
 func New(pool *pgxpool.Pool, sealer *injection.Sealer, config Config, runtime Runtime) *Handler {
@@ -39,7 +41,16 @@ func write(w http.ResponseWriter, status int, value any) {
 	}
 }
 func fail(w http.ResponseWriter, status int, code string) {
-	write(w, status, map[string]any{"error": map[string]string{"code": code, "message": "MCP 操作失败，请检查连接状态后重试。"}})
+	message := "MCP 操作失败，请检查连接状态后重试。"
+	switch code {
+	case "MCP_INVALID_CUSTOM_SERVER":
+		message = "请检查名称、HTTPS 地址和认证方式；地址不能包含凭证或查询参数。"
+	case "MCP_CONNECTION_CHECK_FAILED":
+		message = "连接或工具发现失败，请检查服务是否支持 Streamable HTTP 及认证信息。"
+	case "MCP_CUSTOM_LIMIT":
+		message = "自定义 MCP 数量已达上限，请先移除不用的连接。"
+	}
+	write(w, status, map[string]any{"error": map[string]string{"code": code, "message": message}})
 }
 func (h *Handler) identity(w http.ResponseWriter, r *http.Request) (string, bool) {
 	i, ok := auth.IdentityFromContext(r.Context())
@@ -86,7 +97,11 @@ func (h *Handler) Account(w http.ResponseWriter, r *http.Request) {
 	}
 	path := r.URL.Path
 	switch {
-	case path == "/v1/mcp/catalog" && r.Method == "GET", path == "/v1/mcp/catalog/github" && r.Method == "GET", path == "/v1/mcp/favorites" && r.Method == "GET":
+	case path == "/v1/mcp/custom" && r.Method == "POST":
+		h.createCustom(w, r, tenant)
+	case strings.HasPrefix(path, "/v1/mcp/custom/") && r.Method == "DELETE":
+		h.deleteCustom(w, r, tenant, strings.TrimPrefix(path, "/v1/mcp/custom/"))
+	case path == "/v1/mcp/catalog" && r.Method == "GET", strings.HasPrefix(path, "/v1/mcp/catalog/") && r.Method == "GET", path == "/v1/mcp/favorites" && r.Method == "GET":
 		h.catalog(w, r, tenant)
 	case path == "/v1/mcp/favorites/github" && (r.Method == "PUT" || r.Method == "DELETE"):
 		sql := `INSERT INTO mcp_favorites(tenant_id,market_mcp_id) VALUES($1,'github') ON CONFLICT DO NOTHING`
@@ -191,11 +206,28 @@ func (h *Handler) catalog(w http.ResponseWriter, r *http.Request, tenant string)
 		if status == "connected" && expiry != nil && !expiry.After(time.Now()) {
 			status = "expired"
 		}
-		items = append(items, map[string]any{"market_mcp_id": id, "name": name, "provider": provider, "description": description, "endpoint": endpoint, "transport": transport, "auth_kind": kind, "favorite": favorite, "status": status, "oauth_connection_id": connection, "oauth_configured": configured(h.config)})
+		items = append(items, map[string]any{"market_mcp_id": id, "name": name, "provider": provider, "description": description, "endpoint": endpoint, "transport": transport, "auth_kind": kind, "favorite": favorite, "status": status, "oauth_connection_id": connection, "oauth_configured": configured(h.config), "source": "market"})
 	}
 	if rows.Err() != nil {
 		fail(w, 503, "MCP_STORAGE_UNAVAILABLE")
 		return
+	}
+	if err := h.appendCustom(r.Context(), tenant, &items); err != nil {
+		fail(w, 503, "MCP_STORAGE_UNAVAILABLE")
+		return
+	}
+	if wanted, detail := strings.CutPrefix(r.URL.Path, "/v1/mcp/catalog/"); detail {
+		filtered := []map[string]any{}
+		for _, item := range items {
+			if item["market_mcp_id"] == wanted {
+				filtered = append(filtered, item)
+			}
+		}
+		if len(filtered) == 0 {
+			fail(w, 404, "MCP_NOT_FOUND")
+			return
+		}
+		items = filtered
 	}
 	write(w, 200, map[string]any{"items": items})
 }

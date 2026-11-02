@@ -2,6 +2,7 @@ package orchestrator
 
 import (
 	"context"
+	"encoding/json"
 	"io"
 	"net/http"
 	"net/url"
@@ -22,8 +23,8 @@ import (
 // SyncMCP is reachable only on the existing mTLS runtime service. No OAuth
 // credentials are accepted; Node only holds binding-scoped broker capabilities.
 func (s *CHVServer) SyncMCP(ctx context.Context, request *nodev1.SyncMCPRequest) (*nodev1.SyncMCPResponse, error) {
-	if request == nil || len(request.Bindings) > 1 {
-		return nil, status.Error(codes.InvalidArgument, "one GitHub binding is supported")
+	if request == nil || len(request.Bindings) > 64 {
+		return nil, status.Error(codes.InvalidArgument, "too many MCP bindings")
 	}
 	s.mu.Lock()
 	err := s.injectionTarget(request.Target)
@@ -36,10 +37,17 @@ func (s *CHVServer) SyncMCP(ctx context.Context, request *nodev1.SyncMCPRequest)
 		return nil, status.Error(codes.FailedPrecondition, "sandbox is not running")
 	}
 	bindings := []injection.MCPBinding{}
+	seen := map[string]bool{}
 	for _, b := range request.Bindings {
-		if !canonicalUUID(b.BindingId) || b.MarketMcpId != "github" || len(b.Capability) != 43 {
+		if b == nil {
 			return nil, status.Error(codes.InvalidArgument, "invalid MCP binding")
 		}
+		custom, ok := strings.CutPrefix(b.MarketMcpId, "custom-")
+		validMarket := b.MarketMcpId == "github" || ok && canonicalUUID(custom)
+		if !canonicalUUID(b.BindingId) || !validMarket || seen[b.MarketMcpId] || len(b.Capability) != 43 {
+			return nil, status.Error(codes.InvalidArgument, "invalid MCP binding")
+		}
+		seen[b.MarketMcpId] = true
 		bindings = append(bindings, injection.MCPBinding{ID: b.BindingId, MarketID: b.MarketMcpId, Capability: b.Capability})
 	}
 	guest, err := s.fileGuest(ctx, request.Target)
@@ -82,12 +90,18 @@ func (s *CHVServer) serveMCP(sandbox string, w http.ResponseWriter, r *http.Requ
 		http.Error(w, "MCP unavailable", 503)
 		return
 	}
-	bindings := s.injections.MCP(sandbox)
-	if len(bindings) != 1 {
+	market := strings.TrimPrefix(r.URL.Path, "/isodo-mcp/")
+	var b injection.MCPBinding
+	for _, binding := range s.injections.MCP(sandbox) {
+		if binding.MarketID == market {
+			b = binding
+			break
+		}
+	}
+	if b.ID == "" {
 		http.Error(w, "MCP is not bound", 403)
 		return
 	}
-	b := bindings[0]
 	s.mu.Lock()
 	record, ok := s.journal.getSandbox(sandbox)
 	instance := s.live[sandbox]
@@ -191,14 +205,19 @@ func (s *CHVServer) installMCPConfig(ctx context.Context, sandbox string, instan
 		return err
 	}
 	defer connection.Close()
-	_, err = runT3GuestCommand(ctx, guestv1.NewGuestServiceClient(connection), instance.Identity(), "mcp-config-"+newT3RequestSuffix(), []string{"python3", "-c", codexMCPMerge, strconv.Itoa(runtimeports.GuestEgress), strconv.FormatBool(len(bindings) > 0)})
+	ids := make([]string, 0, len(bindings))
+	for _, b := range bindings {
+		ids = append(ids, b.MarketID)
+	}
+	data, _ := json.Marshal(ids)
+	_, err = runT3GuestCommand(ctx, guestv1.NewGuestServiceClient(connection), instance.Identity(), "mcp-config-"+newT3RequestSuffix(), []string{"python3", "-c", codexMCPMerge, strconv.Itoa(runtimeports.GuestEgress), string(data)})
 	return err
 }
 
 // Python's standard TOML parser validates the full document before and after
 // merging an owned section. openat/O_NOFOLLOW and a per-directory lock prevent
 // symlink traversal. Unknown/manual conflicting sections fail closed.
-const codexMCPMerge = `import os,sys,stat,fcntl,secrets
+const codexMCPMerge = `import os,sys,stat,fcntl,secrets,json,re
 try: import tomllib
 except ModuleNotFoundError: import tomli as tomllib
 root=os.open('/workspace',os.O_RDONLY|os.O_DIRECTORY|os.O_NOFOLLOW)
@@ -216,7 +235,10 @@ try:
 except FileNotFoundError: old=''
 assert len(old)<=1048576
 parsed=tomllib.loads(old)
-active=sys.argv[2]=='true'
+ids=['github'] if sys.argv[2]=='true' else [] if sys.argv[2]=='false' else json.loads(sys.argv[2])
+assert isinstance(ids,list) and len(ids)<=64 and len(set(ids))==len(ids)
+assert all(isinstance(x,str) and (x=='github' or re.fullmatch(r'custom-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',x)) for x in ids)
+active=bool(ids)
 start='# BEGIN ISODO MANAGED GITHUB MCP\n';end='# END ISODO MANAGED GITHUB MCP\n'
 assert old.count(start)==old.count(end) and old.count(start)<=1
 if start in old:
@@ -225,7 +247,14 @@ else:
  if not active: sys.exit(0)
  assert 'isodo_github' not in parsed.get('mcp_servers',{}),'manual isodo_github configuration conflicts'
  base=old
-section='\n'+start+'[mcp_servers.isodo_github]\nurl = "http://127.0.0.1:'+sys.argv[1]+'/isodo-mcp/github"\nhttp_headers = { Authorization = "Bearer isodo-mcp-placeholder" }\nenabled_tools = ["get_me", "get_file_contents", "search_repositories", "search_code", "list_branches", "list_commits", "get_commit", "list_issues", "issue_read", "search_issues", "list_pull_requests", "pull_request_read", "search_pull_requests"]\n'+end
+section='\n'+start
+base_parsed=tomllib.loads(base)
+for identifier in sorted(ids):
+ name='isodo_'+identifier.replace('-','_')
+ assert name not in base_parsed.get('mcp_servers',{}),'manual MCP configuration conflicts'
+ section+='[mcp_servers.'+name+']\nurl = "http://127.0.0.1:'+sys.argv[1]+'/isodo-mcp/'+identifier+'"\nhttp_headers = { Authorization = "Bearer isodo-mcp-placeholder" }\n'
+ if identifier=='github': section+='enabled_tools = ["get_me", "get_file_contents", "search_repositories", "search_code", "list_branches", "list_commits", "get_commit", "list_issues", "issue_read", "search_issues", "list_pull_requests", "pull_request_read", "search_pull_requests"]\n'
+section+=end
 new=base.rstrip()+'\n'+(section if active else '')
 tomllib.loads(new)
 if new==old: sys.exit(0)

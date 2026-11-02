@@ -115,9 +115,9 @@ describe("MCP market separation", () => {
     expect(fixture.connect).not.toHaveBeenCalled();
     const favorites = renderer.root
       .findAllByType("button")
-      .find((b) => b.children.includes("我的收藏"))!;
+      .find((b) => b.children.includes("我的 MCP"))!;
     await act(async () => favorites.props.onClick());
-    expect(JSON.stringify(renderer.toJSON())).toContain("还没有收藏的 MCP");
+    expect(JSON.stringify(renderer.toJSON())).toContain("还没有收藏或添加的 MCP");
   });
 });
 
@@ -158,4 +158,20 @@ it("does not carry an unsaved selection to a different Sandbox", async () => {
   await act(async () => renderer.update(<BoundFields sandboxId="sandbox-b" />));
   expect(renderer.root.findByType("input").props.checked).toBe(false);
   expect(fixture.bind).not.toHaveBeenCalled();
+});
+
+it("offers GitHub installation configuration separately from account reauthorization", async () => {
+  fixture.items = [github];
+  await act(async () => {
+    renderer = create(<MCPMarketPage />);
+  });
+  await act(async () =>
+    renderer.root.findByProps({ "aria-label": "查看 GitHub MCP" }).props.onClick(),
+  );
+  const link = renderer.root.findByProps({ href: "https://github.com/settings/installations" });
+  expect(link.props.target).toBe("_blank");
+  expect(link.props.rel).toContain("noopener");
+  expect(JSON.stringify(renderer.toJSON())).toContain("仓库访问");
+  expect(JSON.stringify(renderer.toJSON())).toContain("重新授权账号");
+  expect(fixture.connect).not.toHaveBeenCalled();
 });

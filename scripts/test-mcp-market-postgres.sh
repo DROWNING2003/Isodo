@@ -28,19 +28,19 @@ import os,pathlib,subprocess,sys
 root,work,port,binary=sys.argv[1:]
 password=(pathlib.Path(work)/'postgres.env').read_text().splitlines()[0].split('=',1)[1]
 env=dict(os.environ,ISODO_TEST_DATABASE_URL='postgres://postgres:'+password+'@127.0.0.1:'+port+'/isodo_mcp_market?sslmode=disable')
-args=[binary,'-test.run','^Test(PostgresMCPAccountOAuthBindingLifecycle|MCPRuntimeRolePermissions)$','-test.v'] if binary else ['go','test','./internal/control/mcpmarket','-run','^Test(PostgresMCPAccountOAuthBindingLifecycle|MCPRuntimeRolePermissions)$','-count=1','-v']
+args=[binary,'-test.run','^Test(PostgresMCPAccountOAuthBindingLifecycle|MCPRuntimeRolePermissions|PostgresCustomMCPIsolationAndRevocation)$','-test.v'] if binary else ['go','test','./internal/control/mcpmarket','-run','^Test(PostgresMCPAccountOAuthBindingLifecycle|MCPRuntimeRolePermissions|PostgresCustomMCPIsolationAndRevocation)$','-count=1','-v']
 with (pathlib.Path(work)/'test.log').open('w') as log:
  p=subprocess.run(args,cwd=root,env=env,stdout=log,stderr=subprocess.STDOUT)
  print((pathlib.Path(work)/'test.log').read_text())
  if p.returncode:raise SystemExit(p.returncode)
 PY
 # Verify the new migration is reversible on this disposable database.
-python3 - "$ROOT/migrations/0016_mcp_market.sql" "$WORK" <<'PY'
+python3 - "$ROOT/migrations" "$WORK" <<'PY'
 import pathlib,sys
-source=pathlib.Path(sys.argv[1]).read_text()
-root=pathlib.Path(sys.argv[2])
-(root/'down.sql').write_text(source.split('-- +goose Down')[1])
-(root/'up.sql').write_text(source.split('-- +goose Up')[1].split('-- +goose Down')[0])
+migrations,work=map(pathlib.Path,sys.argv[1:])
+sources=[(migrations/name).read_text() for name in ['0016_mcp_market.sql','0017_custom_mcp.sql']]
+(work/'down.sql').write_text('\n'.join(s.split('-- +goose Down')[1] for s in reversed(sources)))
+(work/'up.sql').write_text('\n'.join(s.split('-- +goose Up')[1].split('-- +goose Down')[0] for s in sources))
 PY
 for migration in down up;do docker exec -i "$CID" psql -q -v ON_ERROR_STOP=1 -U postgres -d isodo_mcp_market < "$WORK/$migration.sql";done
 echo '迁移 Down→Up 通过'

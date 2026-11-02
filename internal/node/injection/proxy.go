@@ -153,7 +153,7 @@ func (p *Proxy) record(host, path, rule string) {
 func (p *Proxy) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	// Only the sandbox-scoped vsock/loopback channel reaches this origin-form
 	// endpoint. It never resolves DNS or opens another host listener.
-	if !r.URL.IsAbs() && r.URL.Path == "/isodo-mcp/github" && p.mcpHandler != nil {
+	if !r.URL.IsAbs() && strings.HasPrefix(r.URL.Path, "/isodo-mcp/") && p.mcpHandler != nil {
 		p.mcpHandler(p.sandboxID, w, r)
 		return
 	}

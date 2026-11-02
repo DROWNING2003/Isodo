@@ -31,6 +31,8 @@
     "GetInjectionRuleMaterial",
     "---MCP 市场---",
     "CompleteMCPOAuth",
+    "CreateCustomMCP",
+    "DeleteCustomMCP",
     "ListMCPCatalog",
     "GetMCPCatalog",
     "ListMCPFavorites",
