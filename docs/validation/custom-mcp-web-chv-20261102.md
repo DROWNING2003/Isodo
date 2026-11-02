@@ -44,3 +44,7 @@
 ## 自动化质量检查
 
 功能提交前已通过 `go test ./...`、相关 `go test -race`、`go vet ./...`、`make generate-check`、Web TypeScript 检查、相关前端测试（29 文件 / 164 测试）、Web 生产构建、Linux API/Node 构建及真实临时 PostgreSQL 的迁移、回滚和权限验证。PostgreSQL 测试中的 Node / 上游是 fixture，不能替代本报告的 CHV 验收。此次仅新增验收文档，执行 Markdown diff 与 `git diff --check`。
+
+## 后续修复跟踪
+
+上述首次工作台初始化问题保留为当时部署版本的历史证据。后续代码与独立 CHV 验证见 [CHV Ready 出站验证](chv-ready-egress-20261102.md)；该记录区分组件验证与公开 API / 真实模型端到端验收。

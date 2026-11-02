@@ -334,6 +334,11 @@ func (s *CHVServer) execute(entry journalOperation, record sandboxRecord) {
 	}
 	var instance CHVRuntime
 	var err error
+	if entry.Operation.Action == nodev1.OperationAction_OPERATION_ACTION_CREATE || entry.Operation.Action == nodev1.OperationAction_OPERATION_ACTION_START {
+		s.mu.Lock()
+		s.closeAppLinkLocked(record.SandboxID)
+		s.mu.Unlock()
+	}
 	switch entry.Operation.Action {
 	case nodev1.OperationAction_OPERATION_ACTION_CREATE:
 		var artifact string
@@ -382,6 +387,13 @@ func (s *CHVServer) execute(entry journalOperation, record sandboxRecord) {
 			err = s.injections.Delete(record.SandboxID)
 		}
 	}
+	if err == nil && (entry.Operation.Action == nodev1.OperationAction_OPERATION_ACTION_CREATE || entry.Operation.Action == nodev1.OperationAction_OPERATION_ACTION_START) {
+		entry.Operation.Stage = nodev1.OperationStage_OPERATION_STAGE_GUEST_READY
+		if err = s.persistOperation(entry); err == nil {
+			err = s.prepareReadyEgress(ctx, record, instance)
+		}
+	}
+
 	s.mu.Lock()
 	defer s.mu.Unlock()
 	if err != nil {
@@ -400,7 +412,6 @@ func (s *CHVServer) execute(entry journalOperation, record sandboxRecord) {
 		entry.Operation.State = nodev1.OperationState_OPERATION_STATE_SUCCEEDED
 		switch entry.Operation.Action {
 		case nodev1.OperationAction_OPERATION_ACTION_CREATE, nodev1.OperationAction_OPERATION_ACTION_START:
-			s.closeAppLinkLocked(record.SandboxID)
 			identity := instance.Identity()
 			record.State = "running"
 			record.BootID = identity.BootId
