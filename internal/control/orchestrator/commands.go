@@ -38,7 +38,10 @@ func (c *Client) RunCommand(ctx context.Context, target *nodev1.SandboxTarget, i
 	}
 	conn, err := grpc.NewClient("passthrough:///isodo-guest", grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithContextDialer(func(dialCtx context.Context, _ string) (net.Conn, error) {
-			return c.RelayPort(dialCtx, target.GetSandboxId(), target.GetOwnershipGeneration(), 1024, "guest-rpc")
+			// gRPC can cancel its dial-attempt context immediately after DialContext
+			// returns. RelayPort owns a connection-long stream and must instead
+			// live until the returned net.Conn is closed by gRPC.
+			return c.RelayPort(context.WithoutCancel(dialCtx), target.GetSandboxId(), target.GetOwnershipGeneration(), 1024, "guest-rpc")
 		}))
 	if err != nil {
 		return sandbox.CommandResult{}, err
