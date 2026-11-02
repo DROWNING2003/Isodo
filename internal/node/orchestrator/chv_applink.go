@@ -126,6 +126,10 @@ func (s *CHVServer) CreateSandboxAppLink(ctx context.Context, request *nodev1.Cr
 }
 
 func (s *CHVServer) dialGuestPort(parent context.Context, socket string, identity *guestv1.RuntimeIdentity, port uint16) (net.Conn, error) {
+	return s.dialGuestService(parent, socket, identity, port, "t3")
+}
+
+func (s *CHVServer) dialGuestService(parent context.Context, socket string, identity *guestv1.RuntimeIdentity, port uint16, service string) (net.Conn, error) {
 	connection, err := guesttransport.NewVsockClientConn(socket)
 	if err != nil {
 		return nil, err
@@ -138,7 +142,7 @@ func (s *CHVServer) dialGuestPort(parent context.Context, socket string, identit
 		return nil, err
 	}
 	if err := stream.Send(&guestv1.PortForwardFrame{Frame: &guestv1.PortForwardFrame_Open{Open: &guestv1.PortForwardOpen{
-		Identity: identity, RequestId: "app-" + newT3RequestSuffix(), Port: uint32(port), Service: "t3",
+		Identity: identity, RequestId: "app-" + newT3RequestSuffix(), Port: uint32(port), Service: service,
 	}}}); err != nil {
 		cancel()
 		_ = connection.Close()

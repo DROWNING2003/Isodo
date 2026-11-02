@@ -55,6 +55,7 @@ func (a *Access) AuthenticateRequest(r *http.Request) (Identity, error) {
 			return Identity{}, err
 		}
 		identity.Credential = "api_key"
+		identity.Subject = "api-key:" + id
 		return identity, nil
 	}
 	if len(headers) == 1 {
@@ -102,11 +103,11 @@ func parseAPIKey(raw string) (string, []byte, bool) {
 }
 
 func validScopes(scopes []string) bool {
-	if len(scopes) < 1 || len(scopes) > 5 {
+	if len(scopes) < 1 || len(scopes) > 6 {
 		return false
 	}
 	for i, scope := range scopes {
-		if !slices.Contains([]string{"sandboxes:read", "sandboxes:write", "sandboxes:execute", "templates:read", "templates:write"}, scope) {
+		if !slices.Contains([]string{"sandboxes:read", "sandboxes:write", "sandboxes:execute", "sandboxes:preview", "templates:read", "templates:write"}, scope) {
 			return false
 		}
 		if slices.Contains(scopes[:i], scope) {

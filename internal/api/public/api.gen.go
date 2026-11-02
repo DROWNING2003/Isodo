@@ -742,6 +742,11 @@ type SetSandboxInjectionsJSONBody struct {
 	Rules []SandboxInjection `json:"rules"`
 }
 
+// CreateSandboxPreviewJSONBody defines parameters for CreateSandboxPreview.
+type CreateSandboxPreviewJSONBody struct {
+	Port int `json:"port"`
+}
+
 // ListSystemTemplatesParams defines parameters for ListSystemTemplates.
 type ListSystemTemplatesParams struct {
 	Limit  *int `form:"limit,omitempty" json:"limit,omitempty"`
@@ -784,6 +789,9 @@ type UploadSandboxFileMultipartRequestBody UploadSandboxFileMultipartBody
 
 // SetSandboxInjectionsJSONRequestBody defines body for SetSandboxInjections for application/json ContentType.
 type SetSandboxInjectionsJSONRequestBody SetSandboxInjectionsJSONBody
+
+// CreateSandboxPreviewJSONRequestBody defines body for CreateSandboxPreview for application/json ContentType.
+type CreateSandboxPreviewJSONRequestBody CreateSandboxPreviewJSONBody
 
 // CreateTemplateJSONRequestBody defines body for CreateTemplate for application/json ContentType.
 type CreateTemplateJSONRequestBody = CreateTemplate
@@ -868,6 +876,9 @@ type ServerInterface interface {
 	// SetSandboxInjections Replace sandbox host-side injection rules
 	// (PUT /v1/sandboxes/{sandboxID}/injections)
 	SetSandboxInjections(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// CreateSandboxPreview Authorize a sandbox HTTP port preview
+	// (POST /v1/sandboxes/{sandboxID}/previews)
+	CreateSandboxPreview(w http.ResponseWriter, r *http.Request, sandboxID string)
 	// StartSandbox Start a stopped sandbox
 	// (POST /v1/sandboxes/{sandboxID}/start)
 	StartSandbox(w http.ResponseWriter, r *http.Request, sandboxID string)
@@ -1568,6 +1579,32 @@ func (siw *ServerInterfaceWrapper) SetSandboxInjections(w http.ResponseWriter, r
 	handler.ServeHTTP(w, r)
 }
 
+// CreateSandboxPreview operation middleware
+func (siw *ServerInterfaceWrapper) CreateSandboxPreview(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateSandboxPreview(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // StartSandbox operation middleware
 func (siw *ServerInterfaceWrapper) StartSandbox(w http.ResponseWriter, r *http.Request) {
 
@@ -2146,6 +2183,7 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/stop", wrapper.StopSandbox)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/app", wrapper.GetSandboxApp)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/app-link", wrapper.CreateSandboxAppLink)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/previews", wrapper.CreateSandboxPreview)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/commands/run", wrapper.RunSandboxCommand)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/injection-rules", wrapper.ListInjectionRules)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/injection-rules", wrapper.CreateInjectionRule)

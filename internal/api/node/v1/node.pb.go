@@ -1259,8 +1259,12 @@ type RelayOpen struct {
 	OwnershipGeneration uint64                 `protobuf:"varint,2,opt,name=ownership_generation,json=ownershipGeneration,proto3" json:"ownership_generation,omitempty"`
 	Port                uint32                 `protobuf:"varint,3,opt,name=port,proto3" json:"port,omitempty"`
 	Service             string                 `protobuf:"bytes,4,opt,name=service,proto3" json:"service,omitempty"`
-	unknownFields       protoimpl.UnknownFields
-	sizeCache           protoimpl.SizeCache
+	// Required for http-port; binds the grant to the current Guest incarnation.
+	Revision      uint64 `protobuf:"varint,5,opt,name=revision,proto3" json:"revision,omitempty"`
+	BootId        string `protobuf:"bytes,6,opt,name=boot_id,json=bootId,proto3" json:"boot_id,omitempty"`
+	GuestEpoch    string `protobuf:"bytes,7,opt,name=guest_epoch,json=guestEpoch,proto3" json:"guest_epoch,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
 }
 
 func (x *RelayOpen) Reset() {
@@ -1317,6 +1321,27 @@ func (x *RelayOpen) GetPort() uint32 {
 func (x *RelayOpen) GetService() string {
 	if x != nil {
 		return x.Service
+	}
+	return ""
+}
+
+func (x *RelayOpen) GetRevision() uint64 {
+	if x != nil {
+		return x.Revision
+	}
+	return 0
+}
+
+func (x *RelayOpen) GetBootId() string {
+	if x != nil {
+		return x.BootId
+	}
+	return ""
+}
+
+func (x *RelayOpen) GetGuestEpoch() string {
+	if x != nil {
+		return x.GuestEpoch
 	}
 	return ""
 }
@@ -1583,13 +1608,17 @@ const file_isodo_node_v1_node_proto_rawDesc = "" +
 	"observedAt\"a\n" +
 	"\x15WatchOperationRequest\x12!\n" +
 	"\foperation_id\x18\x01 \x01(\tR\voperationId\x12%\n" +
-	"\x0eafter_sequence\x18\x02 \x01(\x04R\rafterSequence\"\x8b\x01\n" +
+	"\x0eafter_sequence\x18\x02 \x01(\x04R\rafterSequence\"\xe1\x01\n" +
 	"\tRelayOpen\x12\x1d\n" +
 	"\n" +
 	"sandbox_id\x18\x01 \x01(\tR\tsandboxId\x121\n" +
 	"\x14ownership_generation\x18\x02 \x01(\x04R\x13ownershipGeneration\x12\x12\n" +
 	"\x04port\x18\x03 \x01(\rR\x04port\x12\x18\n" +
-	"\aservice\x18\x04 \x01(\tR\aservice\"~\n" +
+	"\aservice\x18\x04 \x01(\tR\aservice\x12\x1a\n" +
+	"\brevision\x18\x05 \x01(\x04R\brevision\x12\x17\n" +
+	"\aboot_id\x18\x06 \x01(\tR\x06bootId\x12\x1f\n" +
+	"\vguest_epoch\x18\a \x01(\tR\n" +
+	"guestEpoch\"~\n" +
 	"\n" +
 	"RelayFrame\x12.\n" +
 	"\x04open\x18\x01 \x01(\v2\x18.isodo.node.v1.RelayOpenH\x00R\x04open\x12\x14\n" +

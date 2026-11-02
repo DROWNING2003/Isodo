@@ -64,9 +64,11 @@ type Publisher struct {
 	additionalAppOrigins []string
 	ttl                  time.Duration
 
-	relay   RelayDialer
-	mu      sync.RWMutex
-	targets map[string]*url.URL
+	httpAuthorize HTTPAuthorizer
+	httpRelay     HTTPRelay
+	relay         RelayDialer
+	mu            sync.RWMutex
+	targets       map[string]*url.URL
 }
 
 type claims struct {
@@ -216,6 +218,10 @@ func (p *Publisher) Wrap(next http.Handler) http.Handler {
 			next.ServeHTTP(w, r)
 			return
 		}
+		if port != t3WorkbenchPort {
+			p.serveHTTPPort(w, r, sandboxID, port)
+			return
+		}
 		// SameSite=None removes the browser's CSRF barrier. Unsafe methods
 		// must carry an allowed Origin; CORS alone does not prevent writes.
 		if p.crossSiteCookie && r.Method != http.MethodGet && r.Method != http.MethodHead && r.Method != http.MethodOptions && r.Header.Get("Origin") == "" {
@@ -338,7 +344,7 @@ func stripInternalCookies(request *http.Request) {
 	for _, header := range headers {
 		for _, item := range strings.Split(header, ";") {
 			name, _, _ := strings.Cut(strings.TrimSpace(item), "=")
-			if name == cookieName || name == "isodo_session" {
+			if name == cookieName || name == httpCookieName || name == "isodo_session" {
 				continue
 			}
 			if strings.TrimSpace(item) != "" {

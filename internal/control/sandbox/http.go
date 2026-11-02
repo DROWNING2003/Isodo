@@ -14,6 +14,7 @@ import (
 
 	publicapi "github.com/DROWNING2003/Isodo/internal/api/public"
 	"github.com/DROWNING2003/Isodo/internal/control/auth"
+	"github.com/DROWNING2003/Isodo/internal/control/preview"
 	"github.com/DROWNING2003/Isodo/internal/sandboxfiles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
@@ -85,14 +86,16 @@ type Store interface {
 }
 
 type Handler struct {
-	files     *sandboxfiles.HTTP
-	commands  CommandRunner
-	runtime   RuntimeClient
-	store     Store
-	appLink   AppLinkIssuer
-	publisher AppLinkPublisher
-	localLima bool
-	webOrigin string
+	httpPreview *preview.Publisher
+	previewNode PreviewInspector
+	files       *sandboxfiles.HTTP
+	commands    CommandRunner
+	runtime     RuntimeClient
+	store       Store
+	appLink     AppLinkIssuer
+	publisher   AppLinkPublisher
+	localLima   bool
+	webOrigin   string
 }
 
 type AppLinkIssuer interface {

@@ -13,12 +13,22 @@ description: Isodo 用户和 SDK 使用的公开 HTTP API。
 | --- | --- |
 | 沙箱管理 | 创建、查询、修改名称、启动、停止和删除沙箱 |
 | 应用访问 | 获取沙箱应用入口，以及供客户端打开的应用链接 |
+| 命令执行 | 在运行中的 Guest 执行有超时和输出上限的非交互式命令 |
+| HTTP 端口预览 | 为指定 Guest 端口签发短期授权，通过 Gateway 转发 HTTP、WebSocket 和 SSE |
 | 文件 | 工作区文件上传、下载与目录创建；与 Agent 配置复用同一条链路 |
 | 安全连接 | 管理持久注入规则；读取规则材料属于敏感操作，需满足该端点的授权条件 |
 | Agent 配置 | 账号级配置文档与沙箱应用选择；使用交互式会话授权 |
 | 模板管理 | 查看系统与个人模板、修改元数据、设置可见性和派生已有版本 |
 | 模板构建 | 提交构建配方、查询构建状态 |
 | 模板版本与标签 | 将可变 tag 解析或指向不可变的 Ready build |
+
+## 命令执行与端口预览
+
+[`RunSandboxCommand`](/docs/api-reference/endpoints/RunSandboxCommand) 接受 argv 数组，需提供 `Idempotency-Key`；API Key 需要独立 `sandboxes:execute` 权限。HTTP 200 后仍需检查 `exit_code` 和输出完整性。
+
+[`CreateSandboxPreview`](/docs/api-reference/endpoints/CreateSandboxPreview) 接受 Guest 端口，API Key 需要独立 `sandboxes:preview` 权限。浏览器应打开 `authorization_url`，仅知道 `url` 不授予访问权。授权固定五分钟，生命周期变化会提前撤销；禁用管理端口 1024 和工作台端口 8080。
+
+从创建远程沙箱到启动 Python HTTP 服务的完整示例，见[HTTP 服务预览指南](/docs/guides/http-port-preview)。
 
 ## 模板创建与构建
 
@@ -34,7 +44,7 @@ description: Isodo 用户和 SDK 使用的公开 HTTP API。
 
 公开接口需要认证，支持浏览器会话 Cookie、Casdoor Bearer Token 或 API Key。API Key 通过 `X-API-Key` 请求头发送；各端点的具体权限与响应以端点页面为准。
 
-仓库已有生成的 HTTP 请求函数和 App 内部 SandboxClient，覆盖管理与 Files 接线；尚未发布面向外部开发者的 TypeScript/Python SDK。通用 Commands、PTY、Sessions 和 Ports API 不属于当前公开接口。
+仓库已有生成的 HTTP 请求函数和 App 内部 SandboxClient；生成的公开客户端包含 `runSandboxCommand` 和 `createSandboxPreview`。尚未发布面向外部开发者的 TypeScript/Python SDK；PTY、Sessions 和完整 Ports 管理接口尚未公开。当前 HTTP 端口访问由 Previews 接口提供。
 
 ## 动作与文件语义
 

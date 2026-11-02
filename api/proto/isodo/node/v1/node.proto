@@ -170,6 +170,10 @@ message RelayOpen {
   uint64 ownership_generation = 2;
   uint32 port = 3;
   string service = 4;
+  // Required for http-port; binds the grant to the current Guest incarnation.
+  uint64 revision = 5;
+  string boot_id = 6;
+  string guest_epoch = 7;
 }
 
 message RelayFrame {

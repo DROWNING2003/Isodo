@@ -79,7 +79,7 @@ make generate-check
 - [ ] 完整 Control 生命周期 worker→持久化 Node journal→CHV Stop/Start/Delete 联合验收。本轮 CHV 测试真实重建 VM，但用测试构造的 journal/live map 驱动命令准入，不等于该联合链路已验证。
 - [ ] StartProcess 响应丢失的真实网络故障注入；当前保留 Guest timeout 兜底的已知边界。
 
-本轮没有重启 jfcs1024 已有 Node/VM，没有修改其 API、Nginx、E2B 或 client-proxy。独立测试无 NIC、无生产数据库连接。初始化模块和 kernel 只读复用测试资产，所有写入位于专用目录及随机 /tmp 目录。
+上述隔离测试阶段没有重启 jfcs1024 已有 Node/VM，没有修改其 API、Nginx、E2B 或 client-proxy。独立测试无 NIC、无生产数据库连接。初始化模块和 kernel 只读复用测试资产，所有写入位于专用目录及随机 /tmp 目录。
 
 ## 重现隔离 CHV 验收
 
@@ -99,3 +99,9 @@ bash scripts/test-runtime-commands-chv.sh
 完整 postgres 包集成测试未全绿：已有 `TestPostgresCredentialsLifecycle` 和 `TestPostgresSandboxTenantIsolation` 在创建沙箱时报告 `TEMPLATE_NOT_FOUND` / `template not found or not ready`。这是本轮实际观测到的模板夹具问题，未修改这些测试来放宽断言；本 PR 新增的执行权限数据库测试独立通过。没有据此声称所有集成测试通过。
 
 完整 E2E 计划可在基础 Runtime API 齐全后集中推进，但正式合并仍要求最小可复现的 Guest 命令验证，避免仅凭 Mock 宣称命令可执行。
+
+## 后续真实 API 演示（2026-11-02）
+
+演示环境 Node/API 已部署 `78c513d`。通过真实账号的临时 API Key 调用 Control API，worker 创建 CHV 沙箱后，Commands API 成功执行 `python3 --version`（Python 3.10.12），再启动 Guest loopback 的 Python HTTP 服务。返回 exit_code=0，随后通过公开 HTTPS 预览及真实浏览器看到页面。创建、命令和 HTTP 预览在这次演示中使用真实数据库、Node、Guest 和 Nginx。
+
+这补充了正常路径的真实运行证据，不代表上面列出的完整生命周期组合与网络故障注入已经通过。可复现客户端脚本见[HTTP 服务预览指南](../docs-site/content/docs/guides/http-port-preview.mdx)。

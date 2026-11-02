@@ -11,16 +11,29 @@ import (
 
 	nodev1 "github.com/DROWNING2003/Isodo/internal/api/node/v1"
 	"google.golang.org/grpc"
+	"google.golang.org/protobuf/proto"
 )
 
 // RelayPort opens a long-lived Control-to-Node stream for one Guest TCP port.
 // The API's Preview Gateway uses the returned net.Conn as a reverse-proxy
 // upstream, so the API and Node may live on different hosts.
 func (c *Client) RelayPort(ctx context.Context, sandboxID string, generation uint64, port uint16, service string) (net.Conn, error) {
+	return c.relayPort(ctx, &nodev1.RelayOpen{SandboxId: sandboxID, OwnershipGeneration: generation, Port: uint32(port), Service: service})
+}
+
+// RelayHTTPPort requires a fully fenced target; the Node validates it again.
+func (c *Client) RelayHTTPPort(ctx context.Context, open *nodev1.RelayOpen) (net.Conn, error) {
+	if open == nil || open.Service != "http-port" || open.Revision == 0 || open.OwnershipGeneration == 0 || open.BootId == "" || open.GuestEpoch == "" {
+		return nil, errors.New("invalid HTTP preview runtime")
+	}
+	return c.relayPort(ctx, open)
+}
+
+func (c *Client) relayPort(ctx context.Context, open *nodev1.RelayOpen) (net.Conn, error) {
 	if err := c.requireService(); err != nil {
 		return nil, err
 	}
-	if sandboxID == "" || port == 0 {
+	if open.SandboxId == "" || open.Port == 0 {
 		return nil, errors.New("sandbox ID and port are required")
 	}
 	streamCtx, cancel := context.WithCancel(ctx)
@@ -29,11 +42,38 @@ func (c *Client) RelayPort(ctx context.Context, sandboxID string, generation uin
 		cancel()
 		return nil, fmt.Errorf("open node relay: %w", err)
 	}
-	if err = stream.Send(&nodev1.RelayFrame{Frame: &nodev1.RelayFrame_Open{Open: &nodev1.RelayOpen{
-		SandboxId: sandboxID, OwnershipGeneration: generation, Port: uint32(port), Service: service,
-	}}}); err != nil {
+	if err = stream.Send(&nodev1.RelayFrame{Frame: &nodev1.RelayFrame_Open{Open: open}}); err != nil {
 		cancel()
 		return nil, fmt.Errorf("open node relay target: %w", err)
+	}
+	if open.Service == "http-port" {
+		// Older Nodes ignored service/fencing fields. Require an explicit echo
+		// after validation before sending any HTTP bytes to the Guest.
+		type acknowledgement struct {
+			frame *nodev1.RelayFrame
+			err   error
+		}
+		ready := make(chan acknowledgement, 1)
+		go func() { frame, err := stream.Recv(); ready <- acknowledgement{frame, err} }()
+		timer := time.NewTimer(5 * time.Second)
+		defer timer.Stop()
+		select {
+		case <-ctx.Done():
+			cancel()
+			return nil, ctx.Err()
+		case <-timer.C:
+			cancel()
+			return nil, errors.New("Node does not acknowledge fenced HTTP previews")
+		case result := <-ready:
+			if result.err != nil {
+				cancel()
+				return nil, fmt.Errorf("authorize Node HTTP relay: %w", result.err)
+			}
+			if result.frame.GetOpen() == nil || !proto.Equal(result.frame.GetOpen(), open) {
+				cancel()
+				return nil, errors.New("Node returned an invalid HTTP relay acknowledgement")
+			}
+		}
 	}
 	return &relayConn{stream: stream, cancel: cancel}, nil
 }
@@ -89,9 +129,11 @@ func (c *relayConn) CloseWrite() error {
 
 func (c *relayConn) Close() error {
 	c.closed.Do(func() {
-		_ = c.CloseWrite()
-		_ = c.stream.CloseSend()
+		// Cancel first: a blocked writer must not prevent lifecycle revocation.
 		c.cancel()
+		c.writeMu.Lock()
+		defer c.writeMu.Unlock()
+		_ = c.stream.CloseSend()
 	})
 	return nil
 }

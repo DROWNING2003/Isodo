@@ -61,6 +61,8 @@ curl 'http://127.0.0.1:8080/v1/templates?scope=available' -H "X-API-Key: $ISODO_
 
 远端创建需要可创建的 Ready 模板：`POST /v1/sandboxes` 返回 `202 Sandbox`，随后等待同一 `revision` 的 `last_action.status=succeeded` 和 `observed_state=running`。HTTP 接受请求不等于 Guest 已就绪。
 
+通过 API Key 创建远程沙箱、执行 Python 并取得浏览器链接，见[HTTP 服务预览指南](/docs/guides/http-port-preview)。
+
 公开接口、Files 与错误模型见 [API Reference](/docs/api-reference)。修改协议后使用根目录 `make generate` 更新生成代码；只更新接口文档可执行 `npm --prefix docs-site run generate:openapi`。
 
 ```bash
