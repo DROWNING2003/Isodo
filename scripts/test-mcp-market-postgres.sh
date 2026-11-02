@@ -15,7 +15,7 @@ python3 - "$WORK" <<'PY'
 import pathlib,secrets,sys
 (pathlib.Path(sys.argv[1])/'postgres.env').write_text('POSTGRES_PASSWORD='+secrets.token_urlsafe(32)+'\nPOSTGRES_DB=isodo_mcp_market\n')
 PY
-CID="$(docker run -d --rm --env-file "$WORK/postgres.env" -p 127.0.0.1::5432 "${ISODO_TEST_POSTGRES_IMAGE:-postgres:17.4}")"
+CID="$(docker run -d --rm --tmpfs /var/lib/postgresql/data:rw,nosuid,size=512m --env-file "$WORK/postgres.env" -p 127.0.0.1::5432 "${ISODO_TEST_POSTGRES_IMAGE:-postgres:17.4}")"
 for attempt in {1..600};do
  if docker exec "$CID" pg_isready -h 127.0.0.1 -U postgres -d isodo_mcp_market >/dev/null 2>&1;then break;fi
  sleep .1
@@ -28,7 +28,7 @@ import os,pathlib,subprocess,sys
 root,work,port,binary=sys.argv[1:]
 password=(pathlib.Path(work)/'postgres.env').read_text().splitlines()[0].split('=',1)[1]
 env=dict(os.environ,ISODO_TEST_DATABASE_URL='postgres://postgres:'+password+'@127.0.0.1:'+port+'/isodo_mcp_market?sslmode=disable')
-args=[binary,'-test.run','^Test(PostgresMCPAccountOAuthBindingLifecycle|MCPRuntimeRolePermissions|PostgresCustomMCPIsolationAndRevocation|PostgresSkillAccountIsolationAndSync)$','-test.v'] if binary else ['go','test','./internal/control/mcpmarket','./internal/control/skillmarket','-run','^Test(PostgresMCPAccountOAuthBindingLifecycle|MCPRuntimeRolePermissions|PostgresCustomMCPIsolationAndRevocation|PostgresSkillAccountIsolationAndSync)$','-count=1','-v']
+args=[binary,'-test.run','^Test(PostgresDCRProviders|PostgresMCPAccountOAuthBindingLifecycle|MCPRuntimeRolePermissions|PostgresCustomMCPIsolationAndRevocation|PostgresSkillAccountIsolationAndSync)$','-test.v'] if binary else ['go','test','./internal/control/mcpmarket','./internal/control/skillmarket','-run','^Test(PostgresDCRProviders|PostgresMCPAccountOAuthBindingLifecycle|MCPRuntimeRolePermissions|PostgresCustomMCPIsolationAndRevocation|PostgresSkillAccountIsolationAndSync)$','-count=1','-v']
 with (pathlib.Path(work)/'test.log').open('w') as log:
  p=subprocess.run(args,cwd=str(pathlib.Path(root)/"internal/control/mcpmarket") if binary else root,env=env,stdout=log,stderr=subprocess.STDOUT)
  print((pathlib.Path(work)/'test.log').read_text())
@@ -44,7 +44,7 @@ PY
 python3 - "$ROOT/migrations" "$WORK" <<'PY'
 import pathlib,sys
 migrations,work=map(pathlib.Path,sys.argv[1:])
-sources=[(migrations/name).read_text() for name in ['0016_mcp_market.sql','0017_custom_mcp.sql','0018_skill_market.sql']]
+sources=[(migrations/name).read_text() for name in ['0016_mcp_market.sql','0017_custom_mcp.sql','0018_skill_market.sql','0019_mcp_dcr.sql','0020_remove_supabase_mcp.sql']]
 (work/'down.sql').write_text('\n'.join(s.split('-- +goose Down')[1] for s in reversed(sources)))
 (work/'up.sql').write_text('\n'.join(s.split('-- +goose Up')[1].split('-- +goose Down')[0] for s in sources))
 PY

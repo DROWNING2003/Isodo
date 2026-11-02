@@ -43,7 +43,7 @@ func (s *CHVServer) SyncMCP(ctx context.Context, request *nodev1.SyncMCPRequest)
 			return nil, status.Error(codes.InvalidArgument, "invalid MCP binding")
 		}
 		custom, ok := strings.CutPrefix(b.MarketMcpId, "custom-")
-		validMarket := b.MarketMcpId == "github" || ok && canonicalUUID(custom)
+		validMarket := (b.MarketMcpId == "github" || b.MarketMcpId == "notion") || ok && canonicalUUID(custom)
 		if !canonicalUUID(b.BindingId) || !validMarket || seen[b.MarketMcpId] || len(b.Capability) != 43 {
 			return nil, status.Error(codes.InvalidArgument, "invalid MCP binding")
 		}
@@ -237,7 +237,7 @@ assert len(old)<=1048576
 parsed=tomllib.loads(old)
 ids=['github'] if sys.argv[2]=='true' else [] if sys.argv[2]=='false' else json.loads(sys.argv[2])
 assert isinstance(ids,list) and len(ids)<=64 and len(set(ids))==len(ids)
-assert all(isinstance(x,str) and (x=='github' or re.fullmatch(r'custom-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',x)) for x in ids)
+assert all(isinstance(x,str) and (x in ('github','notion') or re.fullmatch(r'custom-[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}',x)) for x in ids)
 active=bool(ids)
 start='# BEGIN ISODO MANAGED GITHUB MCP\n';end='# END ISODO MANAGED GITHUB MCP\n'
 assert old.count(start)==old.count(end) and old.count(start)<=1
@@ -253,6 +253,7 @@ for identifier in sorted(ids):
  name='isodo_'+identifier.replace('-','_')
  assert name not in base_parsed.get('mcp_servers',{}),'manual MCP configuration conflicts'
  section+='[mcp_servers.'+name+']\nurl = "http://127.0.0.1:'+sys.argv[1]+'/isodo-mcp/'+identifier+'"\nhttp_headers = { Authorization = "Bearer isodo-mcp-placeholder" }\n'
+ if identifier=='notion': section+='enabled_tools = ["notion-search", "notion-fetch", "notion-get-self", "notion-query-data-sources", "notion-get-comments", "notion-get-users", "notion-get-user", "notion-get-teams"]\n'
  if identifier=='github': section+='enabled_tools = ["get_me", "get_file_contents", "search_repositories", "search_code", "list_branches", "list_commits", "get_commit", "list_issues", "issue_read", "search_issues", "list_pull_requests", "pull_request_read", "search_pull_requests"]\n'
 section+=end
 new=base.rstrip()+'\n'+(section if active else '')

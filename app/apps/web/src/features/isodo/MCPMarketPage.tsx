@@ -11,6 +11,7 @@ import {
   ArrowLeftIcon,
   ExternalLinkIcon,
 } from "lucide-react";
+import { NotionIcon } from "../../components/Icons";
 import { Button } from "../../components/ui/button";
 import { isodoFetch } from "../../api/transport";
 import { CloudPage } from "./CloudPages";
@@ -25,6 +26,11 @@ import {
   useMCPOAuth,
   type MCPBinding,
 } from "./mcpMarket";
+
+function MCPServiceIcon({ marketID, className }: { marketID: string; className: string }) {
+  const Icon = marketID === "github" ? GithubIcon : marketID === "notion" ? NotionIcon : ServerIcon;
+  return <Icon className={className} aria-hidden="true" />;
+}
 
 export function MCPMarketPage() {
   const market = useMCPMarket();
@@ -102,11 +108,7 @@ export function MCPMarketPage() {
                 onClick={() => setSelected(item.market_mcp_id)}
                 className={`flex items-center gap-2 rounded-lg px-3 py-2 text-left text-sm ${selected === item.market_mcp_id ? "bg-muted" : "hover:bg-muted/60"}`}
               >
-                {item.source === "custom" ? (
-                  <ServerIcon className="size-4 shrink-0" />
-                ) : (
-                  <GithubIcon className="size-4 shrink-0" />
-                )}
+                <MCPServiceIcon marketID={item.market_mcp_id} className="size-4 shrink-0" />
                 <span className="truncate">{item.name}</span>
               </button>
             ))}
@@ -139,15 +141,17 @@ export function MCPMarketPage() {
                 返回 MCP 列表
               </button>
               <div className="flex items-center gap-4">
-                {selectedItem.source === "custom" ? (
-                  <ServerIcon className="size-10" />
-                ) : (
-                  <GithubIcon className="size-10" />
-                )}
+                <MCPServiceIcon
+                  marketID={selectedItem.market_mcp_id}
+                  className="size-10 shrink-0"
+                />
                 <div>
                   <h2 className="text-xl font-semibold">{selectedItem.name}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {selectedItem.description || "你的私有远程 MCP 服务"}
+                    {selectedItem.workspace_name ? (
+                      <span className="block mt-1">工作区：{selectedItem.workspace_name}</span>
+                    ) : null}
                   </p>
                 </div>
               </div>
@@ -158,7 +162,9 @@ export function MCPMarketPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-medium">
-                      {selectedItem.source === "custom" ? "服务器连接" : "GitHub 账号"}
+                      {selectedItem.source === "custom"
+                        ? "服务器连接"
+                        : `${selectedItem.name} 账号`}
                     </h3>
                     <p role="status" className="mt-1 text-sm text-muted-foreground">
                       {oauth.pending ? "正在授权，请在浏览器完成" : mcpStatus(selectedItem.status)}
@@ -177,15 +183,22 @@ export function MCPMarketPage() {
                       <>
                         <Button
                           disabled={pending || oauth.pending || !selectedItem.oauth_configured}
-                          onClick={() => void oauth.connect()}
+                          onClick={() => void oauth.connect(selectedItem.market_mcp_id)}
                         >
-                          {selectedItem.status === "connected" ? "重新授权账号" : "连接 GitHub"}
+                          {selectedItem.status === "connected"
+                            ? "重新授权账号"
+                            : `连接 ${selectedItem.name}`}
                         </Button>
                         {selectedItem.status !== "disconnected" ? (
                           <Button
                             variant="outline"
                             disabled={pending || oauth.pending}
-                            onClick={() => void mutate("/v1/mcp/connections/github", "DELETE")}
+                            onClick={() =>
+                              void mutate(
+                                `/v1/mcp/connections/${selectedItem.market_mcp_id}`,
+                                "DELETE",
+                              )
+                            }
                           >
                             断开连接
                           </Button>
@@ -205,7 +218,7 @@ export function MCPMarketPage() {
                       · 仅当前账号可见
                     </p>
                   </div>
-                ) : (
+                ) : selectedItem.market_mcp_id === "github" ? (
                   <div className="flex flex-wrap items-start justify-between gap-4 border-t border-border pt-4">
                     <div>
                       <h3 className="text-sm font-medium">仓库访问</h3>
@@ -224,6 +237,8 @@ export function MCPMarketPage() {
                       <ExternalLinkIcon className="size-3.5" />
                     </a>
                   </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">只读工具由 Isodo 服务端强制限制。</p>
                 )}
               </section>
               <p className="text-xs text-muted-foreground">
@@ -288,11 +303,7 @@ export function MCPMarketPage() {
                       className="flex min-w-0 flex-1 items-center gap-3 text-left"
                       onClick={() => setSelected(item.market_mcp_id)}
                     >
-                      {item.source === "custom" ? (
-                        <ServerIcon className="size-8 shrink-0" />
-                      ) : (
-                        <GithubIcon className="size-8 shrink-0" />
-                      )}
+                      <MCPServiceIcon marketID={item.market_mcp_id} className="size-8 shrink-0" />
                       <span className="min-w-0">
                         <span className="block text-sm font-medium">{item.name}</span>
                         <span className="mt-1 block truncate text-xs text-muted-foreground">
@@ -397,7 +408,7 @@ export function MCPFavoriteFields({
           <span className="flex-1 text-sm">
             {item.name}
             <span className="block text-xs text-muted-foreground">
-              {item.source === "custom" ? "自定义 MCP" : "GitHub 官方 MCP"} ·{" "}
+              {item.source === "custom" ? "自定义 MCP" : `${item.name} 官方 MCP`} ·{" "}
               {mcpStatus(item.status)}
               {bindings
                 ? ` · ${bindingSummary(
@@ -407,12 +418,12 @@ export function MCPFavoriteFields({
                 : null}
             </span>
           </span>
-          {item.market_mcp_id === "github" && item.status !== "connected" ? (
+          {item.auth_kind === "oauth2" && item.status !== "connected" ? (
             <Button
               type="button"
               size="sm"
               disabled={disabled || oauth.pending || !item.oauth_configured}
-              onClick={() => void oauth.connect()}
+              onClick={() => void oauth.connect(item.market_mcp_id)}
             >
               连接
             </Button>

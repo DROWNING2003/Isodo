@@ -2,11 +2,11 @@
 package mcpmarket
 
 import (
-	"bytes"
 	"context"
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/url"
 	"strings"
@@ -33,7 +33,7 @@ func New(pool *pgxpool.Pool, sealer *injection.Sealer, config Config, runtime Ru
 	return &Handler{pool: pool, sealer: sealer, config: config, http: newHTTPClient(), runtime: runtime}
 }
 func write(w http.ResponseWriter, status int, value any) {
-	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.Header().Set("Cache-Control", "no-store")
 	w.WriteHeader(status)
 	if status != 204 {
@@ -43,6 +43,8 @@ func write(w http.ResponseWriter, status int, value any) {
 func fail(w http.ResponseWriter, status int, code string) {
 	message := "MCP 操作失败，请检查连接状态后重试。"
 	switch code {
+	case "MCP_DCR_INCOMPATIBLE":
+		message = "服务发现或 DCR 注册失败；Isodo 要求 S256、issuer 回调与兼容的动态注册，不会回退 PAT。"
 	case "MCP_INVALID_CUSTOM_SERVER":
 		message = "请检查名称、HTTPS 地址和认证方式；地址不能包含凭证或查询参数。"
 	case "MCP_CONNECTION_CHECK_FAILED":
@@ -96,6 +98,13 @@ func (h *Handler) Account(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	path := r.URL.Path
+	market := r.PathValue("marketID")
+	if market == "" {
+		parts := strings.Split(path, "/")
+		if len(parts) > 4 && (parts[3] == "connections" || parts[3] == "favorites") {
+			market = parts[4]
+		}
+	}
 	switch {
 	case path == "/v1/mcp/custom" && r.Method == "POST":
 		h.createCustom(w, r, tenant)
@@ -103,43 +112,43 @@ func (h *Handler) Account(w http.ResponseWriter, r *http.Request) {
 		h.deleteCustom(w, r, tenant, strings.TrimPrefix(path, "/v1/mcp/custom/"))
 	case path == "/v1/mcp/catalog" && r.Method == "GET", strings.HasPrefix(path, "/v1/mcp/catalog/") && r.Method == "GET", path == "/v1/mcp/favorites" && r.Method == "GET":
 		h.catalog(w, r, tenant)
-	case path == "/v1/mcp/favorites/github" && (r.Method == "PUT" || r.Method == "DELETE"):
-		sql := `INSERT INTO mcp_favorites(tenant_id,market_mcp_id) VALUES($1,'github') ON CONFLICT DO NOTHING`
+	case officialProvider(market) && path == "/v1/mcp/favorites/"+market && (r.Method == "PUT" || r.Method == "DELETE"):
+		sql := `INSERT INTO mcp_favorites(tenant_id,market_mcp_id) VALUES($1,$2) ON CONFLICT DO NOTHING`
 		if r.Method == "DELETE" {
-			sql = `DELETE FROM mcp_favorites WHERE tenant_id=$1 AND market_mcp_id='github'`
+			sql = `DELETE FROM mcp_favorites WHERE tenant_id=$1 AND market_mcp_id=$2`
 		}
-		if _, err := h.pool.Exec(r.Context(), sql, tenant); err != nil {
+		if _, err := h.pool.Exec(r.Context(), sql, tenant, market); err != nil {
 			fail(w, 503, "MCP_STORAGE_UNAVAILABLE")
 			return
 		}
 		write(w, 204, nil)
-	case path == "/v1/mcp/connections/github" && r.Method == "GET":
-		h.connection(w, r, tenant)
-	case path == "/v1/mcp/connections/github" && r.Method == "DELETE":
+	case officialProvider(market) && path == "/v1/mcp/connections/"+market && r.Method == "GET":
+		h.connection(w, r, tenant, market)
+	case officialProvider(market) && path == "/v1/mcp/connections/"+market && r.Method == "DELETE":
 		tx, err := h.pool.Begin(r.Context())
 		if err != nil {
 			fail(w, 503, "MCP_STORAGE_UNAVAILABLE")
 			return
 		}
 		defer tx.Rollback(r.Context())
-		_, err = tx.Exec(r.Context(), `UPDATE mcp_oauth_connections SET status='disconnected',nonce=NULL,ciphertext=NULL,tools='[]',version=version+1,updated_at=now() WHERE tenant_id=$1 AND market_mcp_id='github'`, tenant)
+		_, err = tx.Exec(r.Context(), `UPDATE mcp_oauth_connections SET status='disconnected',nonce=NULL,ciphertext=NULL,tools='[]',version=version+1,updated_at=now() WHERE tenant_id=$1 AND market_mcp_id=$2`, tenant, market)
 		if err == nil {
-			_, err = tx.Exec(r.Context(), `UPDATE mcp_oauth_transactions SET status='cancelled' WHERE tenant_id=$1 AND status IN ('pending','processing')`, tenant)
+			_, err = tx.Exec(r.Context(), `UPDATE mcp_oauth_transactions SET status='cancelled' WHERE tenant_id=$1 AND market_mcp_id=$2 AND status IN ('pending','processing')`, tenant, market)
 		}
 		if err != nil || tx.Commit(r.Context()) != nil {
 			fail(w, 503, "MCP_STORAGE_UNAVAILABLE")
 			return
 		}
 		write(w, 204, nil)
-	case path == "/v1/mcp/connections/github/authorize" && r.Method == "POST":
-		h.Start(w, r, tenant)
-	case path == "/v1/mcp/connections/github/tools" && r.Method == "GET":
-		token, err := h.freshToken(r.Context(), tenant)
+	case officialProvider(market) && path == "/v1/mcp/connections/"+market+"/authorize" && r.Method == "POST":
+		h.Start(w, r, tenant, market)
+	case officialProvider(market) && path == "/v1/mcp/connections/"+market+"/tools" && r.Method == "GET":
+		token, err := h.freshToken(r.Context(), tenant, market)
 		if err != nil {
 			fail(w, 409, "MCP_RECONNECT_REQUIRED")
 			return
 		}
-		tools, err := h.checkTools(r.Context(), token.Access)
+		tools, err := h.checkTokenTools(r.Context(), token, market)
 		if err != nil {
 			fail(w, 502, "MCP_UPSTREAM_UNAVAILABLE")
 			return
@@ -180,11 +189,13 @@ func (h *Handler) Account(w http.ResponseWriter, r *http.Request) {
 	}
 }
 func (h *Handler) catalog(w http.ResponseWriter, r *http.Request, tenant string) {
-	var expired bool
-	if h.pool.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM mcp_oauth_connections WHERE tenant_id=$1 AND market_mcp_id='github' AND status='connected' AND expires_at<=now()+interval '30 seconds')`, tenant).Scan(&expired) == nil && expired {
-		_, _ = h.freshToken(r.Context(), tenant)
+	for _, market := range []string{"github", "notion"} {
+		var expired bool
+		if h.pool.QueryRow(r.Context(), `SELECT EXISTS(SELECT 1 FROM mcp_oauth_connections WHERE tenant_id=$1 AND market_mcp_id=$2 AND status='connected' AND expires_at<=now()+interval '30 seconds')`, tenant, market).Scan(&expired) == nil && expired {
+			_, _ = h.freshToken(r.Context(), tenant, market)
+		}
 	}
-	rows, err := h.pool.Query(r.Context(), `SELECT c.market_mcp_id,c.name,c.provider,c.description,c.endpoint,c.transport,c.auth_kind,f.market_mcp_id IS NOT NULL,COALESCE(o.status,'disconnected'),o.oauth_connection_id::text,o.expires_at FROM mcp_catalog c LEFT JOIN mcp_favorites f ON f.market_mcp_id=c.market_mcp_id AND f.tenant_id=$1 LEFT JOIN mcp_oauth_connections o ON o.market_mcp_id=c.market_mcp_id AND o.tenant_id=$1 ORDER BY c.market_mcp_id`, tenant)
+	rows, err := h.pool.Query(r.Context(), `SELECT c.market_mcp_id,c.name,c.provider,c.description,c.endpoint,c.transport,c.auth_kind,f.market_mcp_id IS NOT NULL,COALESCE(o.status,'disconnected'),o.oauth_connection_id::text,o.expires_at,o.project_ref,o.workspace_id,o.workspace_name FROM mcp_catalog c LEFT JOIN mcp_favorites f ON f.market_mcp_id=c.market_mcp_id AND f.tenant_id=$1 LEFT JOIN mcp_oauth_connections o ON o.market_mcp_id=c.market_mcp_id AND o.tenant_id=$1 WHERE c.market_mcp_id IN ('github','notion') ORDER BY c.market_mcp_id`, tenant)
 	if err != nil {
 		fail(w, 503, "MCP_STORAGE_UNAVAILABLE")
 		return
@@ -196,7 +207,8 @@ func (h *Handler) catalog(w http.ResponseWriter, r *http.Request, tenant string)
 		var favorite bool
 		var connection *string
 		var expiry *time.Time
-		if rows.Scan(&id, &name, &provider, &description, &endpoint, &transport, &kind, &favorite, &status, &connection, &expiry) != nil {
+		var project, workspaceID, workspaceName *string
+		if rows.Scan(&id, &name, &provider, &description, &endpoint, &transport, &kind, &favorite, &status, &connection, &expiry, &project, &workspaceID, &workspaceName) != nil {
 			fail(w, 503, "MCP_STORAGE_UNAVAILABLE")
 			return
 		}
@@ -206,7 +218,7 @@ func (h *Handler) catalog(w http.ResponseWriter, r *http.Request, tenant string)
 		if status == "connected" && expiry != nil && !expiry.After(time.Now()) {
 			status = "expired"
 		}
-		items = append(items, map[string]any{"market_mcp_id": id, "name": name, "provider": provider, "description": description, "endpoint": endpoint, "transport": transport, "auth_kind": kind, "favorite": favorite, "status": status, "oauth_connection_id": connection, "oauth_configured": configured(h.config), "source": "market"})
+		items = append(items, map[string]any{"market_mcp_id": id, "name": name, "provider": provider, "description": description, "endpoint": endpoint, "transport": transport, "auth_kind": kind, "favorite": favorite, "status": status, "oauth_connection_id": connection, "oauth_configured": (id == "github" && configured(h.config) || id != "github" && callbackConfigured(h.config)), "project_ref": project, "workspace_id": workspaceID, "workspace_name": workspaceName, "source": "market"})
 	}
 	if rows.Err() != nil {
 		fail(w, 503, "MCP_STORAGE_UNAVAILABLE")
@@ -231,11 +243,13 @@ func (h *Handler) catalog(w http.ResponseWriter, r *http.Request, tenant string)
 	}
 	write(w, 200, map[string]any{"items": items})
 }
-func (h *Handler) connection(w http.ResponseWriter, r *http.Request, tenant string) {
+func (h *Handler) connection(w http.ResponseWriter, r *http.Request, tenant string, ids ...string) {
+	market := providerID(ids)
 	var id, status string
 	var tools json.RawMessage
 	var expiry *time.Time
-	err := h.pool.QueryRow(r.Context(), `SELECT oauth_connection_id::text,status,tools,expires_at FROM mcp_oauth_connections WHERE tenant_id=$1 AND market_mcp_id='github'`, tenant).Scan(&id, &status, &tools, &expiry)
+	var project *string
+	err := h.pool.QueryRow(r.Context(), `SELECT oauth_connection_id::text,status,tools,expires_at,project_ref FROM mcp_oauth_connections WHERE tenant_id=$1 AND market_mcp_id=$2`, tenant, market).Scan(&id, &status, &tools, &expiry, &project)
 	if errors.Is(err, pgx.ErrNoRows) {
 		write(w, 200, map[string]any{"status": "disconnected"})
 		return
@@ -247,18 +261,43 @@ func (h *Handler) connection(w http.ResponseWriter, r *http.Request, tenant stri
 	if status == "connected" && expiry != nil && !expiry.After(time.Now()) {
 		status = "expired"
 	}
-	write(w, 200, map[string]any{"market_mcp_id": "github", "oauth_connection_id": id, "status": status, "tools": tools, "expires_at": expiry})
+	write(w, 200, map[string]any{"project_ref": project, "market_mcp_id": market, "oauth_connection_id": id, "status": status, "tools": tools, "expires_at": expiry})
 }
-func (h *Handler) Start(w http.ResponseWriter, r *http.Request, tenant string) {
-	if !configured(h.config) {
+func (h *Handler) Start(w http.ResponseWriter, r *http.Request, tenant string, ids ...string) {
+	market := providerID(ids)
+	if !officialProvider(market) || market == "github" && !configured(h.config) || market != "github" && !callbackConfigured(h.config) {
 		fail(w, 503, "MCP_OAUTH_NOT_CONFIGURED")
 		return
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 30*time.Second)
 	defer cancel()
-	m, err := h.discover(ctx)
+	var m metadata
+	var err error
+	var g *grantContext
+	clientID := h.config.ClientID
+	resource := mcpclient.Endpoint
+	if market == "github" {
+		m, err = h.discover(ctx)
+	} else {
+		var discovered grantContext
+		discovered, err = h.discoverProvider(ctx, market)
+		if err == nil {
+			discovered.Client, err = h.registerClient(ctx, discovered)
+		}
+		if err == nil {
+			discovered.Tenant = tenant
+			g = &discovered
+			m = discovered.Metadata
+			clientID = g.Client.ID
+			resource = g.Resource
+		}
+	}
 	if err != nil {
-		fail(w, 502, "MCP_DISCOVERY_FAILED")
+		if market == "github" {
+			fail(w, 502, "MCP_DISCOVERY_FAILED")
+		} else {
+			fail(w, 502, "MCP_DCR_INCOMPATIBLE")
+		}
 		return
 	}
 	state, verifier, id := randomValue(), randomValue(), uuid.NewString()
@@ -269,19 +308,23 @@ func (h *Handler) Start(w http.ResponseWriter, r *http.Request, tenant string) {
 		return
 	}
 	defer tx.Rollback(ctx)
+	if _, err := tx.Exec(ctx, `SELECT pg_advisory_xact_lock(hashtextextended($1,1))`, "mcp-start:"+tenant); err != nil {
+		fail(w, 503, "MCP_STORAGE_UNAVAILABLE")
+		return
+	}
 	// Serialize account starts, disconnect and callback version changes via the grant row.
-	_, err = tx.Exec(ctx, `INSERT INTO mcp_oauth_connections(oauth_connection_id,tenant_id,market_mcp_id,status) VALUES($1,$2,'github','disconnected') ON CONFLICT DO NOTHING`, uuid.NewString(), tenant)
+	_, err = tx.Exec(ctx, `INSERT INTO mcp_oauth_connections(oauth_connection_id,tenant_id,market_mcp_id,status) VALUES($1,$2,$3,'disconnected') ON CONFLICT DO NOTHING`, uuid.NewString(), tenant, market)
 	if err != nil {
 		fail(w, 503, "MCP_STORAGE_UNAVAILABLE")
 		return
 	}
 	var version int64
-	err = tx.QueryRow(ctx, `SELECT version FROM mcp_oauth_connections WHERE tenant_id=$1 AND market_mcp_id='github' FOR UPDATE`, tenant).Scan(&version)
+	err = tx.QueryRow(ctx, `SELECT version FROM mcp_oauth_connections WHERE tenant_id=$1 AND market_mcp_id=$2 FOR UPDATE`, tenant, market).Scan(&version)
 	if err != nil {
 		fail(w, 503, "MCP_STORAGE_UNAVAILABLE")
 		return
 	}
-	raw, _ := json.Marshal(oauthPending{verifier, h.config.RedirectURI, m, version})
+	raw, _ := json.Marshal(oauthPending{Verifier: verifier, RedirectURI: h.config.RedirectURI, Metadata: m, ConnectionVersion: version, Grant: g})
 	nonce, sealed, err := h.sealer.Seal(raw)
 	if err != nil {
 		fail(w, 500, "MCP_SEAL_FAILED")
@@ -293,12 +336,18 @@ func (h *Handler) Start(w http.ResponseWriter, r *http.Request, tenant string) {
 		fail(w, 429, "MCP_AUTHORIZATION_LIMIT")
 		return
 	}
-	_, err = tx.Exec(ctx, `INSERT INTO mcp_oauth_transactions(transaction_id,tenant_id,market_mcp_id,state_hash,nonce,ciphertext,expires_at) VALUES($1,$2,'github',$3,$4,$5,now()+interval '5 minutes')`, id, tenant, hash(state), nonce, sealed)
+	_, err = tx.Exec(ctx, `INSERT INTO mcp_oauth_transactions(transaction_id,tenant_id,market_mcp_id,state_hash,nonce,ciphertext,expires_at) VALUES($1,$2,$3,$4,$5,$6,now()+interval '5 minutes')`, id, tenant, market, hash(state), nonce, sealed)
 	if err != nil || tx.Commit(ctx) != nil {
 		fail(w, 503, "MCP_STORAGE_UNAVAILABLE")
 		return
 	}
-	values := url.Values{"client_id": {h.config.ClientID}, "redirect_uri": {h.config.RedirectURI}, "response_type": {"code"}, "state": {state}, "code_challenge": {challenge}, "code_challenge_method": {"S256"}, "resource": {mcpclient.Endpoint}}
+	values := url.Values{"client_id": {clientID}, "redirect_uri": {h.config.RedirectURI}, "response_type": {"code"}, "state": {state}, "code_challenge": {challenge}, "code_challenge_method": {"S256"}, "resource": {resource}}
+	if market == "notion" {
+		values.Set("prompt", "consent")
+	}
+	if g != nil && g.Scope != "" {
+		values.Set("scope", g.Scope)
+	}
 	// GitHub Apps derive minimal read permissions from installation settings. No
 	// broad repo scope is requested (OAuth Apps therefore only see public data).
 	write(w, 200, map[string]any{"transaction_id": id, "authorization_url": m.Authorization + "?" + values.Encode(), "expires_at": time.Now().Add(5 * time.Minute)})
@@ -307,7 +356,7 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Cache-Control", "no-store")
 	w.Header().Set("Referrer-Policy", "no-referrer")
 	w.Header().Set("Content-Security-Policy", "default-src 'none'; frame-ancestors 'none'")
-	if h.pool == nil || h.sealer == nil || !configured(h.config) {
+	if h.pool == nil || h.sealer == nil || !callbackConfigured(h.config) {
 		fail(w, 503, "MCP_OAUTH_NOT_CONFIGURED")
 		return
 	}
@@ -323,9 +372,9 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	}
 	ctx, cancel := context.WithTimeout(r.Context(), 90*time.Second)
 	defer cancel()
-	var id, tenant string
+	var id, tenant, market string
 	var nonce, sealed []byte
-	err := h.pool.QueryRow(ctx, `UPDATE mcp_oauth_transactions SET status='processing' WHERE state_hash=$1 AND status='pending' AND expires_at>now() RETURNING transaction_id::text,tenant_id::text,nonce,ciphertext`, hash(state)).Scan(&id, &tenant, &nonce, &sealed)
+	err := h.pool.QueryRow(ctx, `UPDATE mcp_oauth_transactions SET status='processing' WHERE state_hash=$1 AND status='pending' AND expires_at>now() RETURNING transaction_id::text,tenant_id::text,nonce,ciphertext,market_mcp_id`, hash(state)).Scan(&id, &tenant, &nonce, &sealed, &market)
 	if err != nil {
 		fail(w, 400, "MCP_INVALID_STATE")
 		return
@@ -342,7 +391,25 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	}()
 	raw, err := h.sealer.Open(nonce, sealed)
 	var p oauthPending
-	if err != nil || json.Unmarshal(raw, &p) != nil || p.RedirectURI != h.config.RedirectURI || p.Metadata.Issuer != issuer || r.URL.Query().Get("error") != "" || r.URL.Query().Get("iss") != "" && r.URL.Query().Get("iss") != issuer {
+	if err != nil || json.Unmarshal(raw, &p) != nil || p.RedirectURI != h.config.RedirectURI || !officialProvider(market) {
+		fail(w, 400, "MCP_AUTHORIZATION_FAILED")
+		return
+	}
+	if market == "github" && p.Grant != nil {
+		fail(w, 400, "MCP_AUTHORIZATION_FAILED")
+		return
+	}
+	expectedIssuer := issuer
+	if market != "github" {
+		if p.Grant == nil || p.Grant.Provider != market || p.Grant.Tenant != tenant || !oauthURL(market, p.Grant.Metadata.Issuer) {
+			fail(w, 400, "MCP_AUTHORIZATION_FAILED")
+			return
+		}
+		expectedIssuer = p.Grant.Metadata.Issuer
+	}
+	responseIssuer := r.URL.Query().Get("iss")
+	if p.Metadata.Issuer != expectedIssuer || r.URL.Query().Get("error") != "" || len(r.URL.Query()["iss"]) > 1 || responseIssuer != "" && responseIssuer != expectedIssuer || market != "github" && responseIssuer == "" {
+		slog.Warn("MCP OAuth callback rejected", "provider", market, "stage", "issuer", "issuer_present", responseIssuer != "", "issuer_matches", responseIssuer == expectedIssuer, "provider_error", r.URL.Query().Get("error") != "")
 		fail(w, 400, "MCP_AUTHORIZATION_FAILED")
 		return
 	}
@@ -351,12 +418,17 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		fail(w, 400, "MCP_AUTHORIZATION_FAILED")
 		return
 	}
-	token, err := h.exchange(ctx, url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {p.RedirectURI}, "code_verifier": {p.Verifier}})
+	token, err := h.exchangeGrant(ctx, url.Values{"grant_type": {"authorization_code"}, "code": {code}, "redirect_uri": {p.RedirectURI}, "code_verifier": {p.Verifier}}, p.Grant)
 	if err != nil {
+		slog.Warn("MCP OAuth callback rejected", "provider", market, "stage", "token_exchange", "invalid_client", errors.Is(err, errInvalidClient))
+		if errors.Is(err, errInvalidClient) && p.Grant != nil {
+			g := p.Grant
+			_, _ = h.pool.Exec(ctx, `UPDATE mcp_oauth_registrations SET status='invalid' WHERE provider=$1 AND issuer=$2 AND redirect_uri=$3 AND client_id_hash=$4`, g.Provider, g.Metadata.Issuer, g.Redirect, hash(g.Client.ID))
+		}
 		fail(w, 400, "MCP_AUTHORIZATION_FAILED")
 		return
 	}
-	tools, err := h.checkTools(ctx, token.Access)
+	tools, err := h.checkTokenTools(ctx, token, market)
 	if err != nil || len(tools) == 0 {
 		fail(w, 502, "MCP_CONNECTION_CHECK_FAILED")
 		return
@@ -377,7 +449,7 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 	defer tx.Rollback(ctx)
 	// Keep lock ordering consistent with disconnect: grant first, transaction second.
 	var version int64
-	err = tx.QueryRow(ctx, `SELECT version FROM mcp_oauth_connections WHERE tenant_id=$1 AND market_mcp_id='github' FOR UPDATE`, tenant).Scan(&version)
+	err = tx.QueryRow(ctx, `SELECT version FROM mcp_oauth_connections WHERE tenant_id=$1 AND market_mcp_id=$2 FOR UPDATE`, tenant, market).Scan(&version)
 	if err != nil || version != p.ConnectionVersion {
 		fail(w, 409, "MCP_AUTHORIZATION_CANCELLED")
 		return
@@ -388,7 +460,7 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 		fail(w, 409, "MCP_AUTHORIZATION_CANCELLED")
 		return
 	}
-	_, err = tx.Exec(ctx, `UPDATE mcp_oauth_connections SET status='connected',nonce=$2,ciphertext=$3,tools=$4,expires_at=$5,version=version+1,updated_at=now() WHERE tenant_id=$1 AND market_mcp_id='github'`, tenant, nonce, sealed, toolData, nullableTime(token.ExpiresAt))
+	_, err = tx.Exec(ctx, `UPDATE mcp_oauth_connections SET status='connected',nonce=$2,ciphertext=$3,tools=$4,expires_at=$5,version=version+1,updated_at=now(),project_ref=$7,workspace_id=NULLIF($8,''),workspace_name=NULLIF($9,'') WHERE tenant_id=$1 AND market_mcp_id=$6`, tenant, nonce, sealed, toolData, nullableTime(token.ExpiresAt), market, nil, workspaceID(token), workspaceName(token))
 	if err == nil {
 		_, err = tx.Exec(ctx, `UPDATE mcp_oauth_transactions SET status='connected',nonce=''::bytea,ciphertext=''::bytea WHERE transaction_id=$1`, id)
 	}
@@ -399,7 +471,7 @@ func (h *Handler) Callback(w http.ResponseWriter, r *http.Request) {
 
 	success = true
 	w.Header().Set("Content-Type", "text/plain; charset=utf-8")
-	_, _ = w.Write([]byte("GitHub MCP 授权并完成工具发现。请返回 Isodo，关闭此页面。"))
+	_, _ = w.Write([]byte("MCP 授权并完成只读工具发现。请返回 Isodo，关闭此页面。"))
 }
 func nullableTime(t time.Time) any {
 	if t.IsZero() {
@@ -418,11 +490,11 @@ func (h *Handler) checkTools(ctx context.Context, token string) ([]mcpclient.Too
 		return nil, err
 	}
 	raw, _ := json.Marshal(tools)
-	for _, secret := range []string{token, h.config.ClientSecret} {
-		if secret != "" {
-			raw = bytes.ReplaceAll(raw, []byte(secret), []byte("[REDACTED]"))
-		}
+	raw, err = redactJSON(raw, token, h.config.ClientSecret)
+	if err != nil {
+		return nil, ErrOAuth
 	}
+
 	if json.Unmarshal(raw, &tools) != nil {
 		return nil, ErrOAuth
 	}

@@ -48,12 +48,20 @@ func TestCodexMCPMergePreservesConfigAndRejectsSymlinks(t *testing.T) {
 		t.Fatal("duplicate section")
 	}
 	const custom = "custom-11111111-1111-4111-8111-111111111111"
-	if err = run(`["github","` + custom + `"]`); err != nil {
+	if err = run(`["github","notion","` + custom + `"]`); err != nil {
 		t.Fatal(err)
 	}
 	data, _ = os.ReadFile(path)
 	if !strings.Contains(string(data), "/isodo-mcp/"+custom) || !strings.Contains(string(data), "[mcp_servers.isodo_github]") {
 		t.Fatal("mixed MCP config missing")
+	}
+	for _, provider := range []string{"notion"} {
+		if !strings.Contains(string(data), "[mcp_servers.isodo_"+provider+"]") || !strings.Contains(string(data), "/isodo-mcp/"+provider) {
+			t.Fatal("official multi MCP config missing")
+		}
+	}
+	if strings.Contains(string(data), "execute_sql") || strings.Contains(string(data), "mcp.notion.com") || strings.Contains(string(data), "mcp.supabase.com") {
+		t.Fatal("Guest has upstream URL or unsafe tool")
 	}
 	before := string(data)
 	if run(`["../escape"]`) == nil {

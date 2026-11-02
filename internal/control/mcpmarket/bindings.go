@@ -41,7 +41,7 @@ func (h *Handler) Bindings(w http.ResponseWriter, r *http.Request, tenant string
 	}
 	market := r.PathValue("marketID")
 	if r.Method == "GET" && market == "" {
-		rows, err := h.pool.Query(r.Context(), `SELECT b.sandbox_binding_id::text,b.market_mcp_id,b.oauth_connection_id::text,b.sync_status,c.status FROM mcp_sandbox_bindings b JOIN mcp_oauth_connections c USING(tenant_id,oauth_connection_id) WHERE b.tenant_id=$1 AND b.sandbox_id=$2 UNION ALL SELECT b.sandbox_binding_id::text,'custom-'||c.id::text,c.id::text,b.sync_status,c.status FROM mcp_custom_bindings b JOIN mcp_custom_servers c ON c.id=b.custom_server_id AND c.tenant_id=b.tenant_id WHERE b.tenant_id=$1 AND b.sandbox_id=$2`, tenant, sandbox)
+		rows, err := h.pool.Query(r.Context(), `SELECT b.sandbox_binding_id::text,b.market_mcp_id,b.oauth_connection_id::text,CASE WHEN b.project_ref IS DISTINCT FROM c.project_ref THEN 'failed' ELSE b.sync_status END,CASE WHEN b.project_ref IS DISTINCT FROM c.project_ref THEN 'expired' ELSE c.status END FROM mcp_sandbox_bindings b JOIN mcp_oauth_connections c USING(tenant_id,oauth_connection_id) WHERE b.tenant_id=$1 AND b.sandbox_id=$2 UNION ALL SELECT b.sandbox_binding_id::text,'custom-'||c.id::text,c.id::text,b.sync_status,c.status FROM mcp_custom_bindings b JOIN mcp_custom_servers c ON c.id=b.custom_server_id AND c.tenant_id=b.tenant_id WHERE b.tenant_id=$1 AND b.sandbox_id=$2`, tenant, sandbox)
 		if err != nil {
 			fail(w, 503, "MCP_STORAGE_UNAVAILABLE")
 			return
@@ -73,19 +73,19 @@ func (h *Handler) Bindings(w http.ResponseWriter, r *http.Request, tenant string
 		h.customBinding(w, r, tenant, sandbox, id)
 		return
 	}
-	if market != "github" {
+	if !officialProvider(market) {
 		fail(w, 404, "MCP_NOT_FOUND")
 		return
 	}
 	switch r.Method {
 	case "PUT":
 		// A favorite alone is insufficient. Only a live, checked grant can bind.
-		if _, err := h.freshToken(r.Context(), tenant); err != nil {
+		if _, err := h.freshToken(r.Context(), tenant, market); err != nil {
 			fail(w, 409, "MCP_RECONNECT_REQUIRED")
 			return
 		}
 		id, cap := uuid.NewString(), randomValue()
-		_, err = h.pool.Exec(r.Context(), `INSERT INTO mcp_sandbox_bindings(sandbox_binding_id,tenant_id,sandbox_id,market_mcp_id,oauth_connection_id,capability_hash) SELECT $1,$2,$3,'github',oauth_connection_id,$4 FROM mcp_oauth_connections WHERE tenant_id=$2 AND market_mcp_id='github' AND status='connected' ON CONFLICT(sandbox_id,market_mcp_id) DO NOTHING`, id, tenant, sandbox, hash(cap))
+		_, err = h.pool.Exec(r.Context(), `INSERT INTO mcp_sandbox_bindings(sandbox_binding_id,tenant_id,sandbox_id,market_mcp_id,oauth_connection_id,capability_hash,project_ref) SELECT $1,$2,$3,$5,oauth_connection_id,$4,project_ref FROM mcp_oauth_connections WHERE tenant_id=$2 AND market_mcp_id=$5 AND status='connected' ON CONFLICT(sandbox_id,market_mcp_id) DO UPDATE SET oauth_connection_id=EXCLUDED.oauth_connection_id,project_ref=EXCLUDED.project_ref,sync_status='pending'`, id, tenant, sandbox, hash(cap), market)
 		if err != nil {
 			fail(w, 409, "MCP_BINDING_FAILED")
 			return

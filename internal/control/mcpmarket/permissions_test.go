@@ -65,4 +65,15 @@ func TestMCPRuntimeRolePermissions(t *testing.T) {
 			}
 		}
 	}
+	for _, action := range []string{"SELECT", "INSERT", "UPDATE"} {
+		var allowed bool
+		if err := tx.QueryRow(t.Context(), `SELECT has_table_privilege(current_user,'mcp_oauth_registrations',$1)`, action).Scan(&allowed); err != nil || !allowed {
+			t.Fatalf("DCR missing %s: %v", action, err)
+		}
+	}
+	var deleteRegistration bool
+	if err := tx.QueryRow(t.Context(), `SELECT has_table_privilege(current_user,'mcp_oauth_registrations','DELETE')`).Scan(&deleteRegistration); err != nil || deleteRegistration {
+		t.Fatal("runtime can delete registration registry")
+	}
+
 }

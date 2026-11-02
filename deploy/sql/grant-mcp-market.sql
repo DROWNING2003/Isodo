@@ -11,6 +11,7 @@ GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE sandbox_port_previews TO :"app_rol
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE mcp_custom_servers, mcp_custom_bindings TO :"app_role";
 GRANT SELECT, INSERT ON TABLE skill_catalog TO :"app_role";
 GRANT SELECT, INSERT, UPDATE, DELETE ON TABLE skill_favorites, sandbox_skills TO :"app_role";
+GRANT SELECT, INSERT, UPDATE ON mcp_oauth_registrations TO :"app_role";
 COMMIT;
 \else
 \echo 'app_role is required; no grants applied'

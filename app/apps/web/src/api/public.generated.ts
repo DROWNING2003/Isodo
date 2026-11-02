@@ -195,6 +195,10 @@ export interface MCPCatalogEntry {
   /** @nullable */
   oauth_connection_id?: string | null;
   oauth_configured: boolean;
+  /** @nullable */
+  workspace_id?: string | null;
+  /** @nullable */
+  workspace_name?: string | null;
 }
 
 export interface MCPCatalogList {
@@ -1419,7 +1423,8 @@ export const getStartMCPOAuthUrl = (marketID: string,) => {
 }
 
 /**
- * @summary Start or reconnect using registered App and PKCE
+ * GitHub uses the pre-registered App. Notion discovers OAuth metadata and registers through DCR with PKCE S256. No PAT or CIMD fallback.
+ * @summary Connect an official MCP using PKCE and provider registration
  */
 export const startMCPOAuth = async (marketID: string, options?: Parameters<typeof isodoFetch>[1]): Promise<MCPOAuthStart> => {
 
