@@ -62,11 +62,6 @@ func NewHandlerWithInjections(web *auth.Web, keys *auth.APIKeyHandler, sandboxes
 			})
 		}},
 	})
-	// The initial command API uses the same authenticator as generated routes.
-	// It stays registered explicitly until API bindings are regenerated.
-	mux.Handle("POST /v1/sandboxes/{sandboxID}/commands/run", auth.Middleware(access, http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		sandboxes.RunSandboxCommand(w, r, r.PathValue("sandboxID"))
-	})))
 	publicapi.HandlerWithOptions(&publicHandlers{sandboxHandlers: sandboxes, templateHandlers: templateHandler, Handler: injectionHandler}, publicapi.StdHTTPServerOptions{
 		BaseRouter: mux,
 		Middlewares: []publicapi.MiddlewareFunc{func(next http.Handler) http.Handler {
