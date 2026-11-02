@@ -212,7 +212,7 @@ export function MCPFavoriteFields({
 }
 
 export function SandboxMCPBindings({ sandboxId }: { sandboxId: string }) {
-  const [ids, setIds] = useState<string[]>([]);
+  const [draft, setDraft] = useState<{ scope: string; ids: string[] } | null>(null);
   const [pending, setPending] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const auth = useAuth();
@@ -222,12 +222,47 @@ export function SandboxMCPBindings({ sandboxId }: { sandboxId: string }) {
     queryFn: () =>
       isodoFetch<{ items: MCPBinding[] }>(`/v1/sandboxes/${encodeURIComponent(sandboxId)}/mcp`),
   });
+  const scope = `${getAuthGeneration()}:${sandboxId}`;
+  const boundIds = bindings.data?.items.map((item) => item.market_mcp_id) ?? [];
+  const ids = draft?.scope === scope ? draft.ids : boundIds;
+  const changed =
+    ids.some((id) => !boundIds.includes(id)) || boundIds.some((id) => !ids.includes(id));
+  const save = async () => {
+    setPending(true);
+    setNotice(null);
+    try {
+      const changes = [
+        ...boundIds.filter((id) => !ids.includes(id)).map((id) => [id, "DELETE"] as const),
+        ...ids.filter((id) => !boundIds.includes(id)).map((id) => [id, "PUT"] as const),
+      ];
+      let unapplied = false;
+      for (const [id, method] of changes) {
+        if (`${getAuthGeneration()}:${sandboxId}` !== scope)
+          throw new Error("账号已切换，请重新加载");
+        const result = await bindMCP(sandboxId, id, method);
+        unapplied ||= result.sync_status !== "applied";
+      }
+      await bindings.refetch();
+      setDraft(null);
+      setNotice(
+        unapplied
+          ? "绑定已保存，配置尚未应用，请重新应用。"
+          : "MCP 配置已保存。新启动的 Codex 会话将加载配置；撤销立即生效。",
+      );
+    } catch (cause) {
+      await bindings.refetch();
+      setNotice(cause instanceof Error ? cause.message : "MCP 保存失败，请重试");
+    } finally {
+      setPending(false);
+    }
+  };
   const apply = async (id: string, method: "PUT" | "DELETE" | "POST") => {
     setPending(true);
     setNotice(null);
     try {
       const result = await bindMCP(sandboxId, id, method);
       await bindings.refetch();
+      setDraft(null);
       setNotice(
         result.sync_status === "applied"
           ? "配置已应用。请重启当前 Codex 会话以加载；撤销会立即阻止调用。"
@@ -241,18 +276,23 @@ export function SandboxMCPBindings({ sandboxId }: { sandboxId: string }) {
   };
   return (
     <section className="grid gap-3 rounded-xl border border-border p-4">
-      <MCPFavoriteFields value={ids} onChange={setIds} disabled={pending} />
+      <MCPFavoriteFields
+        value={ids}
+        onChange={(next) => setDraft({ scope, ids: next })}
+        disabled={pending || bindings.isLoading || bindings.isError}
+      />
       <Button
         type="button"
-        disabled={pending || !ids.length}
-        onClick={() =>
-          void (async () => {
-            for (const id of ids) await apply(id, "PUT");
-          })()
-        }
+        disabled={pending || bindings.isLoading || bindings.isError || !changed}
+        onClick={() => void save()}
       >
-        绑定所选 MCP
+        {pending ? "正在保存…" : "保存 MCP 配置"}
       </Button>
+      {changed ? (
+        <p role="status" className="text-sm text-muted-foreground">
+          有未保存的 MCP 更改。
+        </p>
+      ) : null}
       {bindings.isError ? (
         <p role="alert">
           绑定读取失败。<button onClick={() => void bindings.refetch()}>重新加载</button>

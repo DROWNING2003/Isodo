@@ -1,7 +1,7 @@
 import { act, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, describe, expect, it, vi } from "vite-plus/test";
-import { MCPFavoriteFields, MCPMarketPage } from "./MCPMarketPage";
+import { MCPFavoriteFields, MCPMarketPage, SandboxMCPBindings } from "./MCPMarketPage";
 const fixture = vi.hoisted(() => ({
   items: [] as {
     market_mcp_id: string;
@@ -13,6 +13,14 @@ const fixture = vi.hoisted(() => ({
     status: string;
     oauth_configured: boolean;
   }[],
+  bindings: [] as {
+    sandbox_binding_id: string;
+    market_mcp_id: string;
+    status: string;
+    sync_status: string;
+  }[],
+  bind: vi.fn(),
+  refetch: vi.fn(async () => ({})),
   connect: vi.fn(),
   mutate: vi.fn(),
 }));
@@ -28,11 +36,16 @@ vi.mock("./mcpMarket", () => ({
   useMCPOAuth: () => ({ connect: fixture.connect, pending: false, error: null, cancel: vi.fn() }),
   mcpStatus: (s: string) => (s === "connected" ? "已连接" : "未连接"),
   mcpKey: ["test-mcp"],
-  bindMCP: vi.fn(),
+  bindMCP: (...args: unknown[]) => fixture.bind(...args),
 }));
 vi.mock("@tanstack/react-query", () => ({
   useQueryClient: () => ({ invalidateQueries: vi.fn() }),
-  useQuery: () => ({}),
+  useQuery: () => ({
+    data: { items: fixture.bindings },
+    isLoading: false,
+    isError: false,
+    refetch: fixture.refetch,
+  }),
 }));
 vi.mock("../../api/transport", () => ({
   isodoFetch: (...args: unknown[]) => fixture.mutate(...args),
@@ -50,6 +63,7 @@ afterEach(async () => {
   if (renderer) await act(async () => renderer.unmount());
   vi.clearAllMocks();
   fixture.items = [];
+  fixture.bindings = [];
 });
 const github = {
   market_mcp_id: "github",
@@ -95,4 +109,44 @@ describe("MCP market separation", () => {
     await act(async () => favorites.props.onClick());
     expect(JSON.stringify(renderer.toJSON())).toContain("还没有收藏的 MCP");
   });
+});
+
+it("shows an existing Sandbox binding as checked and saves unchecked as revocation", async () => {
+  fixture.items = [github];
+  fixture.bindings = [
+    {
+      sandbox_binding_id: "binding",
+      market_mcp_id: "github",
+      status: "connected",
+      sync_status: "applied",
+    },
+  ];
+  fixture.bind.mockResolvedValue({ sync_status: "applied" });
+  await act(async () => {
+    renderer = create(<SandboxMCPBindings sandboxId="sandbox-a" />);
+  });
+  expect(renderer.root.findByType("input").props.checked).toBe(true);
+  await act(async () =>
+    renderer.root.findByType("input").props.onChange({ target: { checked: false } }),
+  );
+  expect(fixture.bind).not.toHaveBeenCalled();
+  const save = renderer.root
+    .findAllByType("button")
+    .find((b) => b.children.includes("保存 MCP 配置"))!;
+  expect(save.props.disabled).toBe(false);
+  await act(async () => save.props.onClick());
+  expect(fixture.bind).toHaveBeenCalledWith("sandbox-a", "github", "DELETE");
+});
+it("does not carry an unsaved selection to a different Sandbox", async () => {
+  fixture.items = [github];
+  fixture.bindings = [];
+  await act(async () => {
+    renderer = create(<SandboxMCPBindings sandboxId="sandbox-a" />);
+  });
+  await act(async () =>
+    renderer.root.findByType("input").props.onChange({ target: { checked: true } }),
+  );
+  await act(async () => renderer.update(<SandboxMCPBindings sandboxId="sandbox-b" />));
+  expect(renderer.root.findByType("input").props.checked).toBe(false);
+  expect(fixture.bind).not.toHaveBeenCalled();
 });
