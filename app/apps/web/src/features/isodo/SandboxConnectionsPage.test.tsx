@@ -1,17 +1,39 @@
 import { act, type ReactNode } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
-import { afterEach, expect, it, vi } from "vite-plus/test";
+import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
 const fixture = vi.hoisted(() => ({
+  local: true,
+  trace: [] as string[],
+  revoke: vi.fn(async () => 1),
+  add: vi.fn(async () => {}),
+  refresh: vi.fn(async () => {}),
+  reset: vi.fn(),
   apply: vi.fn().mockResolvedValue(undefined),
   save: vi.fn().mockResolvedValue(undefined),
   rules: [{ kind: "persistent", persistent_id: "credential", key: "credential" }],
 }));
+vi.mock("./MCPMarketPage", () => ({
+  SandboxMCPBindings: () => <div>MCP</div>,
+  useSandboxMCPSelection: () => ({
+    revokeRemoved: fixture.revoke,
+    applyAdded: fixture.add,
+    refetch: fixture.refresh,
+    resetDraft: fixture.reset,
+    loading: false,
+    failed: false,
+  }),
+}));
+vi.mock("./mcpMarket", () => ({ restoreBoundMCP: vi.fn(async () => {}) }));
 vi.mock("./CloudPages", () => ({
   CloudPage: ({ children }: { children: ReactNode }) => <div>{children}</div>,
 }));
 vi.mock("./usePlatformSandbox", () => ({
-  useLocalRuntimeSandbox: () => ({ record: { id: "sandbox", status: "running" } }),
-  usePlatformSandbox: () => ({}),
+  useLocalRuntimeSandbox: () => ({
+    record: fixture.local ? { id: "sandbox", status: "running" } : undefined,
+  }),
+  usePlatformSandbox: () => ({
+    record: fixture.local ? undefined : { id: "sandbox", status: "running" },
+  }),
 }));
 vi.mock("./credentialDocuments", () => ({
   useServerAgentConfigs: () => ({ data: [], isSuccess: true }),
@@ -69,6 +91,24 @@ vi.mock("../../components/ui/dialog", () => {
 });
 import { SandboxConnectionsPage } from "./SandboxConnectionsPage";
 let renderer: ReactTestRenderer;
+beforeEach(() => {
+  fixture.local = true;
+  fixture.trace = [];
+  vi.clearAllMocks();
+  fixture.revoke.mockImplementation(async () => {
+    fixture.trace.push("revoke");
+    return 1;
+  });
+  fixture.apply.mockImplementation(async () => {
+    fixture.trace.push("credentials");
+  });
+  fixture.add.mockImplementation(async () => {
+    fixture.trace.push("bind");
+  });
+  fixture.save.mockImplementation(async () => {
+    fixture.trace.push("preferences");
+  });
+});
 afterEach(async () => {
   await act(async () => renderer?.unmount());
   vi.unstubAllGlobals();
@@ -84,7 +124,7 @@ it("offers an icon save action and saves temporary Agent only in the current san
   expect(checkbox.props.checked).toBe(true);
   await act(async () => checkbox.props.onChange({ target: { checked: false } }));
   expect(renderer.root.findByType("input").props.checked).toBe(false);
-  const save = renderer.root.findByProps({ "aria-label": "保存沙箱凭证配置" });
+  const save = renderer.root.findByProps({ "aria-label": "保存沙箱安全连接" });
   expect(save.props.size).toBe("icon");
   expect(save.props.disabled).toBe(false);
   await act(async () =>
@@ -94,6 +134,8 @@ it("offers an icon save action and saves temporary Agent only in the current san
     .findAllByType("button")
     .find((button) => button.children.join("") === "提交临时 Agent")!;
   await act(async () => submit.props.onClick());
+  expect(fixture.apply).not.toHaveBeenCalled();
+  await act(async () => save.props.onClick());
   expect(fixture.apply.mock.calls[0]?.[0]).toMatchObject({
     sandboxId: "sandbox",
     temporaryAgents: [{ config: { id: "temporary-agent" } }],
@@ -104,4 +146,34 @@ it("offers an icon save action and saves temporary Agent only in the current san
     [],
     { temporaryAgents: [{ config: { id: "temporary-agent" } }] },
   ]);
+});
+
+it("uses the page save for MCP and credentials, revoking before adding access", async () => {
+  fixture.local = false;
+  vi.stubGlobal("window", {});
+  await act(async () => {
+    renderer = create(<SandboxConnectionsPage sandboxId="sandbox" />);
+  });
+  const save = renderer.root.findByProps({ "aria-label": "保存沙箱安全连接" });
+  await act(async () => save.props.onClick());
+  expect(fixture.trace).toEqual(["revoke", "credentials", "bind", "preferences"]);
+  expect(fixture.refresh).toHaveBeenCalledOnce();
+  expect(fixture.reset).toHaveBeenCalledOnce();
+});
+it("retains revocation and reports partial success when credential application fails", async () => {
+  fixture.local = false;
+  vi.stubGlobal("window", {});
+  fixture.apply.mockRejectedValueOnce(new Error("Guest offline"));
+  await act(async () => {
+    renderer = create(<SandboxConnectionsPage sandboxId="sandbox" />);
+  });
+  await act(async () =>
+    renderer.root.findByProps({ "aria-label": "保存沙箱安全连接" }).props.onClick(),
+  );
+  expect(fixture.revoke).toHaveBeenCalledOnce();
+  expect(fixture.add).not.toHaveBeenCalled();
+  expect(fixture.reset).not.toHaveBeenCalled();
+  expect(JSON.stringify(renderer.toJSON())).toContain(
+    "MCP 撤销已完成；后续保存失败：Guest offline",
+  );
 });

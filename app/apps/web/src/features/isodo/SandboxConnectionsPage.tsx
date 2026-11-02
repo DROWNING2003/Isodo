@@ -1,5 +1,5 @@
 import { restoreBoundMCP } from "./mcpMarket";
-import { SandboxMCPBindings } from "./MCPMarketPage";
+import { SandboxMCPBindings, useSandboxMCPSelection } from "./MCPMarketPage";
 import { TemporaryAgentDialog, type TemporaryAgent } from "./TemporaryAgentDialog";
 import { useEffect, useState } from "react";
 import { LoaderIcon, PlusIcon, SettingsIcon, Trash2Icon, SaveIcon } from "lucide-react";
@@ -42,6 +42,7 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
   const runtimeSupported =
     Boolean(localRuntime.record || platform.record) &&
     (!sandboxId.startsWith("local-") || Boolean(window.isodoDesktop));
+  const mcp = useSandboxMCPSelection(sandboxId, Boolean(platform.record) && !localRuntime.record);
   const rulesQuery = useInjectionRules();
   const configQuery = useSandboxInjections(sandboxId, runtimeSupported);
   const write = useSandboxInjectionWriter(sandboxId);
@@ -57,9 +58,16 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
   const [editing, setEditing] = useState<LocalInjectionRule>();
   const [deleting, setDeleting] = useState<LocalInjectionRule | null>(null);
   const [pending, setPending] = useState(false);
+  const [edited, setEdited] = useState(false);
   const [stage, setStage] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (!notice) return;
+    const timer = setTimeout(() => setNotice(null), 5000);
+    return () => clearTimeout(timer);
+  }, [notice]);
 
   useEffect(() => {
     if (
@@ -112,19 +120,29 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
     selectionQuery.data,
   ]);
 
-  const save = async (
-    nextOneOff: readonly LocalInjectionRule[] = oneOff,
-    nextAgents: readonly TemporaryAgent[] = temporaryAgents,
-  ) => {
+  const save = async () => {
+    const nextOneOff = oneOff;
+    const nextAgents = temporaryAgents;
     if (pending) return;
-    if (!initialized || !agentConfigsQuery.isSuccess || !selectionQuery.isSuccess) {
+    if (
+      !initialized ||
+      !agentConfigsQuery.isSuccess ||
+      !selectionQuery.isSuccess ||
+      (!localRuntime.record && (mcp.loading || mcp.failed))
+    ) {
       setError("配置尚未加载完成，请稍后重试。");
       return;
     }
     setPending(true);
     setError(null);
     setNotice(null);
+    const completed: string[] = [];
     try {
+      if (!localRuntime.record) {
+        setStage("正在撤销取消勾选的 MCP…");
+        const revoked = await mcp.revokeRemoved();
+        if (revoked > 0) completed.push("MCP 撤销");
+      }
       await applySandboxCredentials({
         sandboxId,
         selection,
@@ -135,6 +153,11 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
         write,
         onStage: setStage,
       });
+      completed.push("凭证与 Agent 配置");
+      if (!localRuntime.record) {
+        setStage("正在保存 MCP 配置…");
+        await mcp.applyAdded();
+      }
       if (!localRuntime.record && (selection.agentIds.length || nextAgents.length)) {
         setStage("正在恢复已绑定 MCP 配置…");
         await restoreBoundMCP(sandboxId);
@@ -143,13 +166,19 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
         temporaryAgents: nextAgents,
         oneOff: nextOneOff,
       });
+      if (!localRuntime.record) {
+        await mcp.refetch();
+        mcp.resetDraft();
+      }
+      setEdited(false);
       setTemporaryAgents([...nextAgents]);
       setOneOff(nextOneOff);
-      setNotice(
-        selection.agentIds.length ? "已保存。新启动的 Agent 将使用所选配置。" : "凭证授权已保存。",
-      );
+      setNotice("安全连接已保存。新启动的 Agent 会加载配置。");
     } catch (cause) {
-      setError(cause instanceof Error ? cause.message : "保存失败，请重试。");
+      const message = cause instanceof Error ? cause.message : "保存失败，请重试。";
+      setError(
+        completed.length ? `${completed.join("、")}已完成；后续保存失败：${message}` : message,
+      );
       throw cause;
     } finally {
       setPending(false);
@@ -177,10 +206,13 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
           ? { secret_hint: editing.secret_hint }
           : {}),
     };
-    await save(
+    setOneOff(
       editing ? oneOff.map((item) => (item.key === editing.key ? next : item)) : [...oneOff, next],
     );
+    setEdited(true);
+    setNotice(null);
     setEditing(undefined);
+    setDialogOpen(false);
   };
   const supported =
     runtimeSupported &&
@@ -191,13 +223,13 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
   if (localRuntime.loading || (!localRuntime.record && platform.loading))
     return (
       <CloudPage title="安全连接">
-        {!localRuntime.record ? <SandboxMCPBindings sandboxId={sandboxId} /> : null}
+        {!localRuntime.record ? <SandboxMCPBindings state={mcp} disabled={pending} /> : null}
         <p className="text-sm text-muted-foreground">正在读取沙箱…</p>
       </CloudPage>
     );
   return (
     <CloudPage title="安全连接">
-      {!localRuntime.record ? <SandboxMCPBindings sandboxId={sandboxId} /> : null}
+      {!localRuntime.record ? <SandboxMCPBindings state={mcp} disabled={pending} /> : null}
       {!runtimeSupported ? (
         <p className="text-sm text-muted-foreground">沙箱尚未就绪，暂时无法配置凭证。</p>
       ) : null}
@@ -205,7 +237,7 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
         <div>
           <h1 className="text-lg font-semibold">使用凭证</h1>
           <p className="mt-1 text-sm text-muted-foreground">
-            选择凭证库中的配置，保存后在当前沙箱使用。
+            选择当前沙箱使用的连接，统一点击右下角保存。
           </p>
         </div>
         {rulesQuery.isLoading || (runtimeSupported && !initialized && !configQuery.isError) ? (
@@ -254,6 +286,7 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
           value={selection}
           onChange={(value) => {
             setSelection(value);
+            setEdited(true);
             setNotice(null);
           }}
           disabled={!supported || pending}
@@ -317,11 +350,11 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
                 aria-label={`删除临时 Agent ${item.config.name}`}
                 disabled={pending}
                 onClick={() => {
-                  if (window.confirm(`撤销当前沙箱的临时 Agent「${item.config.name}」？`))
-                    void save(
-                      oneOff,
-                      temporaryAgents.filter((value) => value.config.id !== item.config.id),
-                    ).catch(() => {});
+                  setTemporaryAgents(
+                    temporaryAgents.filter((value) => value.config.id !== item.config.id),
+                  );
+                  setEdited(true);
+                  setNotice(null);
                 }}
               >
                 <Trash2Icon className="size-4" />
@@ -338,10 +371,12 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
           {...(agentDialog.initial ? { initial: agentDialog.initial } : {})}
           onClose={() => setAgentDialog(null)}
           onSave={async (item) => {
-            await save(oneOff, [
+            setTemporaryAgents([
               ...temporaryAgents.filter((value) => value.config.id !== item.config.id),
               item,
             ]);
+            setEdited(true);
+            setNotice(null);
             setAgentDialog(null);
           }}
         />
@@ -400,12 +435,17 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
         ))}
         {!oneOff.length ? <p className="text-sm text-muted-foreground">还没有临时凭证。</p> : null}
       </section>
-      <div className="fixed bottom-6 right-6 z-20 rounded-lg bg-background p-1 shadow-md">
+      <div className="fixed bottom-6 right-6 z-20 flex items-center gap-2 rounded-lg bg-background p-1 shadow-md">
+        {edited || mcp.changed ? (
+          <span role="status" className="px-2 text-xs text-muted-foreground">
+            有未保存的更改
+          </span>
+        ) : null}
         <Button
           size="icon"
-          aria-label="保存沙箱凭证配置"
-          title={pending ? "保存中…" : "保存配置"}
-          disabled={!supported || pending}
+          aria-label="保存沙箱安全连接"
+          title={pending ? "保存中…" : "保存全部安全连接"}
+          disabled={!supported || pending || (!localRuntime.record && (mcp.loading || mcp.failed))}
           onClick={() => void save().catch(() => {})}
         >
           {pending ? (
@@ -431,7 +471,9 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
         <DialogPopup className="max-w-sm">
           <DialogHeader>
             <DialogTitle>删除临时凭证？</DialogTitle>
-            <DialogDescription>从当前沙箱撤销“{deleting?.name}”。</DialogDescription>
+            <DialogDescription>
+              移出待保存配置。点击右下角保存后，从当前沙箱撤销“{deleting?.name}”。
+            </DialogDescription>
           </DialogHeader>
           <DialogPanel>
             {error ? (
@@ -447,9 +489,10 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
                 variant="destructive"
                 disabled={pending}
                 onClick={() => {
-                  void save(oneOff.filter((item) => item.key !== deleting?.key))
-                    .then(() => setDeleting(null))
-                    .catch(() => {});
+                  setOneOff(oneOff.filter((item) => item.key !== deleting?.key));
+                  setEdited(true);
+                  setNotice(null);
+                  setDeleting(null);
                 }}
               >
                 删除
