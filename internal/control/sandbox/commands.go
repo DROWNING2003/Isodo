@@ -2,12 +2,10 @@ package sandbox
 
 import (
 	"context"
-	"errors"
 	"net/http"
 	"time"
 
 	nodev1 "github.com/DROWNING2003/Isodo/internal/api/node/v1"
-	"github.com/DROWNING2003/Isodo/internal/control/auth"
 	publicapi "github.com/DROWNING2003/Isodo/internal/api/public"
 	"google.golang.org/grpc/codes"
 	"github.com/DROWNING2003/Isodo/internal/runtimecommands"
@@ -35,18 +33,8 @@ func (h *Handler) SetCommandRunner(runner CommandRunner) {
 // RunSandboxCommand is the public, authenticated Runtime API. The only command
 // executor is the sandbox Guest Agent reached through a fenced Node relay.
 func (h *Handler) RunSandboxCommand(w http.ResponseWriter, r *http.Request, sandboxID string, _ publicapi.RunSandboxCommandParams) {
-	target, ok := h.resolveRuntimeTarget(w, r, sandboxID, false)
+	target, item, ok := h.resolveRuntimeTargetWithSandbox(w, r, sandboxID, false)
 	if !ok {
-		return
-	}
-	identity, _ := auth.IdentityFromContext(r.Context())
-	item, err := h.store.GetSandbox(r.Context(), identity.TenantID, sandboxID)
-	if err != nil {
-		if errors.Is(err, ErrNotFound) {
-			writeSandboxNotFound(w)
-		} else {
-			writeError(w, http.StatusServiceUnavailable, "SANDBOX_UNAVAILABLE", "The sandbox could not be loaded.")
-		}
 		return
 	}
 	if item.ObservedState != "running" || item.DesiredState != "running" || item.Deletion != nil {
