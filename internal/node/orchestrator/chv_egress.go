@@ -26,7 +26,10 @@ type egressBinding struct {
 	cancel   context.CancelFunc
 }
 
-func (s *CHVServer) EnableInjections(manager *injection.Manager) { s.injections = manager }
+func (s *CHVServer) EnableInjections(manager *injection.Manager) {
+	s.injections = manager
+	manager.SetMCPHandler(s.serveMCP)
+}
 
 // startEgressBridge accepts only this VM's guest-initiated vsock connections.
 // Every connection rechecks the captured boot identity before dialing its proxy.
@@ -110,6 +113,9 @@ func (s *CHVServer) configureCHVEgress(ctx context.Context, record sandboxRecord
 	s.mu.Unlock()
 	if existing != nil && proto.Equal(existing.identity, identity) {
 		return nil
+	}
+	if err := s.installMCPConfig(ctx, record.SandboxID, instance, false); err != nil {
+		return err
 	}
 	environment, err := s.injections.Environment(record.SandboxID)
 	if err != nil {

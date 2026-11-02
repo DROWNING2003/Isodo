@@ -139,6 +139,7 @@ func (s *Store) Get(sandboxID string) SandboxConfig {
 func (s *Store) Set(sandboxID string, config SandboxConfig) error {
 	s.mu.Lock()
 	defer s.mu.Unlock()
+	config.MCP = append([]MCPBinding(nil), s.data[sandboxID].MCP...)
 	config.UpdatedAt = time.Now().UTC()
 	config.Enabled = len(config.Rules) > 0
 	s.data[sandboxID] = cloneConfig(config)
@@ -169,6 +170,7 @@ func (s *Store) Summary() map[string]int {
 
 func cloneConfig(config SandboxConfig) SandboxConfig {
 	clone := config
+	clone.MCP = append([]MCPBinding(nil), config.MCP...)
 	clone.Rules = make([]Rule, 0, len(config.Rules))
 	for _, rule := range config.Rules {
 		copied := rule
@@ -223,4 +225,13 @@ func (s *Store) RemovePersistent(persistentID string) (map[string]SandboxConfig,
 		return changed, nil
 	}
 	return changed, s.saveLocked()
+}
+
+func (s *Store) SetMCP(sandboxID string, bindings []MCPBinding) error {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	config := s.data[sandboxID]
+	config.MCP = append([]MCPBinding(nil), bindings...)
+	s.data[sandboxID] = config
+	return s.saveLocked()
 }

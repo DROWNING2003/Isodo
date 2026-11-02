@@ -90,6 +90,180 @@ func (e InjectionRuleType) Valid() bool {
 	}
 }
 
+// Defines values for MCPBindingStatus.
+const (
+	MCPBindingStatusConnected    MCPBindingStatus = "connected"
+	MCPBindingStatusDisconnected MCPBindingStatus = "disconnected"
+	MCPBindingStatusExpired      MCPBindingStatus = "expired"
+	MCPBindingStatusFailed       MCPBindingStatus = "failed"
+)
+
+// Valid indicates whether the value is a known member of the MCPBindingStatus enum.
+func (e MCPBindingStatus) Valid() bool {
+	switch e {
+	case MCPBindingStatusConnected:
+		return true
+	case MCPBindingStatusDisconnected:
+		return true
+	case MCPBindingStatusExpired:
+		return true
+	case MCPBindingStatusFailed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MCPBindingSyncStatus.
+const (
+	MCPBindingSyncStatusApplied MCPBindingSyncStatus = "applied"
+	MCPBindingSyncStatusFailed  MCPBindingSyncStatus = "failed"
+	MCPBindingSyncStatusPending MCPBindingSyncStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the MCPBindingSyncStatus enum.
+func (e MCPBindingSyncStatus) Valid() bool {
+	switch e {
+	case MCPBindingSyncStatusApplied:
+		return true
+	case MCPBindingSyncStatusFailed:
+		return true
+	case MCPBindingSyncStatusPending:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MCPCatalogEntryAuthKind.
+const (
+	Oauth2 MCPCatalogEntryAuthKind = "oauth2"
+)
+
+// Valid indicates whether the value is a known member of the MCPCatalogEntryAuthKind enum.
+func (e MCPCatalogEntryAuthKind) Valid() bool {
+	switch e {
+	case Oauth2:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MCPCatalogEntryStatus.
+const (
+	MCPCatalogEntryStatusConnected    MCPCatalogEntryStatus = "connected"
+	MCPCatalogEntryStatusDisconnected MCPCatalogEntryStatus = "disconnected"
+	MCPCatalogEntryStatusExpired      MCPCatalogEntryStatus = "expired"
+	MCPCatalogEntryStatusFailed       MCPCatalogEntryStatus = "failed"
+)
+
+// Valid indicates whether the value is a known member of the MCPCatalogEntryStatus enum.
+func (e MCPCatalogEntryStatus) Valid() bool {
+	switch e {
+	case MCPCatalogEntryStatusConnected:
+		return true
+	case MCPCatalogEntryStatusDisconnected:
+		return true
+	case MCPCatalogEntryStatusExpired:
+		return true
+	case MCPCatalogEntryStatusFailed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MCPCatalogEntryTransport.
+const (
+	StreamableHttp MCPCatalogEntryTransport = "streamable-http"
+)
+
+// Valid indicates whether the value is a known member of the MCPCatalogEntryTransport enum.
+func (e MCPCatalogEntryTransport) Valid() bool {
+	switch e {
+	case StreamableHttp:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MCPOAuthConnectionStatus.
+const (
+	MCPOAuthConnectionStatusConnected    MCPOAuthConnectionStatus = "connected"
+	MCPOAuthConnectionStatusDisconnected MCPOAuthConnectionStatus = "disconnected"
+	MCPOAuthConnectionStatusExpired      MCPOAuthConnectionStatus = "expired"
+	MCPOAuthConnectionStatusFailed       MCPOAuthConnectionStatus = "failed"
+)
+
+// Valid indicates whether the value is a known member of the MCPOAuthConnectionStatus enum.
+func (e MCPOAuthConnectionStatus) Valid() bool {
+	switch e {
+	case MCPOAuthConnectionStatusConnected:
+		return true
+	case MCPOAuthConnectionStatusDisconnected:
+		return true
+	case MCPOAuthConnectionStatusExpired:
+		return true
+	case MCPOAuthConnectionStatusFailed:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MCPOAuthTransactionStatus.
+const (
+	MCPOAuthTransactionStatusCancelled  MCPOAuthTransactionStatus = "cancelled"
+	MCPOAuthTransactionStatusConnected  MCPOAuthTransactionStatus = "connected"
+	MCPOAuthTransactionStatusExpired    MCPOAuthTransactionStatus = "expired"
+	MCPOAuthTransactionStatusFailed     MCPOAuthTransactionStatus = "failed"
+	MCPOAuthTransactionStatusPending    MCPOAuthTransactionStatus = "pending"
+	MCPOAuthTransactionStatusProcessing MCPOAuthTransactionStatus = "processing"
+)
+
+// Valid indicates whether the value is a known member of the MCPOAuthTransactionStatus enum.
+func (e MCPOAuthTransactionStatus) Valid() bool {
+	switch e {
+	case MCPOAuthTransactionStatusCancelled:
+		return true
+	case MCPOAuthTransactionStatusConnected:
+		return true
+	case MCPOAuthTransactionStatusExpired:
+		return true
+	case MCPOAuthTransactionStatusFailed:
+		return true
+	case MCPOAuthTransactionStatusPending:
+		return true
+	case MCPOAuthTransactionStatusProcessing:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MCPSyncSyncStatus.
+const (
+	MCPSyncSyncStatusApplied MCPSyncSyncStatus = "applied"
+	MCPSyncSyncStatusFailed  MCPSyncSyncStatus = "failed"
+	MCPSyncSyncStatusPending MCPSyncSyncStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the MCPSyncSyncStatus enum.
+func (e MCPSyncSyncStatus) Valid() bool {
+	switch e {
+	case MCPSyncSyncStatusApplied:
+		return true
+	case MCPSyncSyncStatusFailed:
+		return true
+	case MCPSyncSyncStatusPending:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for PatchTemplateVisibility.
 const (
 	PatchTemplateVisibilityPrivate PatchTemplateVisibility = "private"
@@ -526,6 +700,106 @@ type InjectionRuleMaterial struct {
 // InjectionRuleType defines model for InjectionRuleType.
 type InjectionRuleType string
 
+// MCPBinding defines model for MCPBinding.
+type MCPBinding struct {
+	MarketMcpId       string               `json:"market_mcp_id"`
+	OauthConnectionId string               `json:"oauth_connection_id"`
+	SandboxBindingId  string               `json:"sandbox_binding_id"`
+	Status            MCPBindingStatus     `json:"status"`
+	SyncStatus        MCPBindingSyncStatus `json:"sync_status"`
+}
+
+// MCPBindingStatus defines model for MCPBinding.Status.
+type MCPBindingStatus string
+
+// MCPBindingSyncStatus defines model for MCPBinding.SyncStatus.
+type MCPBindingSyncStatus string
+
+// MCPBindingList defines model for MCPBindingList.
+type MCPBindingList struct {
+	Items []MCPBinding `json:"items"`
+}
+
+// MCPCatalogEntry defines model for MCPCatalogEntry.
+type MCPCatalogEntry struct {
+	AuthKind          MCPCatalogEntryAuthKind  `json:"auth_kind"`
+	Description       string                   `json:"description"`
+	Endpoint          string                   `json:"endpoint"`
+	Favorite          bool                     `json:"favorite"`
+	MarketMcpId       string                   `json:"market_mcp_id"`
+	Name              string                   `json:"name"`
+	OauthConfigured   bool                     `json:"oauth_configured"`
+	OauthConnectionId *string                  `json:"oauth_connection_id,omitempty"`
+	Provider          string                   `json:"provider"`
+	Status            MCPCatalogEntryStatus    `json:"status"`
+	Transport         MCPCatalogEntryTransport `json:"transport"`
+}
+
+// MCPCatalogEntryAuthKind defines model for MCPCatalogEntry.AuthKind.
+type MCPCatalogEntryAuthKind string
+
+// MCPCatalogEntryStatus defines model for MCPCatalogEntry.Status.
+type MCPCatalogEntryStatus string
+
+// MCPCatalogEntryTransport defines model for MCPCatalogEntry.Transport.
+type MCPCatalogEntryTransport string
+
+// MCPCatalogList defines model for MCPCatalogList.
+type MCPCatalogList struct {
+	Items []MCPCatalogEntry `json:"items"`
+}
+
+// MCPOAuthConnection defines model for MCPOAuthConnection.
+type MCPOAuthConnection struct {
+	ExpiresAt         *time.Time               `json:"expires_at,omitempty"`
+	MarketMcpId       *string                  `json:"market_mcp_id,omitempty"`
+	OauthConnectionId *string                  `json:"oauth_connection_id,omitempty"`
+	Status            MCPOAuthConnectionStatus `json:"status"`
+	Tools             *[]MCPTool               `json:"tools,omitempty"`
+}
+
+// MCPOAuthConnectionStatus defines model for MCPOAuthConnection.Status.
+type MCPOAuthConnectionStatus string
+
+// MCPOAuthStart defines model for MCPOAuthStart.
+type MCPOAuthStart struct {
+	AuthorizationUrl string    `json:"authorization_url"`
+	ExpiresAt        time.Time `json:"expires_at"`
+	TransactionId    string    `json:"transaction_id"`
+}
+
+// MCPOAuthTransaction defines model for MCPOAuthTransaction.
+type MCPOAuthTransaction struct {
+	ExpiresAt     time.Time                 `json:"expires_at"`
+	Status        MCPOAuthTransactionStatus `json:"status"`
+	TransactionId string                    `json:"transaction_id"`
+}
+
+// MCPOAuthTransactionStatus defines model for MCPOAuthTransaction.Status.
+type MCPOAuthTransactionStatus string
+
+// MCPSync defines model for MCPSync.
+type MCPSync struct {
+	Message         *string           `json:"message,omitempty"`
+	RestartRequired bool              `json:"restart_required"`
+	SyncStatus      MCPSyncSyncStatus `json:"sync_status"`
+}
+
+// MCPSyncSyncStatus defines model for MCPSync.SyncStatus.
+type MCPSyncSyncStatus string
+
+// MCPTool defines model for MCPTool.
+type MCPTool struct {
+	Description *string                `json:"description,omitempty"`
+	InputSchema map[string]interface{} `json:"inputSchema"`
+	Name        string                 `json:"name"`
+}
+
+// MCPToolList defines model for MCPToolList.
+type MCPToolList struct {
+	Items []MCPTool `json:"items"`
+}
+
 // Metadata defines model for Metadata.
 type Metadata = json.RawMessage
 
@@ -749,6 +1023,14 @@ type TemplateTag struct {
 
 // PutCredentialDocumentJSONBody defines parameters for PutCredentialDocument.
 type PutCredentialDocumentJSONBody map[string]interface{}
+
+// CompleteMCPOAuthParams defines parameters for CompleteMCPOAuth.
+type CompleteMCPOAuthParams struct {
+	State string  `form:"state" json:"state"`
+	Code  *string `form:"code,omitempty" json:"code,omitempty"`
+	Error *string `form:"error,omitempty" json:"error,omitempty"`
+	Iss   *string `form:"iss,omitempty" json:"iss,omitempty"`
+}
 
 // ListSandboxesParams defines parameters for ListSandboxes.
 type ListSandboxesParams struct {
@@ -1027,6 +1309,68 @@ type ClientInterface interface {
 	// Corresponds with GET /v1/injection-rules/{ruleID}/material (the `GetInjectionRuleMaterial` operationId).
 	GetInjectionRuleMaterial(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
+	// ListMCPCatalog List available MCP services
+	//
+	// Corresponds with GET /v1/mcp/catalog (the `ListMCPCatalog` operationId).
+	ListMCPCatalog(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMCPCatalog Get MCP catalog service
+	//
+	// Corresponds with GET /v1/mcp/catalog/{marketID} (the `GetMCPCatalog` operationId).
+	GetMCPCatalog(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// DisconnectMCPOAuth Disconnect and invalidate sandbox calls
+	//
+	// Corresponds with DELETE /v1/mcp/connections/{marketID} (the `DisconnectMCPOAuth` operationId).
+	DisconnectMCPOAuth(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMCPOAuthConnection Get connection without secrets
+	//
+	// Corresponds with GET /v1/mcp/connections/{marketID} (the `GetMCPOAuthConnection` operationId).
+	GetMCPOAuthConnection(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// StartMCPOAuth Start or reconnect using registered App and PKCE
+	//
+	// Corresponds with POST /v1/mcp/connections/{marketID}/authorize (the `StartMCPOAuth` operationId).
+	StartMCPOAuth(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMCPTools Discover allowed upstream tools
+	//
+	// Corresponds with GET /v1/mcp/connections/{marketID}/tools (the `ListMCPTools` operationId).
+	ListMCPTools(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListMCPFavorites List account favorites
+	//
+	// Corresponds with GET /v1/mcp/favorites (the `ListMCPFavorites` operationId).
+	ListMCPFavorites(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UnfavoriteMCP Unfavorite without revoking OAuth
+	//
+	// Corresponds with DELETE /v1/mcp/favorites/{marketID} (the `UnfavoriteMCP` operationId).
+	UnfavoriteMCP(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// FavoriteMCP Favorite without authorizing
+	//
+	// Corresponds with PUT /v1/mcp/favorites/{marketID} (the `FavoriteMCP` operationId).
+	FavoriteMCP(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CompleteMCPOAuth Complete one-time GitHub OAuth callback in the system browser
+	//
+	// Fixed HTTPS callback. State binds the account and PKCE transaction. Does not accept Isodo API keys or return OAuth tokens. Query strings must never be logged.
+	//
+	// Corresponds with GET /v1/mcp/oauth/callback (the `CompleteMCPOAuth` operationId).
+	CompleteMCPOAuth(ctx context.Context, params *CompleteMCPOAuthParams, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// CancelMCPOAuthTransaction Cancel authorization transaction
+	//
+	// Corresponds with DELETE /v1/mcp/oauth/transactions/{transactionID} (the `CancelMCPOAuthTransaction` operationId).
+	CancelMCPOAuthTransaction(ctx context.Context, transactionID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// GetMCPOAuthTransaction Poll account authorization transaction
+	//
+	// Corresponds with GET /v1/mcp/oauth/transactions/{transactionID} (the `GetMCPOAuthTransaction` operationId).
+	GetMCPOAuthTransaction(ctx context.Context, transactionID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
 	// ListSandboxes List sandboxes
 	//
 	// Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
@@ -1168,6 +1512,26 @@ type ClientInterface interface {
 	//
 	// Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
 	SetSandboxInjections(ctx context.Context, sandboxID string, body SetSandboxInjectionsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// ListSandboxMCPBindings List explicit sandbox bindings
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/mcp (the `ListSandboxMCPBindings` operationId).
+	ListSandboxMCPBindings(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// UnbindSandboxMCP Revoke binding before syncing config
+	//
+	// Corresponds with DELETE /v1/sandboxes/{sandboxID}/mcp/{marketID} (the `UnbindSandboxMCP` operationId).
+	UnbindSandboxMCP(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// BindSandboxMCP Bind authorized MCP and sync Codex config
+	//
+	// Corresponds with PUT /v1/sandboxes/{sandboxID}/mcp/{marketID} (the `BindSandboxMCP` operationId).
+	BindSandboxMCP(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
+
+	// SyncSandboxMCP Apply saved MCP config; Agent restart required
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/mcp/{marketID}/sync (the `SyncSandboxMCP` operationId).
+	SyncSandboxMCP(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
 	// CreateSandboxPreviewWithBody Authorize a sandbox HTTP port preview
 	//
@@ -1542,6 +1906,188 @@ func (c *Client) GetInjectionRuleMaterial(ctx context.Context, ruleID string, re
 	return c.Client.Do(req)
 }
 
+// ListMCPCatalog List available MCP services
+//
+// Corresponds with GET /v1/mcp/catalog (the `ListMCPCatalog` operationId).
+func (c *Client) ListMCPCatalog(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMCPCatalogRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetMCPCatalog Get MCP catalog service
+//
+// Corresponds with GET /v1/mcp/catalog/{marketID} (the `GetMCPCatalog` operationId).
+func (c *Client) GetMCPCatalog(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMCPCatalogRequest(c.Server, marketID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// DisconnectMCPOAuth Disconnect and invalidate sandbox calls
+//
+// Corresponds with DELETE /v1/mcp/connections/{marketID} (the `DisconnectMCPOAuth` operationId).
+func (c *Client) DisconnectMCPOAuth(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewDisconnectMCPOAuthRequest(c.Server, marketID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetMCPOAuthConnection Get connection without secrets
+//
+// Corresponds with GET /v1/mcp/connections/{marketID} (the `GetMCPOAuthConnection` operationId).
+func (c *Client) GetMCPOAuthConnection(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMCPOAuthConnectionRequest(c.Server, marketID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// StartMCPOAuth Start or reconnect using registered App and PKCE
+//
+// Corresponds with POST /v1/mcp/connections/{marketID}/authorize (the `StartMCPOAuth` operationId).
+func (c *Client) StartMCPOAuth(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewStartMCPOAuthRequest(c.Server, marketID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListMCPTools Discover allowed upstream tools
+//
+// Corresponds with GET /v1/mcp/connections/{marketID}/tools (the `ListMCPTools` operationId).
+func (c *Client) ListMCPTools(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMCPToolsRequest(c.Server, marketID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListMCPFavorites List account favorites
+//
+// Corresponds with GET /v1/mcp/favorites (the `ListMCPFavorites` operationId).
+func (c *Client) ListMCPFavorites(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListMCPFavoritesRequest(c.Server)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UnfavoriteMCP Unfavorite without revoking OAuth
+//
+// Corresponds with DELETE /v1/mcp/favorites/{marketID} (the `UnfavoriteMCP` operationId).
+func (c *Client) UnfavoriteMCP(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUnfavoriteMCPRequest(c.Server, marketID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// FavoriteMCP Favorite without authorizing
+//
+// Corresponds with PUT /v1/mcp/favorites/{marketID} (the `FavoriteMCP` operationId).
+func (c *Client) FavoriteMCP(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewFavoriteMCPRequest(c.Server, marketID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CompleteMCPOAuth Complete one-time GitHub OAuth callback in the system browser
+//
+// Fixed HTTPS callback. State binds the account and PKCE transaction. Does not accept Isodo API keys or return OAuth tokens. Query strings must never be logged.
+//
+// Corresponds with GET /v1/mcp/oauth/callback (the `CompleteMCPOAuth` operationId).
+func (c *Client) CompleteMCPOAuth(ctx context.Context, params *CompleteMCPOAuthParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCompleteMCPOAuthRequest(c.Server, params)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// CancelMCPOAuthTransaction Cancel authorization transaction
+//
+// Corresponds with DELETE /v1/mcp/oauth/transactions/{transactionID} (the `CancelMCPOAuthTransaction` operationId).
+func (c *Client) CancelMCPOAuthTransaction(ctx context.Context, transactionID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewCancelMCPOAuthTransactionRequest(c.Server, transactionID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// GetMCPOAuthTransaction Poll account authorization transaction
+//
+// Corresponds with GET /v1/mcp/oauth/transactions/{transactionID} (the `GetMCPOAuthTransaction` operationId).
+func (c *Client) GetMCPOAuthTransaction(ctx context.Context, transactionID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewGetMCPOAuthTransactionRequest(c.Server, transactionID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
 // ListSandboxes List sandboxes
 //
 // Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
@@ -1854,6 +2400,66 @@ func (c *Client) SetSandboxInjectionsWithBody(ctx context.Context, sandboxID str
 // Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
 func (c *Client) SetSandboxInjections(ctx context.Context, sandboxID string, body SetSandboxInjectionsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error) {
 	req, err := NewSetSandboxInjectionsRequest(c.Server, sandboxID, body)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// ListSandboxMCPBindings List explicit sandbox bindings
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/mcp (the `ListSandboxMCPBindings` operationId).
+func (c *Client) ListSandboxMCPBindings(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewListSandboxMCPBindingsRequest(c.Server, sandboxID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// UnbindSandboxMCP Revoke binding before syncing config
+//
+// Corresponds with DELETE /v1/sandboxes/{sandboxID}/mcp/{marketID} (the `UnbindSandboxMCP` operationId).
+func (c *Client) UnbindSandboxMCP(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewUnbindSandboxMCPRequest(c.Server, sandboxID, marketID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// BindSandboxMCP Bind authorized MCP and sync Codex config
+//
+// Corresponds with PUT /v1/sandboxes/{sandboxID}/mcp/{marketID} (the `BindSandboxMCP` operationId).
+func (c *Client) BindSandboxMCP(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewBindSandboxMCPRequest(c.Server, sandboxID, marketID)
+	if err != nil {
+		return nil, err
+	}
+	req = req.WithContext(ctx)
+	if err := c.applyEditors(ctx, req, reqEditors); err != nil {
+		return nil, err
+	}
+	return c.Client.Do(req)
+}
+
+// SyncSandboxMCP Apply saved MCP config; Agent restart required
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/mcp/{marketID}/sync (the `SyncSandboxMCP` operationId).
+func (c *Client) SyncSandboxMCP(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
+	req, err := NewSyncSandboxMCPRequest(c.Server, sandboxID, marketID)
 	if err != nil {
 		return nil, err
 	}
@@ -2611,6 +3217,452 @@ func NewGetInjectionRuleMaterialRequest(server string, ruleID string) (*http.Req
 	return req, nil
 }
 
+// NewListMCPCatalogRequest constructs an http.Request for the ListMCPCatalog method
+func NewListMCPCatalogRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/mcp/catalog")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetMCPCatalogRequest constructs an http.Request for the GetMCPCatalog method
+func NewGetMCPCatalogRequest(server string, marketID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "marketID", marketID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/mcp/catalog/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewDisconnectMCPOAuthRequest constructs an http.Request for the DisconnectMCPOAuth method
+func NewDisconnectMCPOAuthRequest(server string, marketID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "marketID", marketID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/mcp/connections/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetMCPOAuthConnectionRequest constructs an http.Request for the GetMCPOAuthConnection method
+func NewGetMCPOAuthConnectionRequest(server string, marketID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "marketID", marketID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/mcp/connections/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewStartMCPOAuthRequest constructs an http.Request for the StartMCPOAuth method
+func NewStartMCPOAuthRequest(server string, marketID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "marketID", marketID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/mcp/connections/%s/authorize", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListMCPToolsRequest constructs an http.Request for the ListMCPTools method
+func NewListMCPToolsRequest(server string, marketID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "marketID", marketID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/mcp/connections/%s/tools", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewListMCPFavoritesRequest constructs an http.Request for the ListMCPFavorites method
+func NewListMCPFavoritesRequest(server string) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/mcp/favorites")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUnfavoriteMCPRequest constructs an http.Request for the UnfavoriteMCP method
+func NewUnfavoriteMCPRequest(server string, marketID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "marketID", marketID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/mcp/favorites/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewFavoriteMCPRequest constructs an http.Request for the FavoriteMCP method
+func NewFavoriteMCPRequest(server string, marketID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "marketID", marketID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/mcp/favorites/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCompleteMCPOAuthRequest constructs an http.Request for the CompleteMCPOAuth method
+func NewCompleteMCPOAuthRequest(server string, params *CompleteMCPOAuthParams) (*http.Request, error) {
+	var err error
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/mcp/oauth/callback")
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	if params != nil {
+		// queryValues collects non-styled parameters (passthrough, JSON)
+		// that are safe to round-trip through url.Values.Encode().
+		queryValues := queryURL.Query()
+		// rawQueryFragments collects pre-encoded query fragments from
+		// styled parameters, preserving literal commas as delimiters
+		// per the OpenAPI spec (e.g. "color=blue,black,brown").
+		var rawQueryFragments []string
+
+		if queryFrag, err := runtime.StyleParamWithOptions("form", true, "state", params.State, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+			return nil, err
+		} else {
+			for _, qp := range strings.Split(queryFrag, "&") {
+				rawQueryFragments = append(rawQueryFragments, qp)
+			}
+		}
+
+		if params.Code != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "code", *params.Code, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Error != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "error", *params.Error, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if params.Iss != nil {
+
+			if queryFrag, err := runtime.StyleParamWithOptions("form", true, "iss", *params.Iss, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationQuery, Type: "string", Format: ""}); err != nil {
+				return nil, err
+			} else {
+				for _, qp := range strings.Split(queryFrag, "&") {
+					rawQueryFragments = append(rawQueryFragments, qp)
+				}
+			}
+
+		}
+
+		if encoded := queryValues.Encode(); encoded != "" {
+			rawQueryFragments = append(rawQueryFragments, encoded)
+		}
+		queryURL.RawQuery = strings.Join(rawQueryFragments, "&")
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewCancelMCPOAuthTransactionRequest constructs an http.Request for the CancelMCPOAuthTransaction method
+func NewCancelMCPOAuthTransactionRequest(server string, transactionID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "transactionID", transactionID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/mcp/oauth/transactions/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewGetMCPOAuthTransactionRequest constructs an http.Request for the GetMCPOAuthTransaction method
+func NewGetMCPOAuthTransactionRequest(server string, transactionID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "transactionID", transactionID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/mcp/oauth/transactions/%s", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 // NewListSandboxesRequest constructs an http.Request for the ListSandboxes method
 func NewListSandboxesRequest(server string, params *ListSandboxesParams) (*http.Request, error) {
 	var err error
@@ -3212,6 +4264,163 @@ func NewSetSandboxInjectionsRequestWithBody(server string, sandboxID string, con
 	}
 
 	req.Header.Add("Content-Type", contentType)
+
+	return req, nil
+}
+
+// NewListSandboxMCPBindingsRequest constructs an http.Request for the ListSandboxMCPBindings method
+func NewListSandboxMCPBindingsRequest(server string, sandboxID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/mcp", pathParam0)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodGet, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewUnbindSandboxMCPRequest constructs an http.Request for the UnbindSandboxMCP method
+func NewUnbindSandboxMCPRequest(server string, sandboxID string, marketID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "marketID", marketID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/mcp/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodDelete, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewBindSandboxMCPRequest constructs an http.Request for the BindSandboxMCP method
+func NewBindSandboxMCPRequest(server string, sandboxID string, marketID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "marketID", marketID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/mcp/%s", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPut, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
+// NewSyncSandboxMCPRequest constructs an http.Request for the SyncSandboxMCP method
+func NewSyncSandboxMCPRequest(server string, sandboxID string, marketID string) (*http.Request, error) {
+	var err error
+
+	var pathParam0 string
+
+	pathParam0, err = runtime.StyleParamWithOptions("simple", false, "sandboxID", sandboxID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	var pathParam1 string
+
+	pathParam1, err = runtime.StyleParamWithOptions("simple", false, "marketID", marketID, runtime.StyleParamOptions{ParamLocation: runtime.ParamLocationPath, Type: "string", Format: ""})
+	if err != nil {
+		return nil, err
+	}
+
+	serverURL, err := url.Parse(server)
+	if err != nil {
+		return nil, err
+	}
+
+	operationPath := fmt.Sprintf("/v1/sandboxes/%s/mcp/%s/sync", pathParam0, pathParam1)
+	if operationPath[0] == '/' {
+		operationPath = "." + operationPath
+	}
+
+	queryURL, err := serverURL.Parse(operationPath)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err := http.NewRequest(http.MethodPost, queryURL.String(), nil)
+	if err != nil {
+		return nil, err
+	}
 
 	return req, nil
 }
@@ -4142,6 +5351,92 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /v1/injection-rules/{ruleID}/material (the `GetInjectionRuleMaterial` operationId).
 	GetInjectionRuleMaterialWithResponse(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*GetInjectionRuleMaterialResponse, error)
 
+	// ListMCPCatalogWithResponse List available MCP services
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/mcp/catalog (the `ListMCPCatalog` operationId).
+	ListMCPCatalogWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMCPCatalogResponse, error)
+
+	// GetMCPCatalogWithResponse Get MCP catalog service
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/mcp/catalog/{marketID} (the `GetMCPCatalog` operationId).
+	GetMCPCatalogWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*GetMCPCatalogResponse, error)
+
+	// DisconnectMCPOAuthWithResponse Disconnect and invalidate sandbox calls
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/mcp/connections/{marketID} (the `DisconnectMCPOAuth` operationId).
+	DisconnectMCPOAuthWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*DisconnectMCPOAuthResponse, error)
+
+	// GetMCPOAuthConnectionWithResponse Get connection without secrets
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/mcp/connections/{marketID} (the `GetMCPOAuthConnection` operationId).
+	GetMCPOAuthConnectionWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*GetMCPOAuthConnectionResponse, error)
+
+	// StartMCPOAuthWithResponse Start or reconnect using registered App and PKCE
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/mcp/connections/{marketID}/authorize (the `StartMCPOAuth` operationId).
+	StartMCPOAuthWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*StartMCPOAuthResponse, error)
+
+	// ListMCPToolsWithResponse Discover allowed upstream tools
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/mcp/connections/{marketID}/tools (the `ListMCPTools` operationId).
+	ListMCPToolsWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*ListMCPToolsResponse, error)
+
+	// ListMCPFavoritesWithResponse List account favorites
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/mcp/favorites (the `ListMCPFavorites` operationId).
+	ListMCPFavoritesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMCPFavoritesResponse, error)
+
+	// UnfavoriteMCPWithResponse Unfavorite without revoking OAuth
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/mcp/favorites/{marketID} (the `UnfavoriteMCP` operationId).
+	UnfavoriteMCPWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*UnfavoriteMCPResponse, error)
+
+	// FavoriteMCPWithResponse Favorite without authorizing
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/mcp/favorites/{marketID} (the `FavoriteMCP` operationId).
+	FavoriteMCPWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*FavoriteMCPResponse, error)
+
+	// CompleteMCPOAuthWithResponse Complete one-time GitHub OAuth callback in the system browser
+	//
+	// Fixed HTTPS callback. State binds the account and PKCE transaction. Does not accept Isodo API keys or return OAuth tokens. Query strings must never be logged.
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/mcp/oauth/callback (the `CompleteMCPOAuth` operationId).
+	CompleteMCPOAuthWithResponse(ctx context.Context, params *CompleteMCPOAuthParams, reqEditors ...RequestEditorFn) (*CompleteMCPOAuthResponse, error)
+
+	// CancelMCPOAuthTransactionWithResponse Cancel authorization transaction
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/mcp/oauth/transactions/{transactionID} (the `CancelMCPOAuthTransaction` operationId).
+	CancelMCPOAuthTransactionWithResponse(ctx context.Context, transactionID string, reqEditors ...RequestEditorFn) (*CancelMCPOAuthTransactionResponse, error)
+
+	// GetMCPOAuthTransactionWithResponse Poll account authorization transaction
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/mcp/oauth/transactions/{transactionID} (the `GetMCPOAuthTransaction` operationId).
+	GetMCPOAuthTransactionWithResponse(ctx context.Context, transactionID string, reqEditors ...RequestEditorFn) (*GetMCPOAuthTransactionResponse, error)
+
 	// ListSandboxesWithResponse List sandboxes
 	//
 	// Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
@@ -4297,6 +5592,34 @@ type ClientWithResponsesInterface interface {
 	//
 	// Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
 	SetSandboxInjectionsWithResponse(ctx context.Context, sandboxID string, body SetSandboxInjectionsJSONRequestBody, reqEditors ...RequestEditorFn) (*SetSandboxInjectionsResponse, error)
+
+	// ListSandboxMCPBindingsWithResponse List explicit sandbox bindings
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with GET /v1/sandboxes/{sandboxID}/mcp (the `ListSandboxMCPBindings` operationId).
+	ListSandboxMCPBindingsWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*ListSandboxMCPBindingsResponse, error)
+
+	// UnbindSandboxMCPWithResponse Revoke binding before syncing config
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with DELETE /v1/sandboxes/{sandboxID}/mcp/{marketID} (the `UnbindSandboxMCP` operationId).
+	UnbindSandboxMCPWithResponse(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*UnbindSandboxMCPResponse, error)
+
+	// BindSandboxMCPWithResponse Bind authorized MCP and sync Codex config
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with PUT /v1/sandboxes/{sandboxID}/mcp/{marketID} (the `BindSandboxMCP` operationId).
+	BindSandboxMCPWithResponse(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*BindSandboxMCPResponse, error)
+
+	// SyncSandboxMCPWithResponse Apply saved MCP config; Agent restart required
+	//
+	// Returns a wrapper object for the known response body format(s).
+	//
+	// Corresponds with POST /v1/sandboxes/{sandboxID}/mcp/{marketID}/sync (the `SyncSandboxMCP` operationId).
+	SyncSandboxMCPWithResponse(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*SyncSandboxMCPResponse, error)
 
 	// CreateSandboxPreviewWithBodyWithResponse Authorize a sandbox HTTP port preview
 	//
@@ -4915,6 +6238,547 @@ func (r GetInjectionRuleMaterialResponse) ContentType() string {
 	return ""
 }
 
+type ListMCPCatalogResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MCPCatalogList
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMCPCatalogResponse) GetJSON200() *MCPCatalogList {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListMCPCatalogResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMCPCatalogResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMCPCatalogResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMCPCatalogResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMCPCatalogResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetMCPCatalogResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MCPCatalogList
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetMCPCatalogResponse) GetJSON200() *MCPCatalogList {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetMCPCatalogResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetMCPCatalogResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMCPCatalogResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMCPCatalogResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMCPCatalogResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type DisconnectMCPOAuthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r DisconnectMCPOAuthResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r DisconnectMCPOAuthResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r DisconnectMCPOAuthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r DisconnectMCPOAuthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r DisconnectMCPOAuthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetMCPOAuthConnectionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MCPOAuthConnection
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetMCPOAuthConnectionResponse) GetJSON200() *MCPOAuthConnection {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetMCPOAuthConnectionResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetMCPOAuthConnectionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMCPOAuthConnectionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMCPOAuthConnectionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMCPOAuthConnectionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type StartMCPOAuthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MCPOAuthStart
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r StartMCPOAuthResponse) GetJSON200() *MCPOAuthStart {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r StartMCPOAuthResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r StartMCPOAuthResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r StartMCPOAuthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r StartMCPOAuthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r StartMCPOAuthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListMCPToolsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MCPToolList
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMCPToolsResponse) GetJSON200() *MCPToolList {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListMCPToolsResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMCPToolsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMCPToolsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMCPToolsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMCPToolsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListMCPFavoritesResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MCPCatalogList
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListMCPFavoritesResponse) GetJSON200() *MCPCatalogList {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListMCPFavoritesResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListMCPFavoritesResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListMCPFavoritesResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListMCPFavoritesResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListMCPFavoritesResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UnfavoriteMCPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r UnfavoriteMCPResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UnfavoriteMCPResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UnfavoriteMCPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UnfavoriteMCPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UnfavoriteMCPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type FavoriteMCPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r FavoriteMCPResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r FavoriteMCPResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r FavoriteMCPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r FavoriteMCPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r FavoriteMCPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CompleteMCPOAuthResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r CompleteMCPOAuthResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CompleteMCPOAuthResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CompleteMCPOAuthResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CompleteMCPOAuthResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CompleteMCPOAuthResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type CancelMCPOAuthTransactionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r CancelMCPOAuthTransactionResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r CancelMCPOAuthTransactionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r CancelMCPOAuthTransactionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r CancelMCPOAuthTransactionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r CancelMCPOAuthTransactionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type GetMCPOAuthTransactionResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MCPOAuthTransaction
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r GetMCPOAuthTransactionResponse) GetJSON200() *MCPOAuthTransaction {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r GetMCPOAuthTransactionResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r GetMCPOAuthTransactionResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r GetMCPOAuthTransactionResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r GetMCPOAuthTransactionResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r GetMCPOAuthTransactionResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
 type ListSandboxesResponse struct {
 	Body         []byte
 	HTTPResponse *http.Response
@@ -5523,6 +7387,219 @@ func (r SetSandboxInjectionsResponse) StatusCode() int {
 
 // ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
 func (r SetSandboxInjectionsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type ListSandboxMCPBindingsResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MCPBindingList
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r ListSandboxMCPBindingsResponse) GetJSON200() *MCPBindingList {
+	return r.JSON200
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r ListSandboxMCPBindingsResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r ListSandboxMCPBindingsResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r ListSandboxMCPBindingsResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r ListSandboxMCPBindingsResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r ListSandboxMCPBindingsResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type UnbindSandboxMCPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MCPSync
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *MCPSync
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r UnbindSandboxMCPResponse) GetJSON200() *MCPSync {
+	return r.JSON200
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r UnbindSandboxMCPResponse) GetJSON202() *MCPSync {
+	return r.JSON202
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r UnbindSandboxMCPResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r UnbindSandboxMCPResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r UnbindSandboxMCPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r UnbindSandboxMCPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r UnbindSandboxMCPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type BindSandboxMCPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MCPSync
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *MCPSync
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r BindSandboxMCPResponse) GetJSON200() *MCPSync {
+	return r.JSON200
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r BindSandboxMCPResponse) GetJSON202() *MCPSync {
+	return r.JSON202
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r BindSandboxMCPResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r BindSandboxMCPResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r BindSandboxMCPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r BindSandboxMCPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r BindSandboxMCPResponse) ContentType() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Header.Get("Content-Type")
+	}
+	return ""
+}
+
+type SyncSandboxMCPResponse struct {
+	Body         []byte
+	HTTPResponse *http.Response
+	// JSON200 the response for an HTTP 200 `application/json` response
+	JSON200 *MCPSync
+	// JSON202 the response for an HTTP 202 `application/json` response
+	JSON202 *MCPSync
+	// JSONDefault the response for an HTTP default `application/json` response
+	JSONDefault *Error
+}
+
+// GetJSON200 returns the response for an HTTP 200 `application/json` response
+func (r SyncSandboxMCPResponse) GetJSON200() *MCPSync {
+	return r.JSON200
+}
+
+// GetJSON202 returns the response for an HTTP 202 `application/json` response
+func (r SyncSandboxMCPResponse) GetJSON202() *MCPSync {
+	return r.JSON202
+}
+
+// GetJSONDefault returns the response for an HTTP default `application/json` response
+func (r SyncSandboxMCPResponse) GetJSONDefault() *Error {
+	return r.JSONDefault
+}
+
+// GetBody returns the raw response body bytes
+func (r SyncSandboxMCPResponse) GetBody() []byte {
+	return r.Body
+}
+
+// Status returns HTTPResponse.Status
+func (r SyncSandboxMCPResponse) Status() string {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.Status
+	}
+	return http.StatusText(0)
+}
+
+// StatusCode returns HTTPResponse.StatusCode
+func (r SyncSandboxMCPResponse) StatusCode() int {
+	if r.HTTPResponse != nil {
+		return r.HTTPResponse.StatusCode
+	}
+	return 0
+}
+
+// ContentType is a convenience method to retrieve the Content-Type value from the HTTP response headers
+func (r SyncSandboxMCPResponse) ContentType() string {
 	if r.HTTPResponse != nil {
 		return r.HTTPResponse.Header.Get("Content-Type")
 	}
@@ -6515,6 +8592,164 @@ func (c *ClientWithResponses) GetInjectionRuleMaterialWithResponse(ctx context.C
 	return ParseGetInjectionRuleMaterialResponse(rsp)
 }
 
+// ListMCPCatalogWithResponse List available MCP services
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/mcp/catalog (the `ListMCPCatalog` operationId).
+func (c *ClientWithResponses) ListMCPCatalogWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMCPCatalogResponse, error) {
+	rsp, err := c.ListMCPCatalog(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMCPCatalogResponse(rsp)
+}
+
+// GetMCPCatalogWithResponse Get MCP catalog service
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/mcp/catalog/{marketID} (the `GetMCPCatalog` operationId).
+func (c *ClientWithResponses) GetMCPCatalogWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*GetMCPCatalogResponse, error) {
+	rsp, err := c.GetMCPCatalog(ctx, marketID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMCPCatalogResponse(rsp)
+}
+
+// DisconnectMCPOAuthWithResponse Disconnect and invalidate sandbox calls
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/mcp/connections/{marketID} (the `DisconnectMCPOAuth` operationId).
+func (c *ClientWithResponses) DisconnectMCPOAuthWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*DisconnectMCPOAuthResponse, error) {
+	rsp, err := c.DisconnectMCPOAuth(ctx, marketID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseDisconnectMCPOAuthResponse(rsp)
+}
+
+// GetMCPOAuthConnectionWithResponse Get connection without secrets
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/mcp/connections/{marketID} (the `GetMCPOAuthConnection` operationId).
+func (c *ClientWithResponses) GetMCPOAuthConnectionWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*GetMCPOAuthConnectionResponse, error) {
+	rsp, err := c.GetMCPOAuthConnection(ctx, marketID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMCPOAuthConnectionResponse(rsp)
+}
+
+// StartMCPOAuthWithResponse Start or reconnect using registered App and PKCE
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/mcp/connections/{marketID}/authorize (the `StartMCPOAuth` operationId).
+func (c *ClientWithResponses) StartMCPOAuthWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*StartMCPOAuthResponse, error) {
+	rsp, err := c.StartMCPOAuth(ctx, marketID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseStartMCPOAuthResponse(rsp)
+}
+
+// ListMCPToolsWithResponse Discover allowed upstream tools
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/mcp/connections/{marketID}/tools (the `ListMCPTools` operationId).
+func (c *ClientWithResponses) ListMCPToolsWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*ListMCPToolsResponse, error) {
+	rsp, err := c.ListMCPTools(ctx, marketID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMCPToolsResponse(rsp)
+}
+
+// ListMCPFavoritesWithResponse List account favorites
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/mcp/favorites (the `ListMCPFavorites` operationId).
+func (c *ClientWithResponses) ListMCPFavoritesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMCPFavoritesResponse, error) {
+	rsp, err := c.ListMCPFavorites(ctx, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListMCPFavoritesResponse(rsp)
+}
+
+// UnfavoriteMCPWithResponse Unfavorite without revoking OAuth
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/mcp/favorites/{marketID} (the `UnfavoriteMCP` operationId).
+func (c *ClientWithResponses) UnfavoriteMCPWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*UnfavoriteMCPResponse, error) {
+	rsp, err := c.UnfavoriteMCP(ctx, marketID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUnfavoriteMCPResponse(rsp)
+}
+
+// FavoriteMCPWithResponse Favorite without authorizing
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/mcp/favorites/{marketID} (the `FavoriteMCP` operationId).
+func (c *ClientWithResponses) FavoriteMCPWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*FavoriteMCPResponse, error) {
+	rsp, err := c.FavoriteMCP(ctx, marketID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseFavoriteMCPResponse(rsp)
+}
+
+// CompleteMCPOAuthWithResponse Complete one-time GitHub OAuth callback in the system browser
+//
+// Fixed HTTPS callback. State binds the account and PKCE transaction. Does not accept Isodo API keys or return OAuth tokens. Query strings must never be logged.
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/mcp/oauth/callback (the `CompleteMCPOAuth` operationId).
+func (c *ClientWithResponses) CompleteMCPOAuthWithResponse(ctx context.Context, params *CompleteMCPOAuthParams, reqEditors ...RequestEditorFn) (*CompleteMCPOAuthResponse, error) {
+	rsp, err := c.CompleteMCPOAuth(ctx, params, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCompleteMCPOAuthResponse(rsp)
+}
+
+// CancelMCPOAuthTransactionWithResponse Cancel authorization transaction
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/mcp/oauth/transactions/{transactionID} (the `CancelMCPOAuthTransaction` operationId).
+func (c *ClientWithResponses) CancelMCPOAuthTransactionWithResponse(ctx context.Context, transactionID string, reqEditors ...RequestEditorFn) (*CancelMCPOAuthTransactionResponse, error) {
+	rsp, err := c.CancelMCPOAuthTransaction(ctx, transactionID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseCancelMCPOAuthTransactionResponse(rsp)
+}
+
+// GetMCPOAuthTransactionWithResponse Poll account authorization transaction
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/mcp/oauth/transactions/{transactionID} (the `GetMCPOAuthTransaction` operationId).
+func (c *ClientWithResponses) GetMCPOAuthTransactionWithResponse(ctx context.Context, transactionID string, reqEditors ...RequestEditorFn) (*GetMCPOAuthTransactionResponse, error) {
+	rsp, err := c.GetMCPOAuthTransaction(ctx, transactionID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseGetMCPOAuthTransactionResponse(rsp)
+}
+
 // ListSandboxesWithResponse List sandboxes
 //
 // Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
@@ -6777,6 +9012,58 @@ func (c *ClientWithResponses) SetSandboxInjectionsWithResponse(ctx context.Conte
 		return nil, err
 	}
 	return ParseSetSandboxInjectionsResponse(rsp)
+}
+
+// ListSandboxMCPBindingsWithResponse List explicit sandbox bindings
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with GET /v1/sandboxes/{sandboxID}/mcp (the `ListSandboxMCPBindings` operationId).
+func (c *ClientWithResponses) ListSandboxMCPBindingsWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*ListSandboxMCPBindingsResponse, error) {
+	rsp, err := c.ListSandboxMCPBindings(ctx, sandboxID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseListSandboxMCPBindingsResponse(rsp)
+}
+
+// UnbindSandboxMCPWithResponse Revoke binding before syncing config
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with DELETE /v1/sandboxes/{sandboxID}/mcp/{marketID} (the `UnbindSandboxMCP` operationId).
+func (c *ClientWithResponses) UnbindSandboxMCPWithResponse(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*UnbindSandboxMCPResponse, error) {
+	rsp, err := c.UnbindSandboxMCP(ctx, sandboxID, marketID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseUnbindSandboxMCPResponse(rsp)
+}
+
+// BindSandboxMCPWithResponse Bind authorized MCP and sync Codex config
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with PUT /v1/sandboxes/{sandboxID}/mcp/{marketID} (the `BindSandboxMCP` operationId).
+func (c *ClientWithResponses) BindSandboxMCPWithResponse(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*BindSandboxMCPResponse, error) {
+	rsp, err := c.BindSandboxMCP(ctx, sandboxID, marketID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseBindSandboxMCPResponse(rsp)
+}
+
+// SyncSandboxMCPWithResponse Apply saved MCP config; Agent restart required
+//
+// Returns a wrapper object for the known response body format(s).
+//
+// Corresponds with POST /v1/sandboxes/{sandboxID}/mcp/{marketID}/sync (the `SyncSandboxMCP` operationId).
+func (c *ClientWithResponses) SyncSandboxMCPWithResponse(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*SyncSandboxMCPResponse, error) {
+	rsp, err := c.SyncSandboxMCP(ctx, sandboxID, marketID, reqEditors...)
+	if err != nil {
+		return nil, err
+	}
+	return ParseSyncSandboxMCPResponse(rsp)
 }
 
 // CreateSandboxPreviewWithBodyWithResponse Authorize a sandbox HTTP port preview
@@ -7402,6 +9689,379 @@ func ParseGetInjectionRuleMaterialResponse(rsp *http.Response) (*GetInjectionRul
 	return response, nil
 }
 
+// ParseListMCPCatalogResponse parses an HTTP response from a ListMCPCatalogWithResponse call
+func ParseListMCPCatalogResponse(rsp *http.Response) (*ListMCPCatalogResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListMCPCatalogResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MCPCatalogList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetMCPCatalogResponse parses an HTTP response from a GetMCPCatalogWithResponse call
+func ParseGetMCPCatalogResponse(rsp *http.Response) (*GetMCPCatalogResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMCPCatalogResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MCPCatalogList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseDisconnectMCPOAuthResponse parses an HTTP response from a DisconnectMCPOAuthWithResponse call
+func ParseDisconnectMCPOAuthResponse(rsp *http.Response) (*DisconnectMCPOAuthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &DisconnectMCPOAuthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetMCPOAuthConnectionResponse parses an HTTP response from a GetMCPOAuthConnectionWithResponse call
+func ParseGetMCPOAuthConnectionResponse(rsp *http.Response) (*GetMCPOAuthConnectionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMCPOAuthConnectionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MCPOAuthConnection
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseStartMCPOAuthResponse parses an HTTP response from a StartMCPOAuthWithResponse call
+func ParseStartMCPOAuthResponse(rsp *http.Response) (*StartMCPOAuthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &StartMCPOAuthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MCPOAuthStart
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListMCPToolsResponse parses an HTTP response from a ListMCPToolsWithResponse call
+func ParseListMCPToolsResponse(rsp *http.Response) (*ListMCPToolsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListMCPToolsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MCPToolList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListMCPFavoritesResponse parses an HTTP response from a ListMCPFavoritesWithResponse call
+func ParseListMCPFavoritesResponse(rsp *http.Response) (*ListMCPFavoritesResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListMCPFavoritesResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MCPCatalogList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUnfavoriteMCPResponse parses an HTTP response from a UnfavoriteMCPWithResponse call
+func ParseUnfavoriteMCPResponse(rsp *http.Response) (*UnfavoriteMCPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UnfavoriteMCPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseFavoriteMCPResponse parses an HTTP response from a FavoriteMCPWithResponse call
+func ParseFavoriteMCPResponse(rsp *http.Response) (*FavoriteMCPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &FavoriteMCPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCompleteMCPOAuthResponse parses an HTTP response from a CompleteMCPOAuthWithResponse call
+func ParseCompleteMCPOAuthResponse(rsp *http.Response) (*CompleteMCPOAuthResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CompleteMCPOAuthResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseCancelMCPOAuthTransactionResponse parses an HTTP response from a CancelMCPOAuthTransactionWithResponse call
+func ParseCancelMCPOAuthTransactionResponse(rsp *http.Response) (*CancelMCPOAuthTransactionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &CancelMCPOAuthTransactionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case rsp.StatusCode == 204:
+		break // No content-type
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseGetMCPOAuthTransactionResponse parses an HTTP response from a GetMCPOAuthTransactionWithResponse call
+func ParseGetMCPOAuthTransactionResponse(rsp *http.Response) (*GetMCPOAuthTransactionResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &GetMCPOAuthTransactionResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MCPOAuthTransaction
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
 // ParseListSandboxesResponse parses an HTTP response from a ListSandboxesWithResponse call
 func ParseListSandboxesResponse(rsp *http.Response) (*ListSandboxesResponse, error) {
 	bodyBytes, err := io.ReadAll(rsp.Body)
@@ -7839,6 +10499,159 @@ func ParseSetSandboxInjectionsResponse(rsp *http.Response) (*SetSandboxInjection
 			return nil, err
 		}
 		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseListSandboxMCPBindingsResponse parses an HTTP response from a ListSandboxMCPBindingsWithResponse call
+func ParseListSandboxMCPBindingsResponse(rsp *http.Response) (*ListSandboxMCPBindingsResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &ListSandboxMCPBindingsResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MCPBindingList
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseUnbindSandboxMCPResponse parses an HTTP response from a UnbindSandboxMCPWithResponse call
+func ParseUnbindSandboxMCPResponse(rsp *http.Response) (*UnbindSandboxMCPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &UnbindSandboxMCPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MCPSync
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest MCPSync
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseBindSandboxMCPResponse parses an HTTP response from a BindSandboxMCPWithResponse call
+func ParseBindSandboxMCPResponse(rsp *http.Response) (*BindSandboxMCPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &BindSandboxMCPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MCPSync
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest MCPSync
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
+		var dest Error
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSONDefault = &dest
+
+	}
+
+	return response, nil
+}
+
+// ParseSyncSandboxMCPResponse parses an HTTP response from a SyncSandboxMCPWithResponse call
+func ParseSyncSandboxMCPResponse(rsp *http.Response) (*SyncSandboxMCPResponse, error) {
+	bodyBytes, err := io.ReadAll(rsp.Body)
+	defer func() { _ = rsp.Body.Close() }()
+	if err != nil {
+		return nil, err
+	}
+
+	response := &SyncSandboxMCPResponse{
+		Body:         bodyBytes,
+		HTTPResponse: rsp,
+	}
+
+	switch {
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 200:
+		var dest MCPSync
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON200 = &dest
+
+	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && rsp.StatusCode == 202:
+		var dest MCPSync
+		if err := json.Unmarshal(bodyBytes, &dest); err != nil {
+			return nil, err
+		}
+		response.JSON202 = &dest
 
 	case strings.Contains(rsp.Header.Get("Content-Type"), "json") && true:
 		var dest Error
@@ -8439,6 +11252,42 @@ type ServerInterface interface {
 	// GetInjectionRuleMaterial Read injection material
 	// (GET /v1/injection-rules/{ruleID}/material)
 	GetInjectionRuleMaterial(w http.ResponseWriter, r *http.Request, ruleID string)
+	// ListMCPCatalog List available MCP services
+	// (GET /v1/mcp/catalog)
+	ListMCPCatalog(w http.ResponseWriter, r *http.Request)
+	// GetMCPCatalog Get MCP catalog service
+	// (GET /v1/mcp/catalog/{marketID})
+	GetMCPCatalog(w http.ResponseWriter, r *http.Request, marketID string)
+	// DisconnectMCPOAuth Disconnect and invalidate sandbox calls
+	// (DELETE /v1/mcp/connections/{marketID})
+	DisconnectMCPOAuth(w http.ResponseWriter, r *http.Request, marketID string)
+	// GetMCPOAuthConnection Get connection without secrets
+	// (GET /v1/mcp/connections/{marketID})
+	GetMCPOAuthConnection(w http.ResponseWriter, r *http.Request, marketID string)
+	// StartMCPOAuth Start or reconnect using registered App and PKCE
+	// (POST /v1/mcp/connections/{marketID}/authorize)
+	StartMCPOAuth(w http.ResponseWriter, r *http.Request, marketID string)
+	// ListMCPTools Discover allowed upstream tools
+	// (GET /v1/mcp/connections/{marketID}/tools)
+	ListMCPTools(w http.ResponseWriter, r *http.Request, marketID string)
+	// ListMCPFavorites List account favorites
+	// (GET /v1/mcp/favorites)
+	ListMCPFavorites(w http.ResponseWriter, r *http.Request)
+	// UnfavoriteMCP Unfavorite without revoking OAuth
+	// (DELETE /v1/mcp/favorites/{marketID})
+	UnfavoriteMCP(w http.ResponseWriter, r *http.Request, marketID string)
+	// FavoriteMCP Favorite without authorizing
+	// (PUT /v1/mcp/favorites/{marketID})
+	FavoriteMCP(w http.ResponseWriter, r *http.Request, marketID string)
+	// CompleteMCPOAuth Complete one-time GitHub OAuth callback in the system browser
+	// (GET /v1/mcp/oauth/callback)
+	CompleteMCPOAuth(w http.ResponseWriter, r *http.Request, params CompleteMCPOAuthParams)
+	// CancelMCPOAuthTransaction Cancel authorization transaction
+	// (DELETE /v1/mcp/oauth/transactions/{transactionID})
+	CancelMCPOAuthTransaction(w http.ResponseWriter, r *http.Request, transactionID string)
+	// GetMCPOAuthTransaction Poll account authorization transaction
+	// (GET /v1/mcp/oauth/transactions/{transactionID})
+	GetMCPOAuthTransaction(w http.ResponseWriter, r *http.Request, transactionID string)
 	// ListSandboxes List sandboxes
 	// (GET /v1/sandboxes)
 	ListSandboxes(w http.ResponseWriter, r *http.Request, params ListSandboxesParams)
@@ -8478,6 +11327,18 @@ type ServerInterface interface {
 	// SetSandboxInjections Replace sandbox host-side injection rules
 	// (PUT /v1/sandboxes/{sandboxID}/injections)
 	SetSandboxInjections(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// ListSandboxMCPBindings List explicit sandbox bindings
+	// (GET /v1/sandboxes/{sandboxID}/mcp)
+	ListSandboxMCPBindings(w http.ResponseWriter, r *http.Request, sandboxID string)
+	// UnbindSandboxMCP Revoke binding before syncing config
+	// (DELETE /v1/sandboxes/{sandboxID}/mcp/{marketID})
+	UnbindSandboxMCP(w http.ResponseWriter, r *http.Request, sandboxID string, marketID string)
+	// BindSandboxMCP Bind authorized MCP and sync Codex config
+	// (PUT /v1/sandboxes/{sandboxID}/mcp/{marketID})
+	BindSandboxMCP(w http.ResponseWriter, r *http.Request, sandboxID string, marketID string)
+	// SyncSandboxMCP Apply saved MCP config; Agent restart required
+	// (POST /v1/sandboxes/{sandboxID}/mcp/{marketID}/sync)
+	SyncSandboxMCP(w http.ResponseWriter, r *http.Request, sandboxID string, marketID string)
 	// CreateSandboxPreview Authorize a sandbox HTTP port preview
 	// (POST /v1/sandboxes/{sandboxID}/previews)
 	CreateSandboxPreview(w http.ResponseWriter, r *http.Request, sandboxID string)
@@ -8759,6 +11620,340 @@ func (siw *ServerInterfaceWrapper) GetInjectionRuleMaterial(w http.ResponseWrite
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.GetInjectionRuleMaterial(w, r, ruleID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMCPCatalog operation middleware
+func (siw *ServerInterfaceWrapper) ListMCPCatalog(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMCPCatalog(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMCPCatalog operation middleware
+func (siw *ServerInterfaceWrapper) GetMCPCatalog(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "marketID" -------------
+	var marketID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "marketID", r.PathValue("marketID"), &marketID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "marketID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMCPCatalog(w, r, marketID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DisconnectMCPOAuth operation middleware
+func (siw *ServerInterfaceWrapper) DisconnectMCPOAuth(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "marketID" -------------
+	var marketID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "marketID", r.PathValue("marketID"), &marketID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "marketID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DisconnectMCPOAuth(w, r, marketID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMCPOAuthConnection operation middleware
+func (siw *ServerInterfaceWrapper) GetMCPOAuthConnection(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "marketID" -------------
+	var marketID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "marketID", r.PathValue("marketID"), &marketID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "marketID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMCPOAuthConnection(w, r, marketID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// StartMCPOAuth operation middleware
+func (siw *ServerInterfaceWrapper) StartMCPOAuth(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "marketID" -------------
+	var marketID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "marketID", r.PathValue("marketID"), &marketID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "marketID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.StartMCPOAuth(w, r, marketID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMCPTools operation middleware
+func (siw *ServerInterfaceWrapper) ListMCPTools(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "marketID" -------------
+	var marketID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "marketID", r.PathValue("marketID"), &marketID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "marketID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMCPTools(w, r, marketID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListMCPFavorites operation middleware
+func (siw *ServerInterfaceWrapper) ListMCPFavorites(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMCPFavorites(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnfavoriteMCP operation middleware
+func (siw *ServerInterfaceWrapper) UnfavoriteMCP(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "marketID" -------------
+	var marketID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "marketID", r.PathValue("marketID"), &marketID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "marketID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnfavoriteMCP(w, r, marketID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// FavoriteMCP operation middleware
+func (siw *ServerInterfaceWrapper) FavoriteMCP(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "marketID" -------------
+	var marketID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "marketID", r.PathValue("marketID"), &marketID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "marketID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.FavoriteMCP(w, r, marketID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CompleteMCPOAuth operation middleware
+func (siw *ServerInterfaceWrapper) CompleteMCPOAuth(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params CompleteMCPOAuthParams
+
+	// ------------- Required query parameter "state" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, true, "state", r.URL.Query(), &params.State, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "state"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "state", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "code" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "code", r.URL.Query(), &params.Code, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "code"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "code", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "error" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "error", r.URL.Query(), &params.Error, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "error"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "error", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "iss" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "iss", r.URL.Query(), &params.Iss, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "iss"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "iss", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CompleteMCPOAuth(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CancelMCPOAuthTransaction operation middleware
+func (siw *ServerInterfaceWrapper) CancelMCPOAuthTransaction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "transactionID" -------------
+	var transactionID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "transactionID", r.PathValue("transactionID"), &transactionID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "transactionID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CancelMCPOAuthTransaction(w, r, transactionID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMCPOAuthTransaction operation middleware
+func (siw *ServerInterfaceWrapper) GetMCPOAuthTransaction(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "transactionID" -------------
+	var transactionID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "transactionID", r.PathValue("transactionID"), &transactionID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "transactionID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMCPOAuthTransaction(w, r, transactionID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -9178,6 +12373,137 @@ func (siw *ServerInterfaceWrapper) SetSandboxInjections(w http.ResponseWriter, r
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.SetSandboxInjections(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ListSandboxMCPBindings operation middleware
+func (siw *ServerInterfaceWrapper) ListSandboxMCPBindings(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListSandboxMCPBindings(w, r, sandboxID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UnbindSandboxMCP operation middleware
+func (siw *ServerInterfaceWrapper) UnbindSandboxMCP(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "marketID" -------------
+	var marketID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "marketID", r.PathValue("marketID"), &marketID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "marketID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UnbindSandboxMCP(w, r, sandboxID, marketID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// BindSandboxMCP operation middleware
+func (siw *ServerInterfaceWrapper) BindSandboxMCP(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "marketID" -------------
+	var marketID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "marketID", r.PathValue("marketID"), &marketID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "marketID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.BindSandboxMCP(w, r, sandboxID, marketID)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// SyncSandboxMCP operation middleware
+func (siw *ServerInterfaceWrapper) SyncSandboxMCP(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "sandboxID" -------------
+	var sandboxID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "sandboxID", r.PathValue("sandboxID"), &sandboxID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "sandboxID", Err: err})
+		return
+	}
+
+	// ------------- Path parameter "marketID" -------------
+	var marketID string
+
+	err = runtime.BindStyledParameterWithOptions("simple", "marketID", r.PathValue("marketID"), &marketID, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "", ValueIsUnescaped: true})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "marketID", Err: err})
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.SyncSandboxMCP(w, r, sandboxID, marketID)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -9844,6 +13170,22 @@ func HandlerWithOptions(si ServerInterface, options StdHTTPServerOptions) http.H
 		ErrorHandlerFunc:   options.ErrorHandlerFunc,
 	}
 
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/mcp/oauth/callback", wrapper.CompleteMCPOAuth)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/mcp/catalog", wrapper.ListMCPCatalog)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/mcp/catalog/{marketID}", wrapper.GetMCPCatalog)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/mcp/favorites", wrapper.ListMCPFavorites)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/mcp/favorites/{marketID}", wrapper.UnfavoriteMCP)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/mcp/favorites/{marketID}", wrapper.FavoriteMCP)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/mcp/connections/{marketID}", wrapper.DisconnectMCPOAuth)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/mcp/connections/{marketID}", wrapper.GetMCPOAuthConnection)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/mcp/connections/{marketID}/authorize", wrapper.StartMCPOAuth)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/mcp/connections/{marketID}/tools", wrapper.ListMCPTools)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/mcp/oauth/transactions/{transactionID}", wrapper.CancelMCPOAuthTransaction)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/mcp/oauth/transactions/{transactionID}", wrapper.GetMCPOAuthTransaction)
+	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/mcp", wrapper.ListSandboxMCPBindings)
+	m.HandleFunc(http.MethodDelete+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/mcp/{marketID}", wrapper.UnbindSandboxMCP)
+	m.HandleFunc(http.MethodPut+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/mcp/{marketID}", wrapper.BindSandboxMCP)
+	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/mcp/{marketID}/sync", wrapper.SyncSandboxMCP)
 	m.HandleFunc(http.MethodGet+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/files", wrapper.DownloadSandboxFile)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/files", wrapper.UploadSandboxFile)
 	m.HandleFunc(http.MethodPost+" "+options.BaseURL+"/v1/sandboxes/{sandboxID}/directories", wrapper.MakeSandboxDirectory)

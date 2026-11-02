@@ -1,3 +1,5 @@
+import { MCPFavoriteFields } from "./MCPMarketPage";
+import { bindMCP } from "./mcpMarket";
 import { remoteSandboxesOnly } from "./sandboxCapabilities";
 import { setSandboxInjections } from "../../api/public.generated";
 import type { EnvironmentId } from "@t3tools/contracts";
@@ -83,6 +85,7 @@ export function CreateSandboxDialog() {
   const [credentialSelection, setCredentialSelection] = useState<CredentialSelection>(
     EMPTY_CREDENTIAL_SELECTION,
   );
+  const [mcpIds, setMcpIds] = useState<string[]>([]);
   const [credentialStage, setCredentialStage] = useState("");
   const acceptedSandbox = useRef<Sandbox | null>(null);
   const allowLocal = isElectron && !remoteSandboxesOnly();
@@ -259,6 +262,12 @@ export function CreateSandboxDialog() {
       await saveSandboxCredentialSelection(accepted.id, credentialSelection, agentConfigs);
       setCredentialStage("");
     }
+    for (const id of mcpIds) {
+      setCredentialStage("正在绑定 MCP…");
+      const result = await bindMCP(accepted.id, id);
+      if (result.sync_status !== "applied")
+        throw new Error(result.message ?? "MCP 绑定已保存，但配置同步失败，请重试。");
+    }
     invalidateSandboxLists();
     await navigate({ to: "/sandboxes/$sandboxId", params: { sandboxId: accepted.id } });
   };
@@ -395,6 +404,9 @@ export function CreateSandboxDialog() {
                     disabled={creating}
                   />
                 )}
+                {!local ? (
+                  <MCPFavoriteFields value={mcpIds} onChange={setMcpIds} disabled={creating} />
+                ) : null}
               </div>
             </details>
           </form>

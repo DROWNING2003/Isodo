@@ -262,14 +262,10 @@ it("keeps the Skills entry disabled in both account and sandbox sidebars", async
   await renderSidebar();
   let skill = renderer!.root.findByProps({ "aria-label": "Skill", disabled: true });
   expect(skill.props.onClick).toBeUndefined();
-  expect(
-    renderer!.root.findByProps({ "aria-label": "MCP", disabled: true }).props.onClick,
-  ).toBeUndefined();
+  expect(renderer!.root.findByProps({ "aria-label": "MCP 市场" }).props.disabled).not.toBe(true);
   fixture.pathname = "/sandboxes";
   await act(async () => renderer!.update(<CloudSidebar />));
   skill = renderer!.root.findByProps({ "aria-label": "Skill", disabled: true });
   expect(skill.props.onClick).toBeUndefined();
-  expect(
-    renderer!.root.findByProps({ "aria-label": "MCP", disabled: true }).props.onClick,
-  ).toBeUndefined();
+  expect(renderer!.root.findByProps({ "aria-label": "MCP 市场" }).props.disabled).toBeUndefined();
 });

@@ -46,6 +46,58 @@ type InjectionRule struct {
 	UpdatedAt        pgtype.Timestamptz
 }
 
+type McpCatalog struct {
+	MarketMcpID string
+	Name        string
+	Provider    string
+	Description string
+	Endpoint    string
+	Transport   string
+	AuthKind    string
+}
+
+type McpFavorite struct {
+	TenantID    pgtype.UUID
+	MarketMcpID string
+	CreatedAt   pgtype.Timestamptz
+}
+
+type McpOauthConnection struct {
+	OauthConnectionID pgtype.UUID
+	TenantID          pgtype.UUID
+	MarketMcpID       string
+	Status            string
+	Nonce             []byte
+	Ciphertext        []byte
+	Tools             []byte
+	ExpiresAt         pgtype.Timestamptz
+	Version           int64
+	UpdatedAt         pgtype.Timestamptz
+}
+
+type McpOauthTransaction struct {
+	TransactionID pgtype.UUID
+	TenantID      pgtype.UUID
+	MarketMcpID   string
+	StateHash     []byte
+	Nonce         []byte
+	Ciphertext    []byte
+	Status        string
+	ExpiresAt     pgtype.Timestamptz
+	CreatedAt     pgtype.Timestamptz
+}
+
+type McpSandboxBinding struct {
+	SandboxBindingID  pgtype.UUID
+	TenantID          pgtype.UUID
+	SandboxID         pgtype.UUID
+	MarketMcpID       string
+	OauthConnectionID pgtype.UUID
+	CapabilityHash    []byte
+	SyncStatus        string
+	CreatedAt         pgtype.Timestamptz
+}
+
 type OauthState struct {
 	StateHash    []byte
 	Nonce        string

@@ -2,8 +2,314 @@ openapi: 3.0.3
 info:
   title: Isodo Public API
   version: 0.1.0
-  description: Public sandbox API. Every operation requires a valid session, Casdoor bearer token, or scoped API key.
+  description: Sandbox APIs support sessions, Casdoor bearer tokens and scoped API keys. MCP account operations require interactive account authentication; the one-time OAuth callback is browser-facing.
 paths:
+  /v1/mcp/oauth/callback:
+    get:
+      operationId: CompleteMCPOAuth
+      summary: Complete one-time GitHub OAuth callback in the system browser
+      description: Fixed HTTPS callback. State binds the account and PKCE transaction. Does not accept Isodo API keys or return OAuth tokens. Query strings must never be logged.
+      tags: [MCP]
+      security: []
+      parameters:
+        - {name: state, in: query, required: true, schema: {type: string}}
+        - {name: code, in: query, schema: {type: string}}
+        - {name: error, in: query, schema: {type: string}}
+        - {name: iss, in: query, schema: {type: string}}
+      responses:
+        '200':
+          description: Authorization and tool discovery complete; return to Electron
+          content:
+            text/plain:
+              schema: {type: string}
+        default:
+          description: Invalid, expired or replayed state; authorization failure
+          content:
+            application/json:
+              schema: {$ref: '#/components/schemas/Error'}
+  /v1/mcp/catalog:
+    get:
+      operationId: ListMCPCatalog
+      summary: List available MCP services
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      responses:
+        "200":
+          description: List available MCP services
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MCPCatalogList"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/mcp/catalog/{marketID}:
+    get:
+      operationId: GetMCPCatalog
+      summary: Get MCP catalog service
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: marketID, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Get MCP catalog service
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MCPCatalogList"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/mcp/favorites:
+    get:
+      operationId: ListMCPFavorites
+      summary: List account favorites
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      responses:
+        "200":
+          description: List account favorites
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MCPCatalogList"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/mcp/favorites/{marketID}:
+    put:
+      operationId: FavoriteMCP
+      summary: Favorite without authorizing
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: marketID, in: path, required: true, schema: {type: string}}
+      responses:
+        "204":
+          description: Favorite without authorizing
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+    delete:
+      operationId: UnfavoriteMCP
+      summary: Unfavorite without revoking OAuth
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: marketID, in: path, required: true, schema: {type: string}}
+      responses:
+        "204":
+          description: Unfavorite without revoking OAuth
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/mcp/connections/{marketID}:
+    get:
+      operationId: GetMCPOAuthConnection
+      summary: Get connection without secrets
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: marketID, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Get connection without secrets
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MCPOAuthConnection"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+    delete:
+      operationId: DisconnectMCPOAuth
+      summary: Disconnect and invalidate sandbox calls
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: marketID, in: path, required: true, schema: {type: string}}
+      responses:
+        "204":
+          description: Disconnect and invalidate sandbox calls
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/mcp/connections/{marketID}/authorize:
+    post:
+      operationId: StartMCPOAuth
+      summary: Start or reconnect using registered App and PKCE
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: marketID, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Start or reconnect using registered App and PKCE
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MCPOAuthStart"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/mcp/connections/{marketID}/tools:
+    get:
+      operationId: ListMCPTools
+      summary: Discover allowed upstream tools
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: marketID, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Discover allowed upstream tools
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MCPToolList"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/mcp/oauth/transactions/{transactionID}:
+    get:
+      operationId: GetMCPOAuthTransaction
+      summary: Poll account authorization transaction
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: transactionID, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Poll account authorization transaction
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MCPOAuthTransaction"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+    delete:
+      operationId: CancelMCPOAuthTransaction
+      summary: Cancel authorization transaction
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: transactionID, in: path, required: true, schema: {type: string}}
+      responses:
+        "204":
+          description: Cancel authorization transaction
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/sandboxes/{sandboxID}/mcp:
+    get:
+      operationId: ListSandboxMCPBindings
+      summary: List explicit sandbox bindings
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: sandboxID, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: List explicit sandbox bindings
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MCPBindingList"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/sandboxes/{sandboxID}/mcp/{marketID}:
+    put:
+      operationId: BindSandboxMCP
+      summary: Bind authorized MCP and sync Codex config
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: sandboxID, in: path, required: true, schema: {type: string}}
+        - {name: marketID, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Bind authorized MCP and sync Codex config
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MCPSync"}
+        "202":
+          description: Binding committed but config pending or failed; retry sync
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MCPSync"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+    delete:
+      operationId: UnbindSandboxMCP
+      summary: Revoke binding before syncing config
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: sandboxID, in: path, required: true, schema: {type: string}}
+        - {name: marketID, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Revoke binding before syncing config
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MCPSync"}
+        "202":
+          description: Binding committed but config pending or failed; retry sync
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MCPSync"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/sandboxes/{sandboxID}/mcp/{marketID}/sync:
+    post:
+      operationId: SyncSandboxMCP
+      summary: Apply saved MCP config; Agent restart required
+      tags: [MCP]
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: sandboxID, in: path, required: true, schema: {type: string}}
+        - {name: marketID, in: path, required: true, schema: {type: string}}
+      responses:
+        "200":
+          description: Apply saved MCP config; Agent restart required
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MCPSync"}
+        "202":
+          description: Binding committed but config pending or failed; retry sync
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/MCPSync"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
   /v1/sandboxes/{sandboxID}/files:
     parameters:
       - {name: sandboxID, in: path, required: true, schema: {type: string}}
@@ -1053,6 +1359,83 @@ components:
       in: header
       name: X-API-Key
   schemas:
+
+    MCPCatalogEntry:
+      type: object
+      required: [market_mcp_id, name, provider, description, endpoint, transport, auth_kind, favorite, status, oauth_configured]
+      properties:
+        market_mcp_id: {type: string}
+        name: {type: string}
+        provider: {type: string}
+        description: {type: string}
+        endpoint: {type: string}
+        transport: {type: string, enum: [streamable-http]}
+        auth_kind: {type: string, enum: [oauth2]}
+        favorite: {type: boolean}
+        status: {type: string, enum: [connected, expired, disconnected, failed]}
+        oauth_connection_id: {type: string, nullable: true}
+        oauth_configured: {type: boolean}
+    MCPCatalogList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/MCPCatalogEntry'}}
+    MCPTool:
+      type: object
+      required: [name, inputSchema]
+      properties:
+        name: {type: string}
+        description: {type: string}
+        inputSchema: {type: object, additionalProperties: true}
+    MCPToolList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/MCPTool'}}
+    MCPOAuthConnection:
+      type: object
+      required: [status]
+      properties:
+        market_mcp_id: {type: string}
+        oauth_connection_id: {type: string}
+        status: {type: string, enum: [connected, expired, disconnected, failed]}
+        tools: {type: array, items: {$ref: '#/components/schemas/MCPTool'}}
+        expires_at: {type: string, format: date-time, nullable: true}
+    MCPOAuthStart:
+      type: object
+      required: [transaction_id, authorization_url, expires_at]
+      properties:
+        transaction_id: {type: string}
+        authorization_url: {type: string}
+        expires_at: {type: string, format: date-time}
+    MCPOAuthTransaction:
+      type: object
+      required: [transaction_id, status, expires_at]
+      properties:
+        transaction_id: {type: string}
+        status: {type: string, enum: [pending, processing, connected, failed, cancelled, expired]}
+        expires_at: {type: string, format: date-time}
+    MCPBinding:
+      type: object
+      required: [sandbox_binding_id, market_mcp_id, oauth_connection_id, sync_status, status]
+      properties:
+        sandbox_binding_id: {type: string}
+        market_mcp_id: {type: string}
+        oauth_connection_id: {type: string}
+        sync_status: {type: string, enum: [pending, applied, failed]}
+        status: {type: string, enum: [connected, expired, disconnected, failed]}
+    MCPBindingList:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/MCPBinding'}}
+    MCPSync:
+      type: object
+      required: [sync_status, restart_required]
+      properties:
+        sync_status: {type: string, enum: [pending, applied, failed]}
+        restart_required: {type: boolean}
+        message: {type: string}
     PortPreviewPolicy:
       type: object
       additionalProperties: false

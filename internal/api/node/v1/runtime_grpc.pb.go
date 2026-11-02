@@ -21,6 +21,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	SandboxRuntime_SyncMCP_FullMethodName          = "/isodo.node.v1.SandboxRuntime/SyncMCP"
 	SandboxRuntime_WriteFile_FullMethodName        = "/isodo.node.v1.SandboxRuntime/WriteFile"
 	SandboxRuntime_ReadFile_FullMethodName         = "/isodo.node.v1.SandboxRuntime/ReadFile"
 	SandboxRuntime_MakeDirectory_FullMethodName    = "/isodo.node.v1.SandboxRuntime/MakeDirectory"
@@ -36,6 +37,7 @@ const (
 // SandboxRuntime is the mTLS-only data/configuration plane. Secret material
 // terminates at Node's host proxy and must never be forwarded to Guest files.
 type SandboxRuntimeClient interface {
+	SyncMCP(ctx context.Context, in *SyncMCPRequest, opts ...grpc.CallOption) (*SyncMCPResponse, error)
 	WriteFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[RuntimeWriteFrame, v1.WriteFileResponse], error)
 	ReadFile(ctx context.Context, in *RuntimeReadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[v1.ReadFileFrame], error)
 	MakeDirectory(ctx context.Context, in *RuntimeDirectoryRequest, opts ...grpc.CallOption) (*v1.FileInfo, error)
@@ -50,6 +52,16 @@ type sandboxRuntimeClient struct {
 
 func NewSandboxRuntimeClient(cc grpc.ClientConnInterface) SandboxRuntimeClient {
 	return &sandboxRuntimeClient{cc}
+}
+
+func (c *sandboxRuntimeClient) SyncMCP(ctx context.Context, in *SyncMCPRequest, opts ...grpc.CallOption) (*SyncMCPResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SyncMCPResponse)
+	err := c.cc.Invoke(ctx, SandboxRuntime_SyncMCP_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *sandboxRuntimeClient) WriteFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[RuntimeWriteFrame, v1.WriteFileResponse], error) {
@@ -131,6 +143,7 @@ func (c *sandboxRuntimeClient) SetInjections(ctx context.Context, in *SetInjecti
 // SandboxRuntime is the mTLS-only data/configuration plane. Secret material
 // terminates at Node's host proxy and must never be forwarded to Guest files.
 type SandboxRuntimeServer interface {
+	SyncMCP(context.Context, *SyncMCPRequest) (*SyncMCPResponse, error)
 	WriteFile(grpc.ClientStreamingServer[RuntimeWriteFrame, v1.WriteFileResponse]) error
 	ReadFile(*RuntimeReadRequest, grpc.ServerStreamingServer[v1.ReadFileFrame]) error
 	MakeDirectory(context.Context, *RuntimeDirectoryRequest) (*v1.FileInfo, error)
@@ -147,6 +160,9 @@ type SandboxRuntimeServer interface {
 // pointer dereference when methods are called.
 type UnimplementedSandboxRuntimeServer struct{}
 
+func (UnimplementedSandboxRuntimeServer) SyncMCP(context.Context, *SyncMCPRequest) (*SyncMCPResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncMCP not implemented")
+}
 func (UnimplementedSandboxRuntimeServer) WriteFile(grpc.ClientStreamingServer[RuntimeWriteFrame, v1.WriteFileResponse]) error {
 	return status.Errorf(codes.Unimplemented, "method WriteFile not implemented")
 }
@@ -184,6 +200,24 @@ func RegisterSandboxRuntimeServer(s grpc.ServiceRegistrar, srv SandboxRuntimeSer
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&SandboxRuntime_ServiceDesc, srv)
+}
+
+func _SandboxRuntime_SyncMCP_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncMCPRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SandboxRuntimeServer).SyncMCP(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SandboxRuntime_SyncMCP_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SandboxRuntimeServer).SyncMCP(ctx, req.(*SyncMCPRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _SandboxRuntime_WriteFile_Handler(srv interface{}, stream grpc.ServerStream) error {
@@ -283,6 +317,10 @@ var SandboxRuntime_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "isodo.node.v1.SandboxRuntime",
 	HandlerType: (*SandboxRuntimeServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "SyncMCP",
+			Handler:    _SandboxRuntime_SyncMCP_Handler,
+		},
 		{
 			MethodName: "MakeDirectory",
 			Handler:    _SandboxRuntime_MakeDirectory_Handler,

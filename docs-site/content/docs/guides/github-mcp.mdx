@@ -1,0 +1,38 @@
+---
+title: GitHub MCP 市场
+description: 收藏、独立 GitHub OAuth 和沙箱级只读工具绑定。
+---
+
+本功能在独立开发分支实现，尚未部署或完成真实 GitHub + Codex + CHV 验收。GitHub App 注册完成不代表集成已可用。
+
+## 使用流程
+
+在 Isodo 桌面端打开 **MCP 市场**，收藏 GitHub；收藏不会触发授权。在系统浏览器完成 **连接 GitHub** 后，Control 通过真实工具发现才记录为已连接。创建沙箱的更多选项仅展示收藏服务，默认不勾选，未连接的服务不能绑定为可用。
+
+已创建沙箱可在 **安全连接** 中绑定、移除和应用配置。绑定成功与配置已应用分别显示；配置失败不会显示为完整成功。当前 Codex 会话需要重启，新任务会读取更新后的配置。撤销会在可信网关拒绝后续请求，不依赖 Agent 重启。
+
+## 服务端前置配置
+
+Control 需要独立预注册 GitHub App 的 Client ID、Client Secret、固定 HTTPS Callback。不能使用 Casdoor 登录 Token 或现有 PAT 代替该授权。
+
+- `ISODO_GITHUB_OAUTH_CLIENT_ID`
+- `ISODO_GITHUB_OAUTH_CLIENT_SECRET`：仅保存在服务端受保护配置
+- `ISODO_GITHUB_OAUTH_REDIRECT_URI`：路径必须是 `/v1/mcp/oauth/callback`
+- 既有 `ISODO_INJECTION_KEY` 或 `ISODO_INJECTION_KEY_FILE`
+- Node 的 `ISODO_MCP_BROKER_URL`：管理员配置的固定 HTTPS Control origin
+
+使用五位运行时端口的匹配 Node/Guest/template、Python 3.10+（3.10 需 python3-tomli）和支持 Streamable HTTP 的 Codex。Lima 本轮不承诺支持。
+
+当前演示 Callback 计划使用 `https://api.drowning.top:18443/v1/mcp/oauth/callback`。它尚未部署，公共 DNS 为 NXDOMAIN；现有 HTTPS 只绑定 VPN 私网地址。用户浏览器必须连接 VPN 并能解析该域名，不能将其描述为公网可访问。
+
+## 安全边界
+
+GitHub Token 只在 Control 加密保存和使用。Guest 配置仅含内部 `http://127.0.0.1:31080/isodo-mcp/github` 与无上游权限的占位符。Node 沿现有出站通道承载请求，校验完整运行时身份；Control 进一步校验账号、显式绑定、生命周期和只读工具 allowlist。该入口不是 Public HTTP Preview，不更改 T3 Preview 授权，也不扩大默认出网权限。
+
+取消收藏不撤销 OAuth，断开 OAuth 不删除收藏，删除沙箱不删除账号授权。断开或移除绑定后，后续调用拒绝；在途调用通过 200ms 授权检查及返回前复查取消。
+
+## HTTP 契约
+
+接口和生成客户端见 API 参考的 **MCP 市场** 分组，包含 catalog、favorites、OAuth 连接、事务、工具发现和 sandbox bindings。账号操作需要交互式认证与既有 CSRF 校验，普通 Sandbox API Key 不允许管理 OAuth；接口不返回 Token、Secret 或 Node capability。
+
+[GitHub 官方 Remote MCP](https://github.com/github/github-mcp-server/blob/main/docs/remote-server.md) 使用 readonly 端点；[官方 Host 接入说明](https://github.com/github/github-mcp-server/blob/main/docs/host-integration.md) 明确不支持 DCR。本版使用预注册 App、Authorization Code + PKCE S256。

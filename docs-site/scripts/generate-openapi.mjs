@@ -23,6 +23,7 @@ await generateFiles({
       ['应用访问', []],
       ['文件', []],
       ['安全连接', []],
+      ['MCP 市场', []],
       ['Agent 配置', []],
       ['模板管理', []],
       ['模板构建', []],
@@ -34,7 +35,8 @@ await generateFiles({
       }
       const route = entry.item.path;
       let group;
-      if (route.startsWith('/v1/injection-rules') || route.endsWith('/injections')) group = '安全连接';
+      if (route.startsWith('/v1/mcp/') || /\/mcp(?:\/|$)/.test(route)) group = 'MCP 市场';
+      else if (route.startsWith('/v1/injection-rules') || route.endsWith('/injections')) group = '安全连接';
       else if (route.startsWith('/v1/credential-documents')) group = 'Agent 配置';
       else if (/\/(files|directories)$/.test(route)) group = '文件';
       else if (/\/app(?:-link)?$/.test(route)) group = '应用访问';
