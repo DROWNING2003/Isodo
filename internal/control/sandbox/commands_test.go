@@ -89,7 +89,7 @@ func TestSandboxRunCommandAuthorizationAndValidation(t *testing.T) {
 			if response.Code != tc.want {
 				t.Fatalf("status=%d, want %d, body=%s", response.Code, tc.want, response.Body.String())
 			}
-			if tc.want == 200 && !strings.Contains(response.Body.String(), `"stdout":"hello\\n"`) {
+			if tc.want == 200 && !strings.Contains(response.Body.String(), `"stdout":"hello\n"`) {
 				t.Fatalf("missing result output: %s", response.Body.String())
 			}
 		})
