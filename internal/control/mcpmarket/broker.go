@@ -1,7 +1,6 @@
 package mcpmarket
 
 import (
-	"bytes"
 	"context"
 	"crypto/subtle"
 	"encoding/json"
@@ -37,7 +36,7 @@ func (h *Handler) authorized(ctx context.Context, r *http.Request, expectedVersi
 	}
 	var want []byte
 	err := h.pool.QueryRow(ctx, `SELECT b.tenant_id::text,b.capability_hash FROM (
-SELECT b.sandbox_binding_id,b.tenant_id,b.sandbox_id,b.capability_hash,c.status,c.version FROM mcp_sandbox_bindings b JOIN mcp_oauth_connections c ON c.oauth_connection_id=b.oauth_connection_id AND c.tenant_id=b.tenant_id
+SELECT b.sandbox_binding_id,b.tenant_id,b.sandbox_id,b.capability_hash,c.status,c.version FROM mcp_sandbox_bindings b JOIN mcp_oauth_connections c ON c.oauth_connection_id=b.oauth_connection_id AND c.tenant_id=b.tenant_id AND COALESCE(b.project_ref,'')=COALESCE(c.project_ref,'')
 UNION ALL SELECT b.sandbox_binding_id,b.tenant_id,b.sandbox_id,b.capability_hash,c.status,c.version FROM mcp_custom_bindings b JOIN mcp_custom_servers c ON c.id=b.custom_server_id AND c.tenant_id=b.tenant_id
 ) b JOIN sandboxes s ON s.id=b.sandbox_id AND s.tenant_id=b.tenant_id WHERE b.sandbox_binding_id=$1 AND s.id=$2 AND s.node_id=$3 AND s.ownership_generation=$4 AND s.revision=$5 AND s.desired_state='running' AND s.observed_state='running' AND s.deletion_requested_at IS NULL AND s.deleted_at IS NULL AND b.status='connected' AND ($6::bigint=0 OR b.version=$6)`, id, r.Header.Get("X-Isodo-Sandbox"), r.Header.Get("X-Isodo-Node"), parseUint(r.Header.Get("X-Isodo-Generation")), parseUint(r.Header.Get("X-Isodo-Revision")), version).Scan(&tenant, &want)
 	if err != nil || subtle.ConstantTimeCompare(hash(cap), want) != 1 {
@@ -93,21 +92,12 @@ func (h *Handler) Broker(w http.ResponseWriter, r *http.Request) {
 		fail(w, 503, "MCP_STORAGE_UNAVAILABLE")
 		return
 	}
-	if msg.Method == "tools/call" && !custom {
-		var p struct {
-			Name string `json:"name"`
-		}
-		if json.Unmarshal(msg.Params, &p) != nil || !mcpclient.Allowed(p.Name) {
-			fail(w, 403, "MCP_TOOL_FORBIDDEN")
-			return
-		}
-	}
 	token, endpoint, client, allowed, err := h.brokerConnection(ctx, tenant, r.PathValue("bindingID"), custom)
 	if err != nil {
 		fail(w, 401, "MCP_RECONNECT_REQUIRED")
 		return
 	}
-	if msg.Method == "tools/call" && custom {
+	if msg.Method == "tools/call" {
 		var p struct {
 			Name string `json:"name"`
 		}
@@ -137,7 +127,8 @@ func (h *Handler) Broker(w http.ResponseWriter, r *http.Request) {
 			}
 		}
 	}()
-	session := mcpclient.Session{Client: client, Endpoint: endpoint, Token: token.Access, CustomTools: custom}
+
+	session := mcpclient.Session{Client: client, Endpoint: endpoint, Token: token.Access, CustomTools: true}
 	defer session.Close(ctx)
 	if custom {
 		defer client.CloseIdleConnections()
@@ -158,7 +149,7 @@ func (h *Handler) Broker(w http.ResponseWriter, r *http.Request) {
 	if msg.Method == "tools/list" {
 		tools, e := session.Tools(ctx)
 		err = e
-		if custom {
+		{
 			filtered := tools[:0]
 			for _, tool := range tools {
 				if allowed[tool.Name] {
@@ -184,16 +175,18 @@ func (h *Handler) Broker(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Never echo authentication material even if an upstream includes it in data.
-	for _, secret := range []string{token.Access, token.Refresh, h.config.ClientSecret} {
-		if secret != "" {
-			result = bytes.ReplaceAll(result, []byte(secret), []byte("[REDACTED]"))
-		}
+	result, err = redactJSON(result, token.Access, token.Refresh, h.config.ClientSecret, grantSecret(token))
+	if err != nil {
+		fail(w, 502, "MCP_UPSTREAM_FAILED")
+		return
 	}
+
 	reply(result)
 }
-func (h *Handler) upstreamError(w http.ResponseWriter, ctx context.Context, tenant string, err error) {
+func (h *Handler) upstreamError(w http.ResponseWriter, ctx context.Context, tenant string, err error, ids ...string) {
+	market := providerID(ids)
 	if e, ok := errors.AsType[*mcpclient.StatusError](err); ok && (e.Status == 401 || e.Status == 403) {
-		_, _ = h.pool.Exec(ctx, `UPDATE mcp_oauth_connections SET status='expired',nonce=NULL,ciphertext=NULL,version=version+1 WHERE tenant_id=$1 AND market_mcp_id='github'`, tenant)
+		_, _ = h.pool.Exec(ctx, `UPDATE mcp_oauth_connections SET status='expired',nonce=NULL,ciphertext=NULL,version=version+1 WHERE tenant_id=$1 AND market_mcp_id=$2`, tenant, market)
 		fail(w, 401, "MCP_RECONNECT_REQUIRED")
 		return
 	}
@@ -202,8 +195,30 @@ func (h *Handler) upstreamError(w http.ResponseWriter, ctx context.Context, tena
 
 func (h *Handler) brokerConnection(ctx context.Context, tenant, binding string, custom bool) (tokenMaterial, string, *http.Client, map[string]bool, error) {
 	if !custom {
-		token, err := h.freshToken(ctx, tenant)
-		return token, mcpclient.Endpoint, h.http, nil, err
+		var provider string
+		if err := h.pool.QueryRow(ctx, `SELECT market_mcp_id FROM mcp_sandbox_bindings WHERE sandbox_binding_id=$1 AND tenant_id=$2`, binding, tenant).Scan(&provider); err != nil {
+			return tokenMaterial{}, "", nil, nil, err
+		}
+		token, err := h.freshToken(ctx, tenant, provider)
+		if err != nil {
+			return tokenMaterial{}, "", nil, nil, err
+		}
+		endpoint, err := providerEndpoint(provider)
+		allowed := map[string]bool{}
+		var tools []byte
+		if err := h.pool.QueryRow(ctx, `SELECT tools FROM mcp_oauth_connections WHERE tenant_id=$1 AND market_mcp_id=$2 AND status='connected' AND version=$3`, tenant, provider, token.Version).Scan(&tools); err != nil {
+			return tokenMaterial{}, "", nil, nil, err
+		}
+		var known []mcpclient.Tool
+		if json.Unmarshal(tools, &known) != nil {
+			return tokenMaterial{}, "", nil, nil, ErrOAuth
+		}
+		for _, tool := range known {
+			if readonlyTool(provider, tool.Name) {
+				allowed[tool.Name] = true
+			}
+		}
+		return token, endpoint, h.http, allowed, err
 	}
 	var endpoint string
 	var nonce, sealed, tools []byte
@@ -228,7 +243,12 @@ func (h *Handler) brokerConnection(ctx context.Context, tenant, binding string, 
 }
 func (h *Handler) brokerUpstreamError(w http.ResponseWriter, ctx context.Context, tenant, binding string, custom bool, err error) {
 	if !custom {
-		h.upstreamError(w, ctx, tenant, err)
+		var provider string
+		if h.pool.QueryRow(ctx, `SELECT market_mcp_id FROM mcp_sandbox_bindings WHERE sandbox_binding_id=$1 AND tenant_id=$2`, binding, tenant).Scan(&provider) == nil {
+			h.upstreamError(w, ctx, tenant, err, provider)
+		} else {
+			fail(w, 403, "MCP_BINDING_REVOKED")
+		}
 		return
 	}
 	if e, ok := errors.AsType[*mcpclient.StatusError](err); ok && (e.Status == 401 || e.Status == 403) {
@@ -237,4 +257,11 @@ func (h *Handler) brokerUpstreamError(w http.ResponseWriter, ctx context.Context
 		return
 	}
 	fail(w, 502, "MCP_UPSTREAM_FAILED")
+}
+
+func grantSecret(t tokenMaterial) string {
+	if t.Grant != nil {
+		return t.Grant.Client.Secret
+	}
+	return ""
 }

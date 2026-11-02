@@ -22,6 +22,8 @@ const fixture = vi.hoisted(() => ({
     favorite: boolean;
     status: string;
     oauth_configured: boolean;
+    auth_kind?: string;
+    project_ref?: string;
   }[],
   bindings: [] as {
     sandbox_binding_id: string;
@@ -174,4 +176,17 @@ it("offers GitHub installation configuration separately from account reauthoriza
   expect(JSON.stringify(renderer.toJSON())).toContain("仓库访问");
   expect(JSON.stringify(renderer.toJSON())).toContain("重新授权账号");
   expect(fixture.connect).not.toHaveBeenCalled();
+});
+
+it("offers all official MCP favorites without selecting them by default", async () => {
+  fixture.items = [github, { ...github, market_mcp_id: "notion", name: "Notion" }];
+  await act(async () => {
+    renderer = create(<MCPFavoriteFields value={[]} onChange={vi.fn()} />);
+  });
+  const choices = renderer.root.findAllByType("input");
+  expect(choices.map((choice) => choice.props["aria-label"])).toEqual([
+    "启用 GitHub MCP",
+    "启用 Notion MCP",
+  ]);
+  expect(choices.every((choice) => choice.props.checked === false)).toBe(true);
 });

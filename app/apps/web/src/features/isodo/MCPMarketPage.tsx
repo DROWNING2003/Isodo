@@ -139,7 +139,7 @@ export function MCPMarketPage() {
                 返回 MCP 列表
               </button>
               <div className="flex items-center gap-4">
-                {selectedItem.source === "custom" ? (
+                {selectedItem.market_mcp_id !== "github" ? (
                   <ServerIcon className="size-10" />
                 ) : (
                   <GithubIcon className="size-10" />
@@ -148,6 +148,9 @@ export function MCPMarketPage() {
                   <h2 className="text-xl font-semibold">{selectedItem.name}</h2>
                   <p className="mt-1 text-sm text-muted-foreground">
                     {selectedItem.description || "你的私有远程 MCP 服务"}
+                    {selectedItem.workspace_name ? (
+                      <span className="block mt-1">工作区：{selectedItem.workspace_name}</span>
+                    ) : null}
                   </p>
                 </div>
               </div>
@@ -158,7 +161,9 @@ export function MCPMarketPage() {
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="text-sm font-medium">
-                      {selectedItem.source === "custom" ? "服务器连接" : "GitHub 账号"}
+                      {selectedItem.source === "custom"
+                        ? "服务器连接"
+                        : `${selectedItem.name} 账号`}
                     </h3>
                     <p role="status" className="mt-1 text-sm text-muted-foreground">
                       {oauth.pending ? "正在授权，请在浏览器完成" : mcpStatus(selectedItem.status)}
@@ -177,15 +182,22 @@ export function MCPMarketPage() {
                       <>
                         <Button
                           disabled={pending || oauth.pending || !selectedItem.oauth_configured}
-                          onClick={() => void oauth.connect()}
+                          onClick={() => void oauth.connect(selectedItem.market_mcp_id)}
                         >
-                          {selectedItem.status === "connected" ? "重新授权账号" : "连接 GitHub"}
+                          {selectedItem.status === "connected"
+                            ? "重新授权账号"
+                            : `连接 ${selectedItem.name}`}
                         </Button>
                         {selectedItem.status !== "disconnected" ? (
                           <Button
                             variant="outline"
                             disabled={pending || oauth.pending}
-                            onClick={() => void mutate("/v1/mcp/connections/github", "DELETE")}
+                            onClick={() =>
+                              void mutate(
+                                `/v1/mcp/connections/${selectedItem.market_mcp_id}`,
+                                "DELETE",
+                              )
+                            }
                           >
                             断开连接
                           </Button>
@@ -205,7 +217,7 @@ export function MCPMarketPage() {
                       · 仅当前账号可见
                     </p>
                   </div>
-                ) : (
+                ) : selectedItem.market_mcp_id === "github" ? (
                   <div className="flex flex-wrap items-start justify-between gap-4 border-t border-border pt-4">
                     <div>
                       <h3 className="text-sm font-medium">仓库访问</h3>
@@ -224,6 +236,8 @@ export function MCPMarketPage() {
                       <ExternalLinkIcon className="size-3.5" />
                     </a>
                   </div>
+                ) : (
+                  <p className="text-xs text-muted-foreground">只读工具由 Isodo 服务端强制限制。</p>
                 )}
               </section>
               <p className="text-xs text-muted-foreground">
@@ -397,7 +411,7 @@ export function MCPFavoriteFields({
           <span className="flex-1 text-sm">
             {item.name}
             <span className="block text-xs text-muted-foreground">
-              {item.source === "custom" ? "自定义 MCP" : "GitHub 官方 MCP"} ·{" "}
+              {item.source === "custom" ? "自定义 MCP" : `${item.name} 官方 MCP`} ·{" "}
               {mcpStatus(item.status)}
               {bindings
                 ? ` · ${bindingSummary(
@@ -407,12 +421,12 @@ export function MCPFavoriteFields({
                 : null}
             </span>
           </span>
-          {item.market_mcp_id === "github" && item.status !== "connected" ? (
+          {item.auth_kind === "oauth2" && item.status !== "connected" ? (
             <Button
               type="button"
               size="sm"
               disabled={disabled || oauth.pending || !item.oauth_configured}
-              onClick={() => void oauth.connect()}
+              onClick={() => void oauth.connect(item.market_mcp_id)}
             >
               连接
             </Button>

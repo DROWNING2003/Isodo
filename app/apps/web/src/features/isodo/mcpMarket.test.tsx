@@ -1,6 +1,6 @@
 import { act, create } from "react-test-renderer";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vite-plus/test";
-import { restoreBoundMCP, useMCPOAuth } from "./mcpMarket";
+import { restoreBoundMCP, useMCPOAuth, validMCPOAuthURL } from "./mcpMarket";
 
 const mocks = vi.hoisted(() => ({
   bindings: vi.fn(),
@@ -111,4 +111,23 @@ it("reports partial success instead of claiming MCP survived a failed reapply", 
   mocks.bindings.mockResolvedValue({ items: [{ market_mcp_id: "github" }] });
   mocks.sync.mockResolvedValue({ sync_status: "pending" });
   await expect(restoreBoundMCP("test-sandbox")).rejects.toThrow("MCP 配置恢复失败");
+});
+
+describe("official OAuth URL trust", () => {
+  it("pins each provider and rejects cross-provider or credential URLs", () => {
+    expect(validMCPOAuthURL("notion", new URL("https://mcp.notion.com/authorize?state=one"))).toBe(
+      true,
+    );
+    expect(
+      validMCPOAuthURL("supabase", new URL("https://api.supabase.com/v1/oauth/authorize")),
+    ).toBe(false);
+    for (const url of [
+      "https://github.com/login/oauth/authorize",
+      "https://mcp.notion.com.evil.test/authorize",
+      "https://user@mcp.notion.com/authorize",
+      "http://mcp.notion.com/authorize",
+    ]) {
+      expect(validMCPOAuthURL("notion", new URL(url))).toBe(false);
+    }
+  });
 });

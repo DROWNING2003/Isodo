@@ -876,6 +876,8 @@ type MCPCatalogEntry struct {
 	Source            *MCPCatalogEntrySource   `json:"source,omitempty"`
 	Status            MCPCatalogEntryStatus    `json:"status"`
 	Transport         MCPCatalogEntryTransport `json:"transport"`
+	WorkspaceId       *string                  `json:"workspace_id,omitempty"`
+	WorkspaceName     *string                  `json:"workspace_name,omitempty"`
 }
 
 // MCPCatalogEntryAuthKind defines model for MCPCatalogEntry.AuthKind.
@@ -1557,7 +1559,9 @@ type ClientInterface interface {
 	// Corresponds with GET /v1/mcp/connections/{marketID} (the `GetMCPOAuthConnection` operationId).
 	GetMCPOAuthConnection(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// StartMCPOAuth Start or reconnect using registered App and PKCE
+	// StartMCPOAuth Connect an official MCP using PKCE and provider registration
+	//
+	// GitHub uses the pre-registered App. Notion discovers OAuth metadata and registers through DCR with PKCE S256. No PAT or CIMD fallback.
 	//
 	// Corresponds with POST /v1/mcp/connections/{marketID}/authorize (the `StartMCPOAuth` operationId).
 	StartMCPOAuth(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -2308,7 +2312,9 @@ func (c *Client) GetMCPOAuthConnection(ctx context.Context, marketID string, req
 	return c.Client.Do(req)
 }
 
-// StartMCPOAuth Start or reconnect using registered App and PKCE
+// StartMCPOAuth Connect an official MCP using PKCE and provider registration
+//
+// GitHub uses the pre-registered App. Notion discovers OAuth metadata and registers through DCR with PKCE S256. No PAT or CIMD fallback.
 //
 // Corresponds with POST /v1/mcp/connections/{marketID}/authorize (the `StartMCPOAuth` operationId).
 func (c *Client) StartMCPOAuth(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -6539,7 +6545,9 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with GET /v1/mcp/connections/{marketID} (the `GetMCPOAuthConnection` operationId).
 	GetMCPOAuthConnectionWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*GetMCPOAuthConnectionResponse, error)
 
-	// StartMCPOAuthWithResponse Start or reconnect using registered App and PKCE
+	// StartMCPOAuthWithResponse Connect an official MCP using PKCE and provider registration
+	//
+	// GitHub uses the pre-registered App. Notion discovers OAuth metadata and registers through DCR with PKCE S256. No PAT or CIMD fallback.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -10489,7 +10497,9 @@ func (c *ClientWithResponses) GetMCPOAuthConnectionWithResponse(ctx context.Cont
 	return ParseGetMCPOAuthConnectionResponse(rsp)
 }
 
-// StartMCPOAuthWithResponse Start or reconnect using registered App and PKCE
+// StartMCPOAuthWithResponse Connect an official MCP using PKCE and provider registration
+//
+// GitHub uses the pre-registered App. Notion discovers OAuth metadata and registers through DCR with PKCE S256. No PAT or CIMD fallback.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -13722,7 +13732,7 @@ type ServerInterface interface {
 	// GetMCPOAuthConnection Get connection without secrets
 	// (GET /v1/mcp/connections/{marketID})
 	GetMCPOAuthConnection(w http.ResponseWriter, r *http.Request, marketID string)
-	// StartMCPOAuth Start or reconnect using registered App and PKCE
+	// StartMCPOAuth Connect an official MCP using PKCE and provider registration
 	// (POST /v1/mcp/connections/{marketID}/authorize)
 	StartMCPOAuth(w http.ResponseWriter, r *http.Request, marketID string)
 	// ListMCPTools Discover allowed upstream tools

@@ -52,7 +52,7 @@ export function useMCPOAuth() {
   const controller = useRef<AbortController | null>(null);
   useEffect(() => () => controller.current?.abort(), []);
   const cancel = () => controller.current?.abort();
-  const connect = async () => {
+  const connect = async (provider: string = "github") => {
     if (controller.current) return;
     const abort = new AbortController();
     controller.current = abort;
@@ -70,14 +70,16 @@ export function useMCPOAuth() {
         popup.opener = null;
       }
       const started = await isodoFetch<{ transaction_id: string; authorization_url: string }>(
-        "/v1/mcp/connections/github/authorize",
-        { method: "POST", signal: abort.signal },
+        `/v1/mcp/connections/${provider}/authorize`,
+        {
+          method: "POST",
+          signal: abort.signal,
+        },
       );
       transaction = started.transaction_id;
       if (getAuthGeneration() !== generation) throw new Error("账号已切换，请重新授权");
       const url = new URL(started.authorization_url);
-      if (url.origin !== "https://github.com" || url.pathname !== "/login/oauth/authorize")
-        throw new Error("授权地址校验失败");
+      if (!validMCPOAuthURL(provider, url)) throw new Error("授权地址校验失败");
       if (popup) popup.location.replace(url.toString());
       else await ensureLocalApi().shell.openExternal(url.toString());
       for (let i = 0; i < 150; i++) {
@@ -104,9 +106,9 @@ export function useMCPOAuth() {
           return;
         }
         if (!["pending", "processing"].includes(result.status))
-          throw new Error("GitHub 授权未完成，请重新连接");
+          throw new Error("MCP 授权未完成，请重新连接");
       }
-      throw new Error("GitHub 授权已超时");
+      throw new Error("MCP 授权已超时");
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "授权失败");
     } finally {
@@ -130,4 +132,13 @@ export async function restoreBoundMCP(sandboxId: string): Promise<void> {
     if (result.sync_status !== "applied")
       throw new Error("Agent 配置已保存，但 MCP 配置恢复失败，请在安全连接中重新应用。");
   }
+}
+
+export function validMCPOAuthURL(provider: string, url: URL): boolean {
+  if (url.username || url.password || url.hash) return false;
+  if (provider === "github")
+    return url.origin === "https://github.com" && url.pathname === "/login/oauth/authorize";
+  if (provider === "notion")
+    return url.origin === "https://mcp.notion.com" && url.pathname === "/authorize";
+  return false;
 }

@@ -10,7 +10,6 @@ import (
 	"io"
 	"net"
 	"net/http"
-	"net/netip"
 	"net/url"
 	"regexp"
 	"slices"
@@ -20,27 +19,40 @@ import (
 	"github.com/DROWNING2003/Isodo/internal/mcpclient"
 )
 
-var ErrOAuth = errors.New("GitHub 授权失败，请重新连接")
+var ErrOAuth = errors.New("MCP 授权失败，请重新连接")
 var ErrConfiguration = errors.New("尚未配置 GitHub OAuth App 和 HTTPS 回调")
 
 const issuer = "https://github.com/login/oauth"
+
+var scopePattern = regexp.MustCompile(`(?:^|[, ])scope="([^"]*)"`)
 
 var challengePattern = regexp.MustCompile(`resource_metadata="([^"]+)"`)
 
 type Config struct{ ClientID, ClientSecret, RedirectURI string }
 type metadata struct {
+	Registration   string   `json:"registration_endpoint,omitempty"`
+	AuthMethods    []string `json:"token_endpoint_auth_methods_supported,omitempty"`
+	ResponseIssuer bool     `json:"authorization_response_iss_parameter_supported,omitempty"`
+	Scopes         []string `json:"scopes_supported,omitempty"`
+
 	Issuer        string   `json:"issuer"`
 	Authorization string   `json:"authorization_endpoint"`
 	Token         string   `json:"token_endpoint"`
 	Methods       []string `json:"code_challenge_methods_supported"`
 }
 type oauthPending struct {
+	Grant *grantContext `json:"grant,omitempty"`
+
 	Verifier          string   `json:"verifier"`
 	RedirectURI       string   `json:"redirect_uri"`
 	Metadata          metadata `json:"metadata"`
 	ConnectionVersion int64    `json:"connection_version"`
 }
 type tokenMaterial struct {
+	Grant         *grantContext `json:"grant,omitempty"`
+	WorkspaceID   string        `json:"workspace_id,omitempty"`
+	WorkspaceName string        `json:"workspace_name,omitempty"`
+
 	Version          int64     `json:"-"`
 	Access           string    `json:"access_token"`
 	Refresh          string    `json:"refresh_token,omitempty"`
@@ -78,7 +90,7 @@ func newHTTPClient() *http.Client {
 		if err != nil {
 			return nil, ErrOAuth
 		}
-		if !slices.Contains([]string{"github.com", "api.githubcopilot.com"}, host) || port != "443" {
+		if !slices.Contains([]string{"github.com", "api.githubcopilot.com", "mcp.notion.com"}, host) || port != "443" {
 			return nil, ErrOAuth
 		}
 		ips, err := net.DefaultResolver.LookupNetIP(ctx, "ip", host)
@@ -87,7 +99,7 @@ func newHTTPClient() *http.Client {
 		}
 		for _, ip := range ips {
 			ip = ip.Unmap()
-			if !ip.IsGlobalUnicast() || ip.IsPrivate() || ip.IsLoopback() || ip.IsLinkLocalUnicast() || netip.MustParsePrefix("100.64.0.0/10").Contains(ip) || netip.MustParsePrefix("198.18.0.0/15").Contains(ip) {
+			if !publicMCPAddress(ip) {
 				return nil, ErrOAuth
 			}
 		}

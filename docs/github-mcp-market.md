@@ -96,3 +96,5 @@ OpenAPI 的 MCP 分组生成 Go/TypeScript 客户端和端点文档：catalog �
 Web 验收也可从现有 Web 页面发起授权：点击时同步创建空白浏览器窗口，完成发现后导航到固定 GitHub 授权页，避免异步操作被弹窗策略拦截。Electron 继续使用系统浏览器。
 
 自定义 HTTPS（无认证或 Bearer Token）、新版管理页和仓库访问配置见[自定义 MCP 指南](custom-mcp.md)。GitHub 固定只读链路保持独立。
+
+Notion 的动态注册接入及共同凭证边界见 [官方 MCP DCR](mcp-dcr-providers.md)。GitHub 继续使用既有预注册应用配置。

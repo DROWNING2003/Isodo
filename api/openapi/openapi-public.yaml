@@ -303,7 +303,8 @@ paths:
   /v1/mcp/connections/{marketID}/authorize:
     post:
       operationId: StartMCPOAuth
-      summary: Start or reconnect using registered App and PKCE
+      summary: Connect an official MCP using PKCE and provider registration
+      description: GitHub uses the pre-registered App. Notion discovers OAuth metadata and registers through DCR with PKCE S256. No PAT or CIMD fallback.
       tags: [MCP]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
@@ -1687,6 +1688,8 @@ components:
         status: {type: string, enum: [connected, expired, disconnected, failed]}
         oauth_connection_id: {type: string, nullable: true}
         oauth_configured: {type: boolean}
+        workspace_id: {type: string, nullable: true}
+        workspace_name: {type: string, nullable: true}
     MCPCatalogList:
       type: object
       required: [items]

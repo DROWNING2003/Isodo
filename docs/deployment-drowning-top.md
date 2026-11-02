@@ -148,15 +148,14 @@ Casdoor Compose 仅重建 casdoor service，origin 改为 https://auth.drowning.
 
 ## 远程专用 Web 与 Electron
 
-Web 构建：推荐在仓库根目录执行 `bash scripts/build-drowning-top-web.sh`，固定远程模式、预览域名及完整工作台路由，避免漏传构建变量。等价命令：
+Web 发布必须先阅读 [Web 预览配置与发布检查](web-preview-release-checklist.md)，使用固定脚本并检查产物：
 
 ```bash
-cd app
-VITE_ISODO_REMOTE_ONLY=true \
-VITE_ISODO_PREVIEW_DOMAIN=drowning.top \
-VITE_BOUNDLY_WEB_SURFACE=full \
-pnpm --filter @t3tools/web build
+bash scripts/build-drowning-top-web.sh
+python3 scripts/check-drowning-top-web-build.py app/apps/web/dist
 ```
+
+不要直接执行 `vp build` 手工拼环境变量。`VITE_ISODO_PREVIEW_DOMAIN` 与 `VITE_BOUNDLY_WEB_SURFACE=full` 缺失时，首页仍可能返回200，但工作台无法连接。上传后、切换 Web 软链接前，再在服务器验证完整发布目录的配置清单和文件摘要。
 
 远程专用模式隐藏本地列表/创建入口，不发起本地列表或模板请求，忽略缓存的本地卡片和演示沙箱；未登录时禁止创建演示沙箱。登录后模板与创建走现有远程 API。Electron 保留原有本地能力，不设置 VITE_ISODO_REMOTE_ONLY=true。
 
@@ -189,6 +188,10 @@ Preview Cookie：跨站模式仅允许 HTTPS 且必须有明确 AppOrigin；host
 前端相关 28 项测试通过；Web typecheck 通过（存在仓库原有 suggestion 诊断，退出码 0）；远程构建通过。Go auth/preview/sandbox/API 测试通过；auth/preview/API race 检查通过。已检查 bash -n、systemd 配置、git diff --check。
 
 下一步必须用独立验收 Sandbox 测试：GitHub 登录/回调 → create → HTTPS app-link scheme/端口 → bootstrap204 → Pairing → Workspace → WS101 → 连续终端输入 → 文件内容校验 → Stop/Start 重入 → 非法/过期 token 拒绝。未强行启用额外 client_credentials grant，也未借用、伪造用户登录绕过 OAuth 验收。
+
+## Node 升级与 MCP 检查
+
+升级 Node 前必须保留并比较有效 systemd 配置，尤其是 PrivateMounts、BindReadOnlyPaths 和 hosts 映射。2026-11-03 遗漏 hosts 挂载造成 Node 无法解析 Broker，GitHub MCP 返回502；账号授权和绑定仍正常。按 [发布检查中的 Node/MCP 步骤](web-preview-release-checklist.md#node-到-mcp-broker-的域名解析) 验证实际 Node 命名空间与 Guest 工具发现，不以进程 active 或首页200作为完成依据。
 
 ## 排障和回滚
 

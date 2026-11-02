@@ -97,6 +97,20 @@ type McpOauthConnection struct {
 	ExpiresAt         pgtype.Timestamptz
 	Version           int64
 	UpdatedAt         pgtype.Timestamptz
+	ProjectRef        *string
+	WorkspaceID       *string
+	WorkspaceName     *string
+}
+
+type McpOauthRegistration struct {
+	Provider     string
+	Issuer       string
+	RedirectUri  string
+	Nonce        []byte
+	Ciphertext   []byte
+	ClientIDHash []byte
+	Status       string
+	UpdatedAt    pgtype.Timestamptz
 }
 
 type McpOauthTransaction struct {
@@ -120,6 +134,7 @@ type McpSandboxBinding struct {
 	CapabilityHash    []byte
 	SyncStatus        string
 	CreatedAt         pgtype.Timestamptz
+	ProjectRef        *string
 }
 
 type OauthState struct {

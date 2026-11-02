@@ -8,4 +8,7 @@ export VITE_ISODO_DOCS_URL=https://docs.drowning.top:18443/docs
 export VITE_ISODO_REMOTE_ONLY=true
 export VITE_ISODO_PREVIEW_DOMAIN=drowning.top
 export VITE_BOUNDLY_WEB_SURFACE=full
-exec ../../node_modules/.bin/vp build "$@"
+../../node_modules/.bin/vp build "$@"
+# Mark only a successful build made with this fixed deployment configuration.
+python3 "$ROOT/scripts/check-drowning-top-web-build.py" --record "$PWD/dist"
+python3 "$ROOT/scripts/check-drowning-top-web-build.py" "$PWD/dist"

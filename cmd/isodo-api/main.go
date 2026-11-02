@@ -133,7 +133,15 @@ func run(logger *slog.Logger) error {
 	if nodeClient != nil {
 		mcpRuntime = nodeClient
 	}
-	mcpHandler := mcpmarket.New(store.Pool(), sealer, mcpmarket.Config{ClientID: os.Getenv("ISODO_GITHUB_OAUTH_CLIENT_ID"), ClientSecret: os.Getenv("ISODO_GITHUB_OAUTH_CLIENT_SECRET"), RedirectURI: os.Getenv("ISODO_GITHUB_OAUTH_REDIRECT_URI")}, mcpRuntime)
+	mcpRedirect := os.Getenv("ISODO_MCP_OAUTH_REDIRECT_URI")
+	githubRedirect := os.Getenv("ISODO_GITHUB_OAUTH_REDIRECT_URI")
+	if mcpRedirect == "" {
+		mcpRedirect = githubRedirect
+	}
+	if githubRedirect != "" && mcpRedirect != githubRedirect {
+		return errors.New("MCP and GitHub OAuth must use the same registered callback")
+	}
+	mcpHandler := mcpmarket.New(store.Pool(), sealer, mcpmarket.Config{ClientID: os.Getenv("ISODO_GITHUB_OAUTH_CLIENT_ID"), ClientSecret: os.Getenv("ISODO_GITHUB_OAUTH_CLIENT_SECRET"), RedirectURI: mcpRedirect}, mcpRuntime)
 	var skillRuntime skillmarket.Runtime
 	if nodeClient != nil {
 		skillRuntime = nodeClient
