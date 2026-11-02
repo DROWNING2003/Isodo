@@ -23,6 +23,17 @@ vi.mock("./MCPMarketPage", () => ({
     failed: false,
   }),
 }));
+vi.mock("./skillMarket", () => ({
+  useSandboxSkillSelection: () => ({
+    loading: false,
+    failed: false,
+    changed: false,
+    apply: async () => {
+      fixture.trace.push("skills");
+    },
+  }),
+}));
+vi.mock("./SkillMarketPage", () => ({ SandboxSkillSelection: () => <div>Skill</div> }));
 vi.mock("./mcpMarket", () => ({ restoreBoundMCP: vi.fn(async () => {}) }));
 vi.mock("./CloudPages", () => ({
   CloudPage: ({ children }: { children: ReactNode }) => <div>{children}</div>,
@@ -156,7 +167,7 @@ it("uses the page save for MCP and credentials, revoking before adding access", 
   });
   const save = renderer.root.findByProps({ "aria-label": "保存沙箱安全连接" });
   await act(async () => save.props.onClick());
-  expect(fixture.trace).toEqual(["revoke", "credentials", "bind", "preferences"]);
+  expect(fixture.trace).toEqual(["revoke", "credentials", "bind", "skills", "preferences"]);
   expect(fixture.refresh).toHaveBeenCalledOnce();
   expect(fixture.reset).toHaveBeenCalledOnce();
 });

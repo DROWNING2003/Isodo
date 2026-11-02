@@ -6,6 +6,7 @@
     "runtime",
     "authentication",
     "http-port-preview",
-    "github-mcp"
+    "github-mcp",
+    "skills"
   ]
 }

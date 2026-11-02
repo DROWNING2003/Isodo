@@ -7,6 +7,7 @@ option go_package = "github.com/DROWNING2003/Isodo/internal/api/node/v1;nodev1";
 // SandboxRuntime is the mTLS-only data/configuration plane. Secret material
 // terminates at Node's host proxy and must never be forwarded to Guest files.
 service SandboxRuntime {
+ rpc SyncSkills(SyncSkillsRequest) returns (SyncSkillsResponse);
  rpc SyncMCP(SyncMCPRequest) returns (SyncMCPResponse);
  rpc WriteFile(stream RuntimeWriteFrame) returns (isodo.guest.v1.WriteFileResponse);
  rpc ReadFile(RuntimeReadRequest) returns (stream isodo.guest.v1.ReadFileFrame);
@@ -84,3 +85,8 @@ message SyncMCPRequest {
 }
 message MCPBinding { string binding_id = 1; string market_mcp_id = 2; string capability = 3; }
 message SyncMCPResponse { bool restart_required = 1; }
+
+// Instruction-only, immutable Skill documents. No executable scripts or secrets.
+message SkillDocument { string id = 1; string name = 2; string description = 3; string body = 4; }
+message SyncSkillsRequest { SandboxTarget target = 1; repeated SkillDocument skills = 2; uint64 version = 3; }
+message SyncSkillsResponse { bool restart_required = 1; }

@@ -13,6 +13,7 @@ import (
 	"github.com/DROWNING2003/Isodo/internal/control/injection"
 	"github.com/DROWNING2003/Isodo/internal/control/mcpmarket"
 	"github.com/DROWNING2003/Isodo/internal/control/sandbox"
+	"github.com/DROWNING2003/Isodo/internal/control/skillmarket"
 	"github.com/DROWNING2003/Isodo/internal/control/template"
 )
 
@@ -27,6 +28,7 @@ type sandboxHandlers = sandbox.Handler
 type templateHandlers = template.Handler
 type publicHandlers struct {
 	*MCPHandlers
+	*SkillHandlers
 	*sandboxHandlers
 	*templateHandlers
 	*injection.Handler
@@ -48,6 +50,9 @@ func NewHandlerWithInjections(web *auth.Web, keys *auth.APIKeyHandler, sandboxes
 
 // NewHandlerWithMCP wires market operations through the generated public API.
 func NewHandlerWithMCP(web *auth.Web, keys *auth.APIKeyHandler, sandboxes *sandbox.Handler, access *auth.Access, injections *injection.Handler, market *mcpmarket.Handler, templates ...*template.Handler) http.Handler {
+	return NewHandlerWithMarkets(web, keys, sandboxes, access, injections, market, nil, templates...)
+}
+func NewHandlerWithMarkets(web *auth.Web, keys *auth.APIKeyHandler, sandboxes *sandbox.Handler, access *auth.Access, injections *injection.Handler, market *mcpmarket.Handler, skills *skillmarket.Handler, templates ...*template.Handler) http.Handler {
 	templateHandler := template.NewHandler(nil)
 	if len(templates) > 0 && templates[0] != nil {
 		templateHandler = templates[0]
@@ -69,7 +74,7 @@ func NewHandlerWithMCP(web *auth.Web, keys *auth.APIKeyHandler, sandboxes *sandb
 			})
 		}},
 	})
-	publicapi.HandlerWithOptions(&publicHandlers{MCPHandlers: &MCPHandlers{Market: market}, sandboxHandlers: sandboxes, templateHandlers: templateHandler, Handler: injectionHandler}, publicapi.StdHTTPServerOptions{
+	publicapi.HandlerWithOptions(&publicHandlers{SkillHandlers: &SkillHandlers{Market: skills}, MCPHandlers: &MCPHandlers{Market: market}, sandboxHandlers: sandboxes, templateHandlers: templateHandler, Handler: injectionHandler}, publicapi.StdHTTPServerOptions{
 		BaseRouter: mux,
 		Middlewares: []publicapi.MiddlewareFunc{func(next http.Handler) http.Handler {
 			return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

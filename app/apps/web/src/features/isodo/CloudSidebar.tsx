@@ -606,7 +606,12 @@ export function CloudSidebar() {
         </SidebarMenu>
         <SidebarMenu>
           <SidebarMenuItem>
-            <SidebarMenuButton disabled aria-label="Skill" title="暂未开放">
+            <SidebarMenuButton
+              aria-label="Skill"
+              render={<Link to="/skill-market" />}
+              isActive={pathname === "/skill-market"}
+              onClick={() => setOpenMobile(false)}
+            >
               <SparklesIcon />
               Skill
             </SidebarMenuButton>

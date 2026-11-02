@@ -21,6 +21,7 @@ import (
 const _ = grpc.SupportPackageIsVersion9
 
 const (
+	SandboxRuntime_SyncSkills_FullMethodName       = "/isodo.node.v1.SandboxRuntime/SyncSkills"
 	SandboxRuntime_SyncMCP_FullMethodName          = "/isodo.node.v1.SandboxRuntime/SyncMCP"
 	SandboxRuntime_WriteFile_FullMethodName        = "/isodo.node.v1.SandboxRuntime/WriteFile"
 	SandboxRuntime_ReadFile_FullMethodName         = "/isodo.node.v1.SandboxRuntime/ReadFile"
@@ -37,6 +38,7 @@ const (
 // SandboxRuntime is the mTLS-only data/configuration plane. Secret material
 // terminates at Node's host proxy and must never be forwarded to Guest files.
 type SandboxRuntimeClient interface {
+	SyncSkills(ctx context.Context, in *SyncSkillsRequest, opts ...grpc.CallOption) (*SyncSkillsResponse, error)
 	SyncMCP(ctx context.Context, in *SyncMCPRequest, opts ...grpc.CallOption) (*SyncMCPResponse, error)
 	WriteFile(ctx context.Context, opts ...grpc.CallOption) (grpc.ClientStreamingClient[RuntimeWriteFrame, v1.WriteFileResponse], error)
 	ReadFile(ctx context.Context, in *RuntimeReadRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[v1.ReadFileFrame], error)
@@ -52,6 +54,16 @@ type sandboxRuntimeClient struct {
 
 func NewSandboxRuntimeClient(cc grpc.ClientConnInterface) SandboxRuntimeClient {
 	return &sandboxRuntimeClient{cc}
+}
+
+func (c *sandboxRuntimeClient) SyncSkills(ctx context.Context, in *SyncSkillsRequest, opts ...grpc.CallOption) (*SyncSkillsResponse, error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	out := new(SyncSkillsResponse)
+	err := c.cc.Invoke(ctx, SandboxRuntime_SyncSkills_FullMethodName, in, out, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *sandboxRuntimeClient) SyncMCP(ctx context.Context, in *SyncMCPRequest, opts ...grpc.CallOption) (*SyncMCPResponse, error) {
@@ -143,6 +155,7 @@ func (c *sandboxRuntimeClient) SetInjections(ctx context.Context, in *SetInjecti
 // SandboxRuntime is the mTLS-only data/configuration plane. Secret material
 // terminates at Node's host proxy and must never be forwarded to Guest files.
 type SandboxRuntimeServer interface {
+	SyncSkills(context.Context, *SyncSkillsRequest) (*SyncSkillsResponse, error)
 	SyncMCP(context.Context, *SyncMCPRequest) (*SyncMCPResponse, error)
 	WriteFile(grpc.ClientStreamingServer[RuntimeWriteFrame, v1.WriteFileResponse]) error
 	ReadFile(*RuntimeReadRequest, grpc.ServerStreamingServer[v1.ReadFileFrame]) error
@@ -160,6 +173,9 @@ type SandboxRuntimeServer interface {
 // pointer dereference when methods are called.
 type UnimplementedSandboxRuntimeServer struct{}
 
+func (UnimplementedSandboxRuntimeServer) SyncSkills(context.Context, *SyncSkillsRequest) (*SyncSkillsResponse, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method SyncSkills not implemented")
+}
 func (UnimplementedSandboxRuntimeServer) SyncMCP(context.Context, *SyncMCPRequest) (*SyncMCPResponse, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method SyncMCP not implemented")
 }
@@ -200,6 +216,24 @@ func RegisterSandboxRuntimeServer(s grpc.ServiceRegistrar, srv SandboxRuntimeSer
 		t.testEmbeddedByValue()
 	}
 	s.RegisterService(&SandboxRuntime_ServiceDesc, srv)
+}
+
+func _SandboxRuntime_SyncSkills_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(SyncSkillsRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(SandboxRuntimeServer).SyncSkills(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: SandboxRuntime_SyncSkills_FullMethodName,
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(SandboxRuntimeServer).SyncSkills(ctx, req.(*SyncSkillsRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _SandboxRuntime_SyncMCP_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -317,6 +351,10 @@ var SandboxRuntime_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "isodo.node.v1.SandboxRuntime",
 	HandlerType: (*SandboxRuntimeServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "SyncSkills",
+			Handler:    _SandboxRuntime_SyncSkills_Handler,
+		},
 		{
 			MethodName: "SyncMCP",
 			Handler:    _SandboxRuntime_SyncMCP_Handler,

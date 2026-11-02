@@ -213,3 +213,13 @@ func (c *Client) SyncMCP(ctx context.Context, request *nodev1.SyncMCPRequest) (*
 	defer cancel()
 	return c.sandboxRuntime.SyncMCP(ctx, request)
 }
+
+// SyncSkills sends bounded instruction documents over the existing mTLS channel.
+func (c *Client) SyncSkills(ctx context.Context, request *nodev1.SyncSkillsRequest) (*nodev1.SyncSkillsResponse, error) {
+	if _, err := c.GetNodeStatus(ctx); err != nil {
+		return nil, err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
+	defer cancel()
+	return c.sandboxRuntime.SyncSkills(ctx, request)
+}

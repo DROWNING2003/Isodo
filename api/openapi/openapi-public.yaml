@@ -4,6 +4,123 @@ info:
   version: 0.1.0
   description: Sandbox APIs support sessions, Casdoor bearer tokens and scoped API keys. MCP account operations require interactive account authentication; the one-time OAuth callback is browser-facing.
 paths:
+  /v1/skills:
+    get:
+      operationId: ListSkills
+      tags: [Skills]
+      summary: 列出平台与本人私有 Skill
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SkillCatalog"}
+        default:
+          description: Error; account session required, scoped Sandbox API keys rejected
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+    post:
+      operationId: CreateSkill
+      tags: [Skills]
+      summary: 制作个人 Skill（指令正文，自动收藏）
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/SkillCreate"}
+      responses:
+        '201':
+          description: Success
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SkillEntry"}
+        default:
+          description: Error; account session required, scoped Sandbox API keys rejected
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/skills/{skillID}/favorite:
+    put:
+      operationId: FavoriteSkill
+      tags: [Skills]
+      summary: 收藏 Skill
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: skillID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '204':
+          description: Success
+        default:
+          description: Error; account session required, scoped Sandbox API keys rejected
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+    delete:
+      operationId: UnfavoriteSkill
+      tags: [Skills]
+      summary: 取消收藏（不自动移除沙箱中的 Skill）
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: skillID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '204':
+          description: Success
+        default:
+          description: Error; account session required, scoped Sandbox API keys rejected
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/sandboxes/{sandboxID}/skills:
+    get:
+      operationId: GetSandboxSkills
+      tags: [Skills]
+      summary: 读取沙箱 Skill 选择与同步状态
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: sandboxID, in: path, required: true, schema: {type: string, format: uuid}}
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SkillSelection"}
+        default:
+          description: Error; account session required, scoped Sandbox API keys rejected
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+    put:
+      operationId: SetSandboxSkills
+      tags: [Skills]
+      summary: 保存完整 Skill 选择并同步；停止状态保留为 pending
+      description: 最多 32 个 Skill，合计序列化内容不超过 96 KiB。返回 applied 仅代表文件已同步，新 Agent 任务加载。
+      security: [{SessionCookie: []}, {BearerAuth: []}]
+      parameters:
+        - {name: sandboxID, in: path, required: true, schema: {type: string, format: uuid}}
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema: {$ref: "#/components/schemas/SkillSelectionInput"}
+      responses:
+        '200':
+          description: Success
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SkillSelection"}
+        '202':
+          description: Saved; runtime synchronization pending or failed
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/SkillSelection"}
+        default:
+          description: Error; account session required, scoped Sandbox API keys rejected
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
   /v1/mcp/oauth/callback:
     get:
       operationId: CompleteMCPOAuth
@@ -1397,6 +1514,44 @@ components:
       in: header
       name: X-API-Key
   schemas:
+    SkillCreate:
+      type: object
+      additionalProperties: false
+      required: [name, description, body]
+      properties:
+        name: {type: string, minLength: 1, maxLength: 64, pattern: '^[a-z][a-z0-9]*(-[a-z0-9]+)*$'}
+        description: {type: string, minLength: 1, maxLength: 1024}
+        body: {type: string, minLength: 1, maxLength: 32768}
+    SkillEntry:
+      allOf:
+        - {$ref: '#/components/schemas/SkillCreate'}
+        - type: object
+          required: [id, source, favorite]
+          properties:
+            id: {type: string, format: uuid}
+            source: {type: string, enum: [market, personal]}
+            favorite: {type: boolean}
+    SkillCatalog:
+      type: object
+      required: [items]
+      properties:
+        items: {type: array, items: {$ref: '#/components/schemas/SkillEntry'}}
+    SkillSelectionInput:
+      type: object
+      additionalProperties: false
+      required: [skill_ids]
+      properties:
+        skill_ids: {type: array, maxItems: 32, uniqueItems: true, items: {type: string, format: uuid}}
+    SkillSelection:
+      allOf:
+        - {$ref: '#/components/schemas/SkillSelectionInput'}
+        - type: object
+          required: [version, applied_version, sync_status, restart_required]
+          properties:
+            version: {type: integer, format: int64}
+            applied_version: {type: integer, format: int64}
+            sync_status: {type: string, enum: [pending, applied, failed]}
+            restart_required: {type: boolean}
 
     CustomMCPCreate:
       type: object

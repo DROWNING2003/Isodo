@@ -1,3 +1,5 @@
+import { useSandboxSkillSelection } from "./skillMarket";
+import { SandboxSkillSelection } from "./SkillMarketPage";
 import { restoreBoundMCP } from "./mcpMarket";
 import { SandboxMCPBindings, useSandboxMCPSelection } from "./MCPMarketPage";
 import { TemporaryAgentDialog, type TemporaryAgent } from "./TemporaryAgentDialog";
@@ -43,6 +45,10 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
     Boolean(localRuntime.record || platform.record) &&
     (!sandboxId.startsWith("local-") || Boolean(window.isodoDesktop));
   const mcp = useSandboxMCPSelection(sandboxId, Boolean(platform.record) && !localRuntime.record);
+  const skills = useSandboxSkillSelection(
+    sandboxId,
+    Boolean(platform.record) && !localRuntime.record,
+  );
   const rulesQuery = useInjectionRules();
   const configQuery = useSandboxInjections(sandboxId, runtimeSupported);
   const write = useSandboxInjectionWriter(sandboxId);
@@ -128,7 +134,7 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
       !initialized ||
       !agentConfigsQuery.isSuccess ||
       !selectionQuery.isSuccess ||
-      (!localRuntime.record && (mcp.loading || mcp.failed))
+      (!localRuntime.record && (mcp.loading || mcp.failed || skills.loading || skills.failed))
     ) {
       setError("配置尚未加载完成，请稍后重试。");
       return;
@@ -157,6 +163,8 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
       if (!localRuntime.record) {
         setStage("正在保存 MCP 配置…");
         await mcp.applyAdded();
+        setStage("正在同步 Skill…");
+        await skills.apply();
       }
       if (!localRuntime.record && (selection.agentIds.length || nextAgents.length)) {
         setStage("正在恢复已绑定 MCP 配置…");
@@ -223,13 +231,23 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
   if (localRuntime.loading || (!localRuntime.record && platform.loading))
     return (
       <CloudPage title="安全连接">
-        {!localRuntime.record ? <SandboxMCPBindings state={mcp} disabled={pending} /> : null}
+        {!localRuntime.record ? (
+          <>
+            <SandboxMCPBindings state={mcp} disabled={pending} />
+            <SandboxSkillSelection state={skills} disabled={pending} />
+          </>
+        ) : null}
         <p className="text-sm text-muted-foreground">正在读取沙箱…</p>
       </CloudPage>
     );
   return (
     <CloudPage title="安全连接">
-      {!localRuntime.record ? <SandboxMCPBindings state={mcp} disabled={pending} /> : null}
+      {!localRuntime.record ? (
+        <>
+          <SandboxMCPBindings state={mcp} disabled={pending} />
+          <SandboxSkillSelection state={skills} disabled={pending} />
+        </>
+      ) : null}
       {!runtimeSupported ? (
         <p className="text-sm text-muted-foreground">沙箱尚未就绪，暂时无法配置凭证。</p>
       ) : null}
@@ -436,7 +454,7 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
         {!oneOff.length ? <p className="text-sm text-muted-foreground">还没有临时凭证。</p> : null}
       </section>
       <div className="fixed bottom-6 right-6 z-20 flex items-center gap-2 rounded-lg bg-background p-1 shadow-md">
-        {edited || mcp.changed ? (
+        {edited || mcp.changed || skills.changed ? (
           <span role="status" className="px-2 text-xs text-muted-foreground">
             有未保存的更改
           </span>
@@ -445,7 +463,11 @@ export function SandboxConnectionsPage({ sandboxId }: { sandboxId: string }) {
           size="icon"
           aria-label="保存沙箱安全连接"
           title={pending ? "保存中…" : "保存全部安全连接"}
-          disabled={!supported || pending || (!localRuntime.record && (mcp.loading || mcp.failed))}
+          disabled={
+            !supported ||
+            pending ||
+            (!localRuntime.record && (mcp.loading || mcp.failed || skills.loading || skills.failed))
+          }
           onClick={() => void save().catch(() => {})}
         >
           {pending ? (

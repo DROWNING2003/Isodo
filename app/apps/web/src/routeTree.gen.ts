@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as UsageRouteImport } from './routes/usage'
+import { Route as SkillMarketRouteImport } from './routes/skill-market'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as PairRouteImport } from './routes/pair'
 import { Route as McpMarketRouteImport } from './routes/mcp-market'
@@ -53,6 +54,11 @@ const WelcomeRoute = WelcomeRouteImport.update({
 const UsageRoute = UsageRouteImport.update({
   id: '/usage',
   path: '/usage',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const SkillMarketRoute = SkillMarketRouteImport.update({
+  id: '/skill-market',
+  path: '/skill-market',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -229,6 +235,7 @@ export interface FileRoutesByFullPath {
   '/mcp-market': typeof McpMarketRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/skill-market': typeof SkillMarketRoute
   '/usage': typeof UsageRoute
   '/welcome': typeof WelcomeRoute
   '/pull-requests': typeof ChatPullRequestsRoute
@@ -264,6 +271,7 @@ export interface FileRoutesByTo {
   '/mcp-market': typeof McpMarketRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/skill-market': typeof SkillMarketRoute
   '/usage': typeof UsageRoute
   '/welcome': typeof WelcomeRoute
   '/pull-requests': typeof ChatPullRequestsRoute
@@ -302,6 +310,7 @@ export interface FileRoutesById {
   '/mcp-market': typeof McpMarketRoute
   '/pair': typeof PairRoute
   '/settings': typeof SettingsRouteWithChildren
+  '/skill-market': typeof SkillMarketRoute
   '/usage': typeof UsageRoute
   '/welcome': typeof WelcomeRoute
   '/_chat/pull-requests': typeof ChatPullRequestsRoute
@@ -341,6 +350,7 @@ export interface FileRouteTypes {
     | '/mcp-market'
     | '/pair'
     | '/settings'
+    | '/skill-market'
     | '/usage'
     | '/welcome'
     | '/pull-requests'
@@ -376,6 +386,7 @@ export interface FileRouteTypes {
     | '/mcp-market'
     | '/pair'
     | '/settings'
+    | '/skill-market'
     | '/usage'
     | '/welcome'
     | '/pull-requests'
@@ -413,6 +424,7 @@ export interface FileRouteTypes {
     | '/mcp-market'
     | '/pair'
     | '/settings'
+    | '/skill-market'
     | '/usage'
     | '/welcome'
     | '/_chat/pull-requests'
@@ -451,6 +463,7 @@ export interface RootRouteChildren {
   McpMarketRoute: typeof McpMarketRoute
   PairRoute: typeof PairRoute
   SettingsRoute: typeof SettingsRouteWithChildren
+  SkillMarketRoute: typeof SkillMarketRoute
   UsageRoute: typeof UsageRoute
   WelcomeRoute: typeof WelcomeRoute
   ConnectCallbackRoute: typeof ConnectCallbackRoute
@@ -478,6 +491,13 @@ declare module '@tanstack/react-router' {
       path: '/usage'
       fullPath: '/usage'
       preLoaderRoute: typeof UsageRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/skill-market': {
+      id: '/skill-market'
+      path: '/skill-market'
+      fullPath: '/skill-market'
+      preLoaderRoute: typeof SkillMarketRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -776,6 +796,7 @@ const rootRouteChildren: RootRouteChildren = {
   McpMarketRoute: McpMarketRoute,
   PairRoute: PairRoute,
   SettingsRoute: SettingsRouteWithChildren,
+  SkillMarketRoute: SkillMarketRoute,
   UsageRoute: UsageRoute,
   WelcomeRoute: WelcomeRoute,
   ConnectCallbackRoute: ConnectCallbackRoute,

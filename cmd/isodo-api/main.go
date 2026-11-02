@@ -22,6 +22,7 @@ import (
 	"github.com/DROWNING2003/Isodo/internal/control/preview"
 	"github.com/DROWNING2003/Isodo/internal/control/sandbox"
 	"github.com/DROWNING2003/Isodo/internal/control/sandboxworker"
+	"github.com/DROWNING2003/Isodo/internal/control/skillmarket"
 	"github.com/DROWNING2003/Isodo/internal/control/template"
 	"github.com/DROWNING2003/Isodo/internal/httpapi"
 )
@@ -133,7 +134,12 @@ func run(logger *slog.Logger) error {
 		mcpRuntime = nodeClient
 	}
 	mcpHandler := mcpmarket.New(store.Pool(), sealer, mcpmarket.Config{ClientID: os.Getenv("ISODO_GITHUB_OAUTH_CLIENT_ID"), ClientSecret: os.Getenv("ISODO_GITHUB_OAUTH_CLIENT_SECRET"), RedirectURI: os.Getenv("ISODO_GITHUB_OAUTH_REDIRECT_URI")}, mcpRuntime)
-	publicHandler := httpapi.NewHandlerWithMCP(web, auth.NewAPIKeyHandler(store), sandboxHandler, access, injectionHandler, mcpHandler, template.NewHandler(store))
+	var skillRuntime skillmarket.Runtime
+	if nodeClient != nil {
+		skillRuntime = nodeClient
+	}
+	skillHandler := skillmarket.New(store.Pool(), skillRuntime)
+	publicHandler := httpapi.NewHandlerWithMarkets(web, auth.NewAPIKeyHandler(store), sandboxHandler, access, injectionHandler, mcpHandler, skillHandler, template.NewHandler(store))
 	publicHandler = mcpHandler.Wrap(publicHandler, access)
 	additionalHandlers := make(map[string]http.Handler)
 	for _, origin := range additionalOrigins {
@@ -146,7 +152,7 @@ func run(logger *slog.Logger) error {
 			return fmt.Errorf("configure additional web origin: %w", err)
 		}
 		extraAccess := &auth.Access{Bearer: casdoor, Keys: store, Web: extraWeb}
-		additionalHandlers[site.Host] = mcpHandler.Wrap(httpapi.NewHandlerWithMCP(extraWeb, auth.NewAPIKeyHandler(store), sandboxHandler, extraAccess, injectionHandler, mcpHandler, template.NewHandler(store)), extraAccess)
+		additionalHandlers[site.Host] = mcpHandler.Wrap(httpapi.NewHandlerWithMarkets(extraWeb, auth.NewAPIKeyHandler(store), sandboxHandler, extraAccess, injectionHandler, mcpHandler, skillHandler, template.NewHandler(store)), extraAccess)
 	}
 	publicHandler = routeWebHosts(publicHandler, additionalHandlers)
 	if publisher != nil {

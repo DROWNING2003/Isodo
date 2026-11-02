@@ -173,6 +173,29 @@ type SandboxPortPreview struct {
 	Revision   int64
 }
 
+type SandboxSkill struct {
+	SandboxID      pgtype.UUID
+	TenantID       pgtype.UUID
+	SkillIds       []pgtype.UUID
+	Version        int64
+	AppliedVersion int64
+	SyncStatus     string
+}
+
+type SkillCatalog struct {
+	ID          pgtype.UUID
+	TenantID    pgtype.UUID
+	Name        string
+	Description string
+	Body        string
+	CreatedAt   pgtype.Timestamptz
+}
+
+type SkillFavorite struct {
+	TenantID pgtype.UUID
+	SkillID  pgtype.UUID
+}
+
 type SystemTemplateCatalog struct {
 	Name       string
 	TemplateID pgtype.UUID
