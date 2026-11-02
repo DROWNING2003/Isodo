@@ -2,6 +2,8 @@ package preview
 
 import (
 	"strings"
+	"net/http"
+	"net/http/httptest"
 	"strconv"
 	"testing"
 )
@@ -75,4 +77,24 @@ func TestHTTPPortBaseURLRejectsManagementAndInvalidTargets(t *testing.T) {
 
 func stringPort(port uint16) string {
 	return strconv.FormatUint(uint64(port), 10)
+}
+
+func TestDeterministicPortURLNeverBypassesPreviewAuthorization(t *testing.T) {
+	p, err := New(Config{Secret: "test-secret", Domain: "drowning.top", Scheme: "https"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	base, err := p.HTTPPortBaseURL(portPreviewSandboxID, 3000)
+	if err != nil {
+		t.Fatal(err)
+	}
+	called := false
+	gateway := p.Wrap(http.HandlerFunc(func(http.ResponseWriter, *http.Request) {
+		called = true
+	}))
+	result := httptest.NewRecorder()
+	gateway.ServeHTTP(result, httptest.NewRequest(http.MethodGet, base, nil))
+	if called || result.Code != http.StatusUnauthorized {
+		t.Fatalf("unsigned stable URL was allowed: status=%d fallthrough=%v", result.Code, called)
+	}
 }
