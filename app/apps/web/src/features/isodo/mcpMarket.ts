@@ -59,7 +59,15 @@ export function useMCPOAuth() {
     setError(null);
     const generation = getAuthGeneration();
     let transaction: string | undefined;
+    let popup: Window | null = null;
     try {
+      // Reserve the window synchronously during the click so browsers do not
+      // block it after asynchronous OAuth discovery. Electron uses the OS browser.
+      if (!window.desktopBridge) {
+        popup = window.open("about:blank", "_blank");
+        if (!popup) throw new Error("浏览器阻止了授权弹窗，请允许弹窗后重试。");
+        popup.opener = null;
+      }
       const started = await isodoFetch<{ transaction_id: string; authorization_url: string }>(
         "/v1/mcp/connections/github/authorize",
         { method: "POST", signal: abort.signal },
@@ -69,9 +77,8 @@ export function useMCPOAuth() {
       const url = new URL(started.authorization_url);
       if (url.origin !== "https://github.com" || url.pathname !== "/login/oauth/authorize")
         throw new Error("授权地址校验失败");
-      if (!window.desktopBridge)
-        throw new Error("请在 Isodo 桌面端连接 GitHub，授权将使用系统浏览器。");
-      await ensureLocalApi().shell.openExternal(url.toString());
+      if (popup) popup.location.replace(url.toString());
+      else await ensureLocalApi().shell.openExternal(url.toString());
       for (let i = 0; i < 150; i++) {
         await new Promise<void>((resolve, reject) => {
           const timer = setTimeout(() => {
@@ -102,6 +109,7 @@ export function useMCPOAuth() {
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : "授权失败");
     } finally {
+      popup?.close();
       if (transaction && getAuthGeneration() === generation)
         await isodoFetch(`/v1/mcp/oauth/transactions/${transaction}`, { method: "DELETE" }).catch(
           () => {},

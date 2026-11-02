@@ -28,7 +28,7 @@ import os,pathlib,subprocess,sys
 root,work,port,binary=sys.argv[1:]
 password=(pathlib.Path(work)/'postgres.env').read_text().splitlines()[0].split('=',1)[1]
 env=dict(os.environ,ISODO_TEST_DATABASE_URL='postgres://postgres:'+password+'@127.0.0.1:'+port+'/isodo_mcp_market?sslmode=disable')
-args=[binary,'-test.run','^TestPostgresMCPAccountOAuthBindingLifecycle$','-test.v'] if binary else ['go','test','./internal/control/mcpmarket','-run','^TestPostgresMCPAccountOAuthBindingLifecycle$','-count=1','-v']
+args=[binary,'-test.run','^Test(PostgresMCPAccountOAuthBindingLifecycle|MCPRuntimeRolePermissions)$','-test.v'] if binary else ['go','test','./internal/control/mcpmarket','-run','^Test(PostgresMCPAccountOAuthBindingLifecycle|MCPRuntimeRolePermissions)$','-count=1','-v']
 with (pathlib.Path(work)/'test.log').open('w') as log:
  p=subprocess.run(args,cwd=root,env=env,stdout=log,stderr=subprocess.STDOUT)
  print((pathlib.Path(work)/'test.log').read_text())

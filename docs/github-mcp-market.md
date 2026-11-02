@@ -56,7 +56,7 @@ ISODO_MCP_BROKER_URL=https://api.drowning.top:18443
 
 这是管理员固定的 Control origin，不能由 Guest 指定；Node 必须能解析并以受信任 TLS 连接它。Nginx 的 api 全路径代理已覆盖 `/internal/mcp/{bindingID}`；不应在 web 静态站公开内部路由。内部 Broker 必须通过独立高熵绑定 capability 验证；capability 只经现有 Control→Node mTLS 下发，Control 仅保存 SHA256，Node 使用现有 AES-GCM injection 存储加密落盘。
 
-还需：迁移 `0016_mcp_market.sql`、匹配版本的 API/Node/Guest 与五位端口模板、Guest Python 3.11+（标准库 tomllib）或 Python 3.10 + python3-tomli、已安装支持 HTTP MCP 的 Codex。不能把旧生产镜像当作已升级。
+还需：迁移 `0016_mcp_market.sql`；若迁移角色与 API 运行角色不同，执行 `psql -v app_role=API运行角色 -f deploy/sql/grant-mcp-market.sql`，仅赋予目录 SELECT 与账号状态表 CRUD 权限；匹配版本的 API/Node/Guest 与五位端口模板、Guest Python 3.11+（标准库 tomllib）或 Python 3.10 + python3-tomli、已安装支持 HTTP MCP 的 Codex。不能把旧生产镜像当作已升级。
 
 ## 授权与实际调用链路
 
@@ -92,3 +92,5 @@ OpenAPI 的 MCP 分组生成 Go/TypeScript 客户端和端点文档：catalog �
 新增供应商时新增经过审查的 catalog seed、固定 metadata/issuer/network allowlist、最小工具权限及 OAuth 客户端注册配置，然后复用 favorites/connection/binding 表与 Node capability 链路。不能仅添加卡片就标记可连接，不接受 Guest 任意 URL，不将 DCR 作为通用必选前提。
 
 参考：[GitHub remote server](https://github.com/github/github-mcp-server/blob/main/docs/remote-server.md)、[Host integration](https://github.com/github/github-mcp-server/blob/main/docs/host-integration.md)、[GitHub App 注册](https://docs.github.com/en/apps/creating-github-apps/registering-a-github-app/registering-a-github-app)、[Codex MCP](https://developers.openai.com/codex/mcp/)。参考 AIofCage 的 discovery/PKCE、串行 refresh 和 Vault 边界，未照搬 DCR 必选、loopback callback 或 Colima 架构。
+
+Web 验收也可从现有 Web 页面发起授权：点击时同步创建空白浏览器窗口，完成发现后导航到固定 GitHub 授权页，避免异步操作被弹窗策略拦截。Electron 继续使用系统浏览器。
