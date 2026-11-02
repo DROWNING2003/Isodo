@@ -21,7 +21,9 @@ import (
 )
 
 const commandRunMethod = "/isodo.node.v1.CommandRunner/RunCommand"
-const commandOutputLimit = 1 << 20
+// The Node mTLS gRPC server enforces a 1 MiB response limit. Text output can
+// expand up to sixfold when serialized as JSON, so cap raw output at 128 KiB.
+const commandOutputLimit = 128 << 10
 
 // commandRunnerRPC is intentionally a *narrow* service. Its only operation is
 // RunCommand: callers cannot dial arbitrary Guest RPC methods, files or ports.
@@ -106,9 +108,7 @@ func (s *CHVServer) RunCommand(ctx context.Context, request *wrapperspb.BytesVal
 	// The same caller-provided key + Sandbox runtime maps to a stable Guest
 	// request_id. Reusing the key with a different argv/env/timeout will be
 	// rejected by the Guest's existing idempotency conflict check.
-	hash := sha256.Sum256([]byte(input.SandboxID + ":" + strconv.FormatUint(input.Generation, 10) + ":" +
-		record.BootID + ":" + record.GuestEpoch + ":" + input.Key))
-	requestID := hex.EncodeToString(hash[:])
+	requestID := guestCommandRequestID(input.SandboxID, input.Generation, record.BootID, record.GuestEpoch, input.Key)
 	timeout := uint32(input.Command.TimeoutSeconds)
 	start := &guestv1.StartProcessRequest{
 		Identity: identity,
@@ -157,7 +157,7 @@ func (s *CHVServer) RunCommand(ctx context.Context, request *wrapperspb.BytesVal
 		}
 		if output := event.GetOutput(); output != nil {
 			if stdout.Len()+stderr.Len()+len(output.GetData()) > commandOutputLimit {
-				return nil, status.Error(codes.OutOfRange, "Guest command exceeded output limit")
+				return nil, status.Error(codes.OutOfRange, "Guest command exceeded 128 KiB output limit")
 			}
 			switch output.GetChannel() {
 			case guestv1.OutputChannel_OUTPUT_CHANNEL_STDOUT:
@@ -199,3 +199,11 @@ func validCommandKey(value string) bool {
 	return true
 }
 
+
+// guestCommandRequestID is stable across transport retries in the same VM run.
+// Stop/Start or restore changes bootID/epoch, so the old key cannot refer to
+// an execution in a new runtime.
+func guestCommandRequestID(sandboxID string, generation uint64, bootID, epoch, key string) string {
+	sum := sha256.Sum256([]byte(sandboxID + ":" + strconv.FormatUint(generation, 10) + ":" + bootID + ":" + epoch + ":" + key))
+	return hex.EncodeToString(sum[:])
+}
