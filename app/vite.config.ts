@@ -39,6 +39,8 @@ export default defineConfig({
       "pnpm-lock.yaml",
       "*.tsbuildinfo",
       "**/routeTree.gen.ts",
+      // OpenAPI clients must stay byte-for-byte consistent with the generator.
+      "**/*.generated.ts",
       "apps/mobile/android/**",
       "apps/mobile/ios/**",
       "apps/mobile/uniwind-types.d.ts",

@@ -9,6 +9,7 @@
     "DeleteSandbox",
     "StartSandbox",
     "StopSandbox",
+    "RunSandboxCommand",
     "---应用访问---",
     "GetSandboxApp",
     "CreateSandboxAppLink",

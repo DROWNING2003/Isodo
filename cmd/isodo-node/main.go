@@ -109,6 +109,9 @@ func run(logger *slog.Logger) error {
 			grpc.MaxSendMsgSize(1<<20),
 		)
 		nodev1.RegisterNodeOrchestratorServer(server, service)
+		if chv, ok := service.(*orchestrator.CHVServer); ok {
+			orchestrator.RegisterCommandRunner(server, chv)
+		}
 		if runtimeService, ok := service.(nodev1.SandboxRuntimeServer); ok {
 			nodev1.RegisterSandboxRuntimeServer(server, runtimeService)
 		}
