@@ -516,6 +516,22 @@ paths:
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
+    delete:
+      operationId: RemoveSandboxFile
+      summary: Remove a workspace file or directory
+      description: Idempotent for missing paths. Removes symlinks themselves. Empty directories require no recursive flag; nonempty directories require recursive=true and are limited to 4096 entries. Workspace root and runtime-owned paths are forbidden. Mutations reject symlink parents.
+      tags: [Files]
+      security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
+      parameters:
+        - {name: recursive, in: query, schema: {type: boolean, default: false}}
+      responses:
+        "204":
+          description: Success
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
   /v1/sandboxes/{sandboxID}/directories:
     parameters:
       - {name: sandboxID, in: path, required: true, schema: {type: string}}
@@ -540,6 +556,80 @@ paths:
           content:
             application/json:
               schema: {type: object, required: [path], properties: {path: {type: string}}}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+    get:
+      operationId: ListSandboxDirectory
+      summary: List a workspace directory
+      description: Lexical name order. page_size defaults to 100 and is limited to 500. Pass next_page_token unchanged to page_token; tokens are name cursors, not a consistent snapshot across concurrent mutations. A directory is limited to 4096 entries. Symlink metadata is returned without following the final symlink.
+      tags: [Files]
+      security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
+      parameters:
+        - {name: path, in: query, required: true, schema: {type: string}}
+        - {name: page_size, in: query, schema: {type: integer, minimum: 1, maximum: 500, default: 100}}
+        - {name: page_token, in: query, schema: {type: string, maxLength: 1024}}
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FileDirectoryPage"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/sandboxes/{sandboxID}/files/stat:
+    parameters:
+      - {name: sandboxID, in: path, required: true, schema: {type: string}}
+      - {name: path, in: query, required: true, schema: {type: string}, description: Canonical absolute path under /workspace}
+    get:
+      operationId: StatSandboxFile
+      summary: Inspect workspace path metadata
+      description: Returns lstat metadata, including symlink_target for a final symlink, without following it. Workspace root is allowed; paths outside workspace are rejected.
+      tags: [Files]
+      security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FileMetadata"}
+        default:
+          description: Error
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/Error"}
+  /v1/sandboxes/{sandboxID}/files/move:
+    parameters:
+      - {name: sandboxID, in: path, required: true, schema: {type: string}}
+    post:
+      operationId: MoveSandboxFile
+      summary: Move a workspace file or directory
+      description: Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+      tags: [Files]
+      security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              additionalProperties: false
+              required: [source, destination]
+              properties:
+                source: {type: string}
+                destination: {type: string}
+                overwrite: {type: boolean, default: true}
+      responses:
+        "200":
+          description: Success
+          content:
+            application/json:
+              schema: {$ref: "#/components/schemas/FileMetadata"}
         default:
           description: Error
           content:
@@ -1514,6 +1604,23 @@ components:
       in: header
       name: X-API-Key
   schemas:
+    FileMetadata:
+      type: object
+      required: [path, name, kind, size_bytes, mode, modified_at]
+      properties:
+        path: {type: string}
+        name: {type: string}
+        kind: {type: string, enum: [regular, directory, symlink]}
+        size_bytes: {type: integer, format: int64, minimum: 0}
+        mode: {type: integer, minimum: 0, maximum: 511, description: Unix permission bits as a decimal integer}
+        modified_at: {type: string, format: date-time}
+        symlink_target: {type: string, description: Raw symlink metadata only; never followed outside workspace}
+    FileDirectoryPage:
+      type: object
+      required: [entries, next_page_token]
+      properties:
+        entries: {type: array, items: {$ref: "#/components/schemas/FileMetadata"}}
+        next_page_token: {type: string, description: Empty when there are no more entries}
     SkillCreate:
       type: object
       additionalProperties: false

@@ -91,7 +91,7 @@ func (s *Server) ListDirectory(ctx context.Context, request *guestv1.ListDirecto
 	}
 	entries, err := directory.ReadDir(maxDirectorySize + 1)
 	closeErr := directory.Close()
-	if err != nil {
+	if err != nil && !errors.Is(err, io.EOF) {
 		return nil, mapFileError("read directory", err)
 	}
 	if closeErr != nil {
@@ -405,11 +405,10 @@ func (s *Server) Remove(ctx context.Context, request *guestv1.RemoveRequest) (*e
 	if err := validateRequestID(request.GetRequestId()); err != nil {
 		return nil, err
 	}
-	relative, err := workspaceRelative(request.GetPath(), false)
-	if err != nil {
-		return nil, err
+	root, relative, err := s.mutationParent(request.GetPath())
+	if status.Code(err) == codes.NotFound {
+		return new(emptypb.Empty), nil
 	}
-	root, err := s.openWorkspace()
 	if err != nil {
 		return nil, err
 	}
@@ -428,7 +427,7 @@ func (s *Server) Remove(ctx context.Context, request *guestv1.RemoveRequest) (*e
 		}
 		entries, readErr := directory.ReadDir(1)
 		_ = directory.Close()
-		if readErr != nil {
+		if readErr != nil && !errors.Is(readErr, io.EOF) {
 			return nil, mapFileError("read removal directory", readErr)
 		}
 		if len(entries) > 0 {
@@ -463,44 +462,49 @@ func (s *Server) Move(ctx context.Context, request *guestv1.MoveRequest) (*guest
 	if err := validateRequestID(request.GetRequestId()); err != nil {
 		return nil, err
 	}
-	source, err := workspaceRelative(request.GetSource(), false)
+	sourceRoot, source, err := s.mutationParent(request.GetSource())
 	if err != nil {
 		return nil, err
 	}
-	destination, err := workspaceRelative(request.GetDestination(), false)
+	defer sourceRoot.Close()
+	destinationRoot, destination, err := s.mutationParent(request.GetDestination())
 	if err != nil {
 		return nil, err
 	}
-	if source == destination {
-		return s.statRelative(destination)
-	}
-	root, err := s.openWorkspace()
-	if err != nil {
-		return nil, err
-	}
-	defer root.Close()
-	sourceInfo, err := root.Lstat(source)
+	defer destinationRoot.Close()
+	sourceInfo, err := sourceRoot.Lstat(source)
 	if err != nil {
 		return nil, mapFileError("inspect move source", err)
 	}
-	if info, err := root.Lstat(destination); err == nil {
-		if !request.GetOverwrite() {
-			return nil, status.Error(codes.AlreadyExists, "FILE_EXISTS: destination already exists")
+	if request.Source != request.Destination {
+		if info, err := destinationRoot.Lstat(destination); err == nil {
+			if !request.Overwrite {
+				return nil, status.Error(codes.AlreadyExists, "FILE_EXISTS: destination already exists")
+			}
+			if !info.Mode().IsRegular() || !sourceInfo.Mode().IsRegular() {
+				return nil, status.Error(codes.FailedPrecondition, "overwrite move only replaces regular files")
+			}
+		} else if !errors.Is(err, os.ErrNotExist) {
+			return nil, mapFileError("inspect move destination", err)
 		}
-		if !info.Mode().IsRegular() || !sourceInfo.Mode().IsRegular() {
-			return nil, status.Error(codes.FailedPrecondition, "overwrite move only replaces regular files")
+		// Directories and symlinks always use no-replace, even with overwrite=true.
+		if err := renameWorkspace(sourceRoot, source, destinationRoot, destination, !request.Overwrite || !sourceInfo.Mode().IsRegular()); err != nil {
+			if errors.Is(err, os.ErrExist) {
+				return nil, status.Error(codes.AlreadyExists, "FILE_EXISTS: destination already exists")
+			}
+			return nil, mapFileError("move path", err)
 		}
-	} else if !errors.Is(err, os.ErrNotExist) {
-		return nil, mapFileError("inspect move destination", err)
 	}
-	if err := root.Rename(source, destination); err != nil {
-		return nil, mapFileError("move path", err)
-	}
-	info, err := root.Lstat(destination)
+	info, err := destinationRoot.Lstat(destination)
 	if err != nil {
 		return nil, mapFileError("stat moved path", err)
 	}
-	return fileInfo(root, destination, info)
+	result, err := fileInfo(destinationRoot, destination, info)
+	if err != nil {
+		return nil, err
+	}
+	result.Path = request.Destination
+	return result, nil
 }
 
 func (s *Server) statRelative(relative string) (*guestv1.FileInfo, error) {
@@ -660,7 +664,7 @@ func countTree(root *os.Root, relative string, limit int) (int, error) {
 		}
 		entries, err := file.ReadDir(limit - count + 1)
 		_ = file.Close()
-		if err != nil {
+		if err != nil && !errors.Is(err, io.EOF) {
 			return mapFileError("read recursive removal directory", err)
 		}
 		for _, entry := range entries {

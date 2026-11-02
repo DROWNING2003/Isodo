@@ -291,6 +291,8 @@ func writeError(w http.ResponseWriter, err error) {
 		code = "FILE_INTEGRITY_FAILED"
 	case codes.ResourceExhausted:
 		httpStatus, code = 413, "FILE_TOO_LARGE"
+	case codes.Unimplemented:
+		httpStatus, code = 501, "FILE_OPERATION_UNSUPPORTED"
 	case codes.Unavailable:
 		httpStatus, code, retryable = 503, "FILE_BACKEND_UNAVAILABLE", true
 	case codes.DeadlineExceeded:

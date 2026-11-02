@@ -33,6 +33,38 @@ type NonReadonly<T> = [T] extends [UnionToIntersection<T>] ? {
     : T[P];
 } : DistributeReadOnlyOverUnions<T>;
 
+export type FileMetadataKind = typeof FileMetadataKind[keyof typeof FileMetadataKind];
+
+
+export const FileMetadataKind = {
+  regular: 'regular',
+  directory: 'directory',
+  symlink: 'symlink',
+} as const;
+
+export interface FileMetadata {
+  path: string;
+  name: string;
+  kind: FileMetadataKind;
+  /** @minimum 0 */
+  size_bytes: number;
+  /**
+     * Unix permission bits as a decimal integer
+     * @minimum 0
+     * @maximum 511
+     */
+  mode: number;
+  modified_at: string;
+  /** Raw symlink metadata only; never followed outside workspace */
+  symlink_target?: string;
+}
+
+export interface FileDirectoryPage {
+  entries: FileMetadata[];
+  /** Empty when there are no more entries */
+  next_page_token: string;
+}
+
 export interface SkillCreate {
   /**
      * @minLength 1
@@ -800,6 +832,14 @@ export type DownloadSandboxFileParams = {
 path: string;
 };
 
+export type RemoveSandboxFileParams = {
+/**
+ * Canonical absolute path under /workspace
+ */
+path: string;
+recursive?: boolean;
+};
+
 export type MakeSandboxDirectoryBody = {
   path: string;
   parents?: boolean;
@@ -807,6 +847,32 @@ export type MakeSandboxDirectoryBody = {
 
 export type MakeSandboxDirectory200 = {
   path: string;
+};
+
+export type ListSandboxDirectoryParams = {
+path: string;
+/**
+ * @minimum 1
+ * @maximum 500
+ */
+page_size?: number;
+/**
+ * @maxLength 1024
+ */
+page_token?: string;
+};
+
+export type StatSandboxFileParams = {
+/**
+ * Canonical absolute path under /workspace
+ */
+path: string;
+};
+
+export type MoveSandboxFileBody = {
+  source: string;
+  destination: string;
+  overwrite?: boolean;
 };
 
 export type SetSandboxInjectionsBody = {
@@ -1613,6 +1679,40 @@ export const downloadSandboxFile = async (sandboxID: string,
 
 
 
+export const getRemoveSandboxFileUrl = (sandboxID: string,
+    params: RemoveSandboxFileParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/v1/sandboxes/${sandboxID}/files?${stringifiedParams}` : `/v1/sandboxes/${sandboxID}/files`
+}
+
+/**
+ * Idempotent for missing paths. Removes symlinks themselves. Empty directories require no recursive flag; nonempty directories require recursive=true and are limited to 4096 entries. Workspace root and runtime-owned paths are forbidden. Mutations reject symlink parents.
+ * @summary Remove a workspace file or directory
+ */
+export const removeSandboxFile = async (sandboxID: string,
+    params: RemoveSandboxFileParams, options?: Parameters<typeof isodoFetch>[1]): Promise<void> => {
+
+  return isodoFetch<void>(getRemoveSandboxFileUrl(sandboxID,params),
+  {
+    ...options,
+    method: 'DELETE'
+
+
+  }
+);}
+
+
+
 export const getMakeSandboxDirectoryUrl = (sandboxID: string,) => {
 
 
@@ -1647,6 +1747,114 @@ return isodoFetch<MakeSandboxDirectory200>(getMakeSandboxDirectoryUrl(sandboxID)
     method: 'POST',
     headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
     body: JSON.stringify(makeSandboxDirectoryBody)
+  }
+);}
+
+
+
+export const getListSandboxDirectoryUrl = (sandboxID: string,
+    params: ListSandboxDirectoryParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/v1/sandboxes/${sandboxID}/directories?${stringifiedParams}` : `/v1/sandboxes/${sandboxID}/directories`
+}
+
+/**
+ * Lexical name order. page_size defaults to 100 and is limited to 500. Pass next_page_token unchanged to page_token; tokens are name cursors, not a consistent snapshot across concurrent mutations. A directory is limited to 4096 entries. Symlink metadata is returned without following the final symlink.
+ * @summary List a workspace directory
+ */
+export const listSandboxDirectory = async (sandboxID: string,
+    params: ListSandboxDirectoryParams, options?: Parameters<typeof isodoFetch>[1]): Promise<FileDirectoryPage> => {
+
+  return isodoFetch<FileDirectoryPage>(getListSandboxDirectoryUrl(sandboxID,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getStatSandboxFileUrl = (sandboxID: string,
+    params: StatSandboxFileParams,) => {
+  const normalizedParams = new URLSearchParams();
+
+  Object.entries(params || {}).forEach(([key, value]) => {
+
+    if (value !== undefined) {
+      normalizedParams.append(key, value === null ? 'null' : String(value))
+    }
+  });
+
+  const stringifiedParams = normalizedParams.toString();
+
+  return stringifiedParams.length > 0 ? `/v1/sandboxes/${sandboxID}/files/stat?${stringifiedParams}` : `/v1/sandboxes/${sandboxID}/files/stat`
+}
+
+/**
+ * Returns lstat metadata, including symlink_target for a final symlink, without following it. Workspace root is allowed; paths outside workspace are rejected.
+ * @summary Inspect workspace path metadata
+ */
+export const statSandboxFile = async (sandboxID: string,
+    params: StatSandboxFileParams, options?: Parameters<typeof isodoFetch>[1]): Promise<FileMetadata> => {
+
+  return isodoFetch<FileMetadata>(getStatSandboxFileUrl(sandboxID,params),
+  {
+    ...options,
+    method: 'GET'
+
+
+  }
+);}
+
+
+
+export const getMoveSandboxFileUrl = (sandboxID: string,) => {
+
+
+
+
+  return `/v1/sandboxes/${sandboxID}/files/move`
+}
+
+/**
+ * Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+ * @summary Move a workspace file or directory
+ */
+export const moveSandboxFile = async (sandboxID: string,
+    moveSandboxFileBody: MoveSandboxFileBody, options?: Parameters<typeof isodoFetch>[1]): Promise<FileMetadata> => {
+
+    const getHeaders = (h?: NonNullable<RequestInit['headers']>): Record<string, string | readonly string[]> => {
+    if (!h) return {};
+    if (h instanceof Headers) return Object.fromEntries(h.entries());
+    if (Symbol.iterator in h) {
+      return Object.fromEntries(
+        Array.from(h as Iterable<Iterable<string>>, (entry) => Array.from(entry) as [string, string]),
+      );
+    }
+    const headers: Record<string, string | readonly string[]> = {};
+    for (const [name, value] of Object.entries<string | readonly string[] | undefined>(h)) {
+      if (value !== undefined) headers[name] = value;
+    }
+    return headers;
+  };
+return isodoFetch<FileMetadata>(getMoveSandboxFileUrl(sandboxID),
+  {
+    ...options,
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json', ...getHeaders(options?.headers) },
+    body: JSON.stringify(moveSandboxFileBody)
   }
 );}
 

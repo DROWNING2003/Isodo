@@ -4,12 +4,14 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"io"
+
 	guestv1 "github.com/DROWNING2003/Isodo/internal/api/guest/v1"
 	nodev1 "github.com/DROWNING2003/Isodo/internal/api/node/v1"
 	"github.com/DROWNING2003/Isodo/internal/sandboxfiles"
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/status"
-	"io"
+	"google.golang.org/protobuf/types/known/emptypb"
 )
 
 func (c *Client) Write(parent context.Context, header *nodev1.RuntimeWriteHeader, source io.Reader) (*guestv1.WriteFileResponse, error) {
@@ -88,3 +90,28 @@ func (c *Client) Mkdir(ctx context.Context, request *nodev1.RuntimeDirectoryRequ
 }
 
 var _ sandboxfiles.Backend = (*Client)(nil)
+
+func (c *Client) Stat(ctx context.Context, r *nodev1.RuntimeReadRequest) (*guestv1.FileInfo, error) {
+	if _, err := c.GetNodeStatus(ctx); err != nil {
+		return nil, err
+	}
+	return c.sandboxRuntime.Stat(ctx, r)
+}
+func (c *Client) List(ctx context.Context, r *nodev1.RuntimeListRequest) (*guestv1.ListDirectoryResponse, error) {
+	if _, err := c.GetNodeStatus(ctx); err != nil {
+		return nil, err
+	}
+	return c.sandboxRuntime.ListDirectory(ctx, r)
+}
+func (c *Client) Remove(ctx context.Context, r *nodev1.RuntimeRemoveRequest) (*emptypb.Empty, error) {
+	if _, err := c.GetNodeStatus(ctx); err != nil {
+		return nil, err
+	}
+	return c.sandboxRuntime.Remove(ctx, r)
+}
+func (c *Client) Move(ctx context.Context, r *nodev1.RuntimeMoveRequest) (*guestv1.FileInfo, error) {
+	if _, err := c.GetNodeStatus(ctx); err != nil {
+		return nil, err
+	}
+	return c.sandboxRuntime.Move(ctx, r)
+}

@@ -91,6 +91,25 @@ func TestFilesBackendUsesGuestAtomicCommitAndWorkspaceBoundary(t *testing.T) {
 	if _, err := os.Stat(filepath.Join(outside, "config.toml")); !os.IsNotExist(err) {
 		t.Fatal("outside workspace was modified")
 	}
+	info, err := backend.Stat(t.Context(), &nodev1.RuntimeReadRequest{Target: target, Path: "/workspace/.codex/config.toml"})
+	if err != nil || info.GetSizeBytes() != uint64(len(original)) {
+		t.Fatalf("stat=%v", err)
+	}
+	page, err := backend.List(t.Context(), &nodev1.RuntimeListRequest{Target: target, Path: "/workspace/.codex", PageSize: 1})
+	if err != nil || len(page.GetEntries()) != 1 {
+		t.Fatalf("list=%v", err)
+	}
+	moved, err := backend.Move(t.Context(), &nodev1.RuntimeMoveRequest{Target: target, Source: "/workspace/.codex/config.toml", Destination: "/workspace/.codex/moved.toml", RequestId: "move-file"})
+	if err != nil || moved.GetPath() != "/workspace/.codex/moved.toml" {
+		t.Fatalf("move=%v", err)
+	}
+	if _, err := backend.Remove(t.Context(), &nodev1.RuntimeRemoveRequest{Target: target, Path: moved.GetPath(), RequestId: "remove-file"}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := backend.Stat(t.Context(), &nodev1.RuntimeReadRequest{Target: target, Path: moved.GetPath()}); status.Code(err) != codes.NotFound {
+		t.Fatal("removed file still exists")
+	}
+
 }
 
 func TestFileTargetRejectsStoppedOrSupersededInstance(t *testing.T) {
@@ -113,5 +132,15 @@ func TestFileTargetRejectsStoppedOrSupersededInstance(t *testing.T) {
 	stale.Generation = 4
 	if err := checkFileRecord(stale, true, false, target); status.Code(err) != codes.NotFound {
 		t.Fatal("accepted foreign generation")
+	}
+}
+
+func TestFilesRejectEveryUnavailableLifecycleState(t *testing.T) {
+	target := &nodev1.SandboxTarget{SandboxId: "sandbox", OwnershipGeneration: 1, Revision: 1}
+	for _, state := range []string{"creating", "starting", "stopping", "stopped", "deleting", "deleted", "failed"} {
+		record := sandboxRecord{SandboxID: "sandbox", Generation: 1, Revision: 1, State: state, BootID: "boot", GuestEpoch: "epoch"}
+		if err := checkFileRecord(record, true, false, target); status.Code(err) != codes.FailedPrecondition {
+			t.Errorf("accepted state %s: %v", state, err)
+		}
 	}
 }

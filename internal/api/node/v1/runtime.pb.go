@@ -1159,6 +1159,218 @@ func (x *SyncSkillsResponse) GetRestartRequired() bool {
 	return false
 }
 
+type RuntimeListRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Target        *SandboxTarget         `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	PageSize      uint32                 `protobuf:"varint,3,opt,name=page_size,json=pageSize,proto3" json:"page_size,omitempty"`
+	PageToken     string                 `protobuf:"bytes,4,opt,name=page_token,json=pageToken,proto3" json:"page_token,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RuntimeListRequest) Reset() {
+	*x = RuntimeListRequest{}
+	mi := &file_isodo_node_v1_runtime_proto_msgTypes[18]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RuntimeListRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RuntimeListRequest) ProtoMessage() {}
+
+func (x *RuntimeListRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_isodo_node_v1_runtime_proto_msgTypes[18]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RuntimeListRequest.ProtoReflect.Descriptor instead.
+func (*RuntimeListRequest) Descriptor() ([]byte, []int) {
+	return file_isodo_node_v1_runtime_proto_rawDescGZIP(), []int{18}
+}
+
+func (x *RuntimeListRequest) GetTarget() *SandboxTarget {
+	if x != nil {
+		return x.Target
+	}
+	return nil
+}
+
+func (x *RuntimeListRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *RuntimeListRequest) GetPageSize() uint32 {
+	if x != nil {
+		return x.PageSize
+	}
+	return 0
+}
+
+func (x *RuntimeListRequest) GetPageToken() string {
+	if x != nil {
+		return x.PageToken
+	}
+	return ""
+}
+
+type RuntimeRemoveRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Target        *SandboxTarget         `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
+	Path          string                 `protobuf:"bytes,2,opt,name=path,proto3" json:"path,omitempty"`
+	Recursive     bool                   `protobuf:"varint,3,opt,name=recursive,proto3" json:"recursive,omitempty"`
+	RequestId     string                 `protobuf:"bytes,4,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RuntimeRemoveRequest) Reset() {
+	*x = RuntimeRemoveRequest{}
+	mi := &file_isodo_node_v1_runtime_proto_msgTypes[19]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RuntimeRemoveRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RuntimeRemoveRequest) ProtoMessage() {}
+
+func (x *RuntimeRemoveRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_isodo_node_v1_runtime_proto_msgTypes[19]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RuntimeRemoveRequest.ProtoReflect.Descriptor instead.
+func (*RuntimeRemoveRequest) Descriptor() ([]byte, []int) {
+	return file_isodo_node_v1_runtime_proto_rawDescGZIP(), []int{19}
+}
+
+func (x *RuntimeRemoveRequest) GetTarget() *SandboxTarget {
+	if x != nil {
+		return x.Target
+	}
+	return nil
+}
+
+func (x *RuntimeRemoveRequest) GetPath() string {
+	if x != nil {
+		return x.Path
+	}
+	return ""
+}
+
+func (x *RuntimeRemoveRequest) GetRecursive() bool {
+	if x != nil {
+		return x.Recursive
+	}
+	return false
+}
+
+func (x *RuntimeRemoveRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
+type RuntimeMoveRequest struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Target        *SandboxTarget         `protobuf:"bytes,1,opt,name=target,proto3" json:"target,omitempty"`
+	Source        string                 `protobuf:"bytes,2,opt,name=source,proto3" json:"source,omitempty"`
+	Destination   string                 `protobuf:"bytes,3,opt,name=destination,proto3" json:"destination,omitempty"`
+	Overwrite     bool                   `protobuf:"varint,4,opt,name=overwrite,proto3" json:"overwrite,omitempty"`
+	RequestId     string                 `protobuf:"bytes,5,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"`
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *RuntimeMoveRequest) Reset() {
+	*x = RuntimeMoveRequest{}
+	mi := &file_isodo_node_v1_runtime_proto_msgTypes[20]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *RuntimeMoveRequest) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*RuntimeMoveRequest) ProtoMessage() {}
+
+func (x *RuntimeMoveRequest) ProtoReflect() protoreflect.Message {
+	mi := &file_isodo_node_v1_runtime_proto_msgTypes[20]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use RuntimeMoveRequest.ProtoReflect.Descriptor instead.
+func (*RuntimeMoveRequest) Descriptor() ([]byte, []int) {
+	return file_isodo_node_v1_runtime_proto_rawDescGZIP(), []int{20}
+}
+
+func (x *RuntimeMoveRequest) GetTarget() *SandboxTarget {
+	if x != nil {
+		return x.Target
+	}
+	return nil
+}
+
+func (x *RuntimeMoveRequest) GetSource() string {
+	if x != nil {
+		return x.Source
+	}
+	return ""
+}
+
+func (x *RuntimeMoveRequest) GetDestination() string {
+	if x != nil {
+		return x.Destination
+	}
+	return ""
+}
+
+func (x *RuntimeMoveRequest) GetOverwrite() bool {
+	if x != nil {
+		return x.Overwrite
+	}
+	return false
+}
+
+func (x *RuntimeMoveRequest) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
+	}
+	return ""
+}
+
 var File_isodo_node_v1_runtime_proto protoreflect.FileDescriptor
 
 const file_isodo_node_v1_runtime_proto_rawDesc = "" +
@@ -1260,13 +1472,36 @@ const file_isodo_node_v1_runtime_proto_rawDesc = "" +
 	"\x06skills\x18\x02 \x03(\v2\x1c.isodo.node.v1.SkillDocumentR\x06skills\x12\x18\n" +
 	"\aversion\x18\x03 \x01(\x04R\aversion\"?\n" +
 	"\x12SyncSkillsResponse\x12)\n" +
-	"\x10restart_required\x18\x01 \x01(\bR\x0frestartRequired2\xa1\x05\n" +
+	"\x10restart_required\x18\x01 \x01(\bR\x0frestartRequired\"\x9a\x01\n" +
+	"\x12RuntimeListRequest\x124\n" +
+	"\x06target\x18\x01 \x01(\v2\x1c.isodo.node.v1.SandboxTargetR\x06target\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1b\n" +
+	"\tpage_size\x18\x03 \x01(\rR\bpageSize\x12\x1d\n" +
+	"\n" +
+	"page_token\x18\x04 \x01(\tR\tpageToken\"\x9d\x01\n" +
+	"\x14RuntimeRemoveRequest\x124\n" +
+	"\x06target\x18\x01 \x01(\v2\x1c.isodo.node.v1.SandboxTargetR\x06target\x12\x12\n" +
+	"\x04path\x18\x02 \x01(\tR\x04path\x12\x1c\n" +
+	"\trecursive\x18\x03 \x01(\bR\trecursive\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x04 \x01(\tR\trequestId\"\xc1\x01\n" +
+	"\x12RuntimeMoveRequest\x124\n" +
+	"\x06target\x18\x01 \x01(\v2\x1c.isodo.node.v1.SandboxTargetR\x06target\x12\x16\n" +
+	"\x06source\x18\x02 \x01(\tR\x06source\x12 \n" +
+	"\vdestination\x18\x03 \x01(\tR\vdestination\x12\x1c\n" +
+	"\toverwrite\x18\x04 \x01(\bR\toverwrite\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x05 \x01(\tR\trequestId2\xcd\a\n" +
 	"\x0eSandboxRuntime\x12Q\n" +
 	"\n" +
 	"SyncSkills\x12 .isodo.node.v1.SyncSkillsRequest\x1a!.isodo.node.v1.SyncSkillsResponse\x12H\n" +
 	"\aSyncMCP\x12\x1d.isodo.node.v1.SyncMCPRequest\x1a\x1e.isodo.node.v1.SyncMCPResponse\x12R\n" +
 	"\tWriteFile\x12 .isodo.node.v1.RuntimeWriteFrame\x1a!.isodo.guest.v1.WriteFileResponse(\x01\x12N\n" +
-	"\bReadFile\x12!.isodo.node.v1.RuntimeReadRequest\x1a\x1d.isodo.guest.v1.ReadFileFrame0\x01\x12Q\n" +
+	"\bReadFile\x12!.isodo.node.v1.RuntimeReadRequest\x1a\x1d.isodo.guest.v1.ReadFileFrame0\x01\x12C\n" +
+	"\x04Stat\x12!.isodo.node.v1.RuntimeReadRequest\x1a\x18.isodo.guest.v1.FileInfo\x12Y\n" +
+	"\rListDirectory\x12!.isodo.node.v1.RuntimeListRequest\x1a%.isodo.guest.v1.ListDirectoryResponse\x12E\n" +
+	"\x06Remove\x12#.isodo.node.v1.RuntimeRemoveRequest\x1a\x16.google.protobuf.Empty\x12C\n" +
+	"\x04Move\x12!.isodo.node.v1.RuntimeMoveRequest\x1a\x18.isodo.guest.v1.FileInfo\x12Q\n" +
 	"\rMakeDirectory\x12&.isodo.node.v1.RuntimeDirectoryRequest\x1a\x18.isodo.guest.v1.FileInfo\x12R\n" +
 	"\x10RevokeCredential\x12&.isodo.node.v1.RevokeCredentialRequest\x1a\x16.google.protobuf.Empty\x12O\n" +
 	"\rGetInjections\x12\x1c.isodo.node.v1.SandboxTarget\x1a .isodo.node.v1.SandboxInjections\x12V\n" +
@@ -1284,39 +1519,43 @@ func file_isodo_node_v1_runtime_proto_rawDescGZIP() []byte {
 	return file_isodo_node_v1_runtime_proto_rawDescData
 }
 
-var file_isodo_node_v1_runtime_proto_msgTypes = make([]protoimpl.MessageInfo, 21)
+var file_isodo_node_v1_runtime_proto_msgTypes = make([]protoimpl.MessageInfo, 24)
 var file_isodo_node_v1_runtime_proto_goTypes = []any{
-	(*SandboxTarget)(nil),           // 0: isodo.node.v1.SandboxTarget
-	(*InjectionSpec)(nil),           // 1: isodo.node.v1.InjectionSpec
-	(*InjectionSecret)(nil),         // 2: isodo.node.v1.InjectionSecret
-	(*InjectionMaterial)(nil),       // 3: isodo.node.v1.InjectionMaterial
-	(*InjectionView)(nil),           // 4: isodo.node.v1.InjectionView
-	(*SetInjectionsRequest)(nil),    // 5: isodo.node.v1.SetInjectionsRequest
-	(*SandboxInjections)(nil),       // 6: isodo.node.v1.SandboxInjections
-	(*RevokeCredentialRequest)(nil), // 7: isodo.node.v1.RevokeCredentialRequest
-	(*RuntimeWriteHeader)(nil),      // 8: isodo.node.v1.RuntimeWriteHeader
-	(*RuntimeWriteFrame)(nil),       // 9: isodo.node.v1.RuntimeWriteFrame
-	(*RuntimeReadRequest)(nil),      // 10: isodo.node.v1.RuntimeReadRequest
-	(*RuntimeDirectoryRequest)(nil), // 11: isodo.node.v1.RuntimeDirectoryRequest
-	(*SyncMCPRequest)(nil),          // 12: isodo.node.v1.SyncMCPRequest
-	(*MCPBinding)(nil),              // 13: isodo.node.v1.MCPBinding
-	(*SyncMCPResponse)(nil),         // 14: isodo.node.v1.SyncMCPResponse
-	(*SkillDocument)(nil),           // 15: isodo.node.v1.SkillDocument
-	(*SyncSkillsRequest)(nil),       // 16: isodo.node.v1.SyncSkillsRequest
-	(*SyncSkillsResponse)(nil),      // 17: isodo.node.v1.SyncSkillsResponse
-	nil,                             // 18: isodo.node.v1.InjectionSpec.IfHeadersEntry
-	nil,                             // 19: isodo.node.v1.InjectionSpec.IfQueriesEntry
-	nil,                             // 20: isodo.node.v1.InjectionSecret.HeadersEntry
-	(*v1.FileChunk)(nil),            // 21: isodo.guest.v1.FileChunk
-	(*v1.WriteFileResponse)(nil),    // 22: isodo.guest.v1.WriteFileResponse
-	(*v1.ReadFileFrame)(nil),        // 23: isodo.guest.v1.ReadFileFrame
-	(*v1.FileInfo)(nil),             // 24: isodo.guest.v1.FileInfo
-	(*emptypb.Empty)(nil),           // 25: google.protobuf.Empty
+	(*SandboxTarget)(nil),            // 0: isodo.node.v1.SandboxTarget
+	(*InjectionSpec)(nil),            // 1: isodo.node.v1.InjectionSpec
+	(*InjectionSecret)(nil),          // 2: isodo.node.v1.InjectionSecret
+	(*InjectionMaterial)(nil),        // 3: isodo.node.v1.InjectionMaterial
+	(*InjectionView)(nil),            // 4: isodo.node.v1.InjectionView
+	(*SetInjectionsRequest)(nil),     // 5: isodo.node.v1.SetInjectionsRequest
+	(*SandboxInjections)(nil),        // 6: isodo.node.v1.SandboxInjections
+	(*RevokeCredentialRequest)(nil),  // 7: isodo.node.v1.RevokeCredentialRequest
+	(*RuntimeWriteHeader)(nil),       // 8: isodo.node.v1.RuntimeWriteHeader
+	(*RuntimeWriteFrame)(nil),        // 9: isodo.node.v1.RuntimeWriteFrame
+	(*RuntimeReadRequest)(nil),       // 10: isodo.node.v1.RuntimeReadRequest
+	(*RuntimeDirectoryRequest)(nil),  // 11: isodo.node.v1.RuntimeDirectoryRequest
+	(*SyncMCPRequest)(nil),           // 12: isodo.node.v1.SyncMCPRequest
+	(*MCPBinding)(nil),               // 13: isodo.node.v1.MCPBinding
+	(*SyncMCPResponse)(nil),          // 14: isodo.node.v1.SyncMCPResponse
+	(*SkillDocument)(nil),            // 15: isodo.node.v1.SkillDocument
+	(*SyncSkillsRequest)(nil),        // 16: isodo.node.v1.SyncSkillsRequest
+	(*SyncSkillsResponse)(nil),       // 17: isodo.node.v1.SyncSkillsResponse
+	(*RuntimeListRequest)(nil),       // 18: isodo.node.v1.RuntimeListRequest
+	(*RuntimeRemoveRequest)(nil),     // 19: isodo.node.v1.RuntimeRemoveRequest
+	(*RuntimeMoveRequest)(nil),       // 20: isodo.node.v1.RuntimeMoveRequest
+	nil,                              // 21: isodo.node.v1.InjectionSpec.IfHeadersEntry
+	nil,                              // 22: isodo.node.v1.InjectionSpec.IfQueriesEntry
+	nil,                              // 23: isodo.node.v1.InjectionSecret.HeadersEntry
+	(*v1.FileChunk)(nil),             // 24: isodo.guest.v1.FileChunk
+	(*v1.WriteFileResponse)(nil),     // 25: isodo.guest.v1.WriteFileResponse
+	(*v1.ReadFileFrame)(nil),         // 26: isodo.guest.v1.ReadFileFrame
+	(*v1.FileInfo)(nil),              // 27: isodo.guest.v1.FileInfo
+	(*v1.ListDirectoryResponse)(nil), // 28: isodo.guest.v1.ListDirectoryResponse
+	(*emptypb.Empty)(nil),            // 29: google.protobuf.Empty
 }
 var file_isodo_node_v1_runtime_proto_depIdxs = []int32{
-	18, // 0: isodo.node.v1.InjectionSpec.if_headers:type_name -> isodo.node.v1.InjectionSpec.IfHeadersEntry
-	19, // 1: isodo.node.v1.InjectionSpec.if_queries:type_name -> isodo.node.v1.InjectionSpec.IfQueriesEntry
-	20, // 2: isodo.node.v1.InjectionSecret.headers:type_name -> isodo.node.v1.InjectionSecret.HeadersEntry
+	21, // 0: isodo.node.v1.InjectionSpec.if_headers:type_name -> isodo.node.v1.InjectionSpec.IfHeadersEntry
+	22, // 1: isodo.node.v1.InjectionSpec.if_queries:type_name -> isodo.node.v1.InjectionSpec.IfQueriesEntry
+	23, // 2: isodo.node.v1.InjectionSecret.headers:type_name -> isodo.node.v1.InjectionSecret.HeadersEntry
 	1,  // 3: isodo.node.v1.InjectionMaterial.spec:type_name -> isodo.node.v1.InjectionSpec
 	2,  // 4: isodo.node.v1.InjectionMaterial.secret:type_name -> isodo.node.v1.InjectionSecret
 	1,  // 5: isodo.node.v1.InjectionView.spec:type_name -> isodo.node.v1.InjectionSpec
@@ -1325,34 +1564,45 @@ var file_isodo_node_v1_runtime_proto_depIdxs = []int32{
 	4,  // 8: isodo.node.v1.SandboxInjections.rules:type_name -> isodo.node.v1.InjectionView
 	0,  // 9: isodo.node.v1.RuntimeWriteHeader.target:type_name -> isodo.node.v1.SandboxTarget
 	8,  // 10: isodo.node.v1.RuntimeWriteFrame.header:type_name -> isodo.node.v1.RuntimeWriteHeader
-	21, // 11: isodo.node.v1.RuntimeWriteFrame.chunk:type_name -> isodo.guest.v1.FileChunk
+	24, // 11: isodo.node.v1.RuntimeWriteFrame.chunk:type_name -> isodo.guest.v1.FileChunk
 	0,  // 12: isodo.node.v1.RuntimeReadRequest.target:type_name -> isodo.node.v1.SandboxTarget
 	0,  // 13: isodo.node.v1.RuntimeDirectoryRequest.target:type_name -> isodo.node.v1.SandboxTarget
 	0,  // 14: isodo.node.v1.SyncMCPRequest.target:type_name -> isodo.node.v1.SandboxTarget
 	13, // 15: isodo.node.v1.SyncMCPRequest.bindings:type_name -> isodo.node.v1.MCPBinding
 	0,  // 16: isodo.node.v1.SyncSkillsRequest.target:type_name -> isodo.node.v1.SandboxTarget
 	15, // 17: isodo.node.v1.SyncSkillsRequest.skills:type_name -> isodo.node.v1.SkillDocument
-	16, // 18: isodo.node.v1.SandboxRuntime.SyncSkills:input_type -> isodo.node.v1.SyncSkillsRequest
-	12, // 19: isodo.node.v1.SandboxRuntime.SyncMCP:input_type -> isodo.node.v1.SyncMCPRequest
-	9,  // 20: isodo.node.v1.SandboxRuntime.WriteFile:input_type -> isodo.node.v1.RuntimeWriteFrame
-	10, // 21: isodo.node.v1.SandboxRuntime.ReadFile:input_type -> isodo.node.v1.RuntimeReadRequest
-	11, // 22: isodo.node.v1.SandboxRuntime.MakeDirectory:input_type -> isodo.node.v1.RuntimeDirectoryRequest
-	7,  // 23: isodo.node.v1.SandboxRuntime.RevokeCredential:input_type -> isodo.node.v1.RevokeCredentialRequest
-	0,  // 24: isodo.node.v1.SandboxRuntime.GetInjections:input_type -> isodo.node.v1.SandboxTarget
-	5,  // 25: isodo.node.v1.SandboxRuntime.SetInjections:input_type -> isodo.node.v1.SetInjectionsRequest
-	17, // 26: isodo.node.v1.SandboxRuntime.SyncSkills:output_type -> isodo.node.v1.SyncSkillsResponse
-	14, // 27: isodo.node.v1.SandboxRuntime.SyncMCP:output_type -> isodo.node.v1.SyncMCPResponse
-	22, // 28: isodo.node.v1.SandboxRuntime.WriteFile:output_type -> isodo.guest.v1.WriteFileResponse
-	23, // 29: isodo.node.v1.SandboxRuntime.ReadFile:output_type -> isodo.guest.v1.ReadFileFrame
-	24, // 30: isodo.node.v1.SandboxRuntime.MakeDirectory:output_type -> isodo.guest.v1.FileInfo
-	25, // 31: isodo.node.v1.SandboxRuntime.RevokeCredential:output_type -> google.protobuf.Empty
-	6,  // 32: isodo.node.v1.SandboxRuntime.GetInjections:output_type -> isodo.node.v1.SandboxInjections
-	6,  // 33: isodo.node.v1.SandboxRuntime.SetInjections:output_type -> isodo.node.v1.SandboxInjections
-	26, // [26:34] is the sub-list for method output_type
-	18, // [18:26] is the sub-list for method input_type
-	18, // [18:18] is the sub-list for extension type_name
-	18, // [18:18] is the sub-list for extension extendee
-	0,  // [0:18] is the sub-list for field type_name
+	0,  // 18: isodo.node.v1.RuntimeListRequest.target:type_name -> isodo.node.v1.SandboxTarget
+	0,  // 19: isodo.node.v1.RuntimeRemoveRequest.target:type_name -> isodo.node.v1.SandboxTarget
+	0,  // 20: isodo.node.v1.RuntimeMoveRequest.target:type_name -> isodo.node.v1.SandboxTarget
+	16, // 21: isodo.node.v1.SandboxRuntime.SyncSkills:input_type -> isodo.node.v1.SyncSkillsRequest
+	12, // 22: isodo.node.v1.SandboxRuntime.SyncMCP:input_type -> isodo.node.v1.SyncMCPRequest
+	9,  // 23: isodo.node.v1.SandboxRuntime.WriteFile:input_type -> isodo.node.v1.RuntimeWriteFrame
+	10, // 24: isodo.node.v1.SandboxRuntime.ReadFile:input_type -> isodo.node.v1.RuntimeReadRequest
+	10, // 25: isodo.node.v1.SandboxRuntime.Stat:input_type -> isodo.node.v1.RuntimeReadRequest
+	18, // 26: isodo.node.v1.SandboxRuntime.ListDirectory:input_type -> isodo.node.v1.RuntimeListRequest
+	19, // 27: isodo.node.v1.SandboxRuntime.Remove:input_type -> isodo.node.v1.RuntimeRemoveRequest
+	20, // 28: isodo.node.v1.SandboxRuntime.Move:input_type -> isodo.node.v1.RuntimeMoveRequest
+	11, // 29: isodo.node.v1.SandboxRuntime.MakeDirectory:input_type -> isodo.node.v1.RuntimeDirectoryRequest
+	7,  // 30: isodo.node.v1.SandboxRuntime.RevokeCredential:input_type -> isodo.node.v1.RevokeCredentialRequest
+	0,  // 31: isodo.node.v1.SandboxRuntime.GetInjections:input_type -> isodo.node.v1.SandboxTarget
+	5,  // 32: isodo.node.v1.SandboxRuntime.SetInjections:input_type -> isodo.node.v1.SetInjectionsRequest
+	17, // 33: isodo.node.v1.SandboxRuntime.SyncSkills:output_type -> isodo.node.v1.SyncSkillsResponse
+	14, // 34: isodo.node.v1.SandboxRuntime.SyncMCP:output_type -> isodo.node.v1.SyncMCPResponse
+	25, // 35: isodo.node.v1.SandboxRuntime.WriteFile:output_type -> isodo.guest.v1.WriteFileResponse
+	26, // 36: isodo.node.v1.SandboxRuntime.ReadFile:output_type -> isodo.guest.v1.ReadFileFrame
+	27, // 37: isodo.node.v1.SandboxRuntime.Stat:output_type -> isodo.guest.v1.FileInfo
+	28, // 38: isodo.node.v1.SandboxRuntime.ListDirectory:output_type -> isodo.guest.v1.ListDirectoryResponse
+	29, // 39: isodo.node.v1.SandboxRuntime.Remove:output_type -> google.protobuf.Empty
+	27, // 40: isodo.node.v1.SandboxRuntime.Move:output_type -> isodo.guest.v1.FileInfo
+	27, // 41: isodo.node.v1.SandboxRuntime.MakeDirectory:output_type -> isodo.guest.v1.FileInfo
+	29, // 42: isodo.node.v1.SandboxRuntime.RevokeCredential:output_type -> google.protobuf.Empty
+	6,  // 43: isodo.node.v1.SandboxRuntime.GetInjections:output_type -> isodo.node.v1.SandboxInjections
+	6,  // 44: isodo.node.v1.SandboxRuntime.SetInjections:output_type -> isodo.node.v1.SandboxInjections
+	33, // [33:45] is the sub-list for method output_type
+	21, // [21:33] is the sub-list for method input_type
+	21, // [21:21] is the sub-list for extension type_name
+	21, // [21:21] is the sub-list for extension extendee
+	0,  // [0:21] is the sub-list for field type_name
 }
 
 func init() { file_isodo_node_v1_runtime_proto_init() }
@@ -1370,7 +1620,7 @@ func file_isodo_node_v1_runtime_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_isodo_node_v1_runtime_proto_rawDesc), len(file_isodo_node_v1_runtime_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   21,
+			NumMessages:   24,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

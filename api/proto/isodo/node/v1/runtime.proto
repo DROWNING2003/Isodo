@@ -11,6 +11,10 @@ service SandboxRuntime {
  rpc SyncMCP(SyncMCPRequest) returns (SyncMCPResponse);
  rpc WriteFile(stream RuntimeWriteFrame) returns (isodo.guest.v1.WriteFileResponse);
  rpc ReadFile(RuntimeReadRequest) returns (stream isodo.guest.v1.ReadFileFrame);
+ rpc Stat(RuntimeReadRequest) returns (isodo.guest.v1.FileInfo);
+ rpc ListDirectory(RuntimeListRequest) returns (isodo.guest.v1.ListDirectoryResponse);
+ rpc Remove(RuntimeRemoveRequest) returns (google.protobuf.Empty);
+ rpc Move(RuntimeMoveRequest) returns (isodo.guest.v1.FileInfo);
  rpc MakeDirectory(RuntimeDirectoryRequest) returns (isodo.guest.v1.FileInfo);
  rpc RevokeCredential(RevokeCredentialRequest) returns (google.protobuf.Empty);
  rpc GetInjections(SandboxTarget) returns (SandboxInjections);
@@ -90,3 +94,7 @@ message SyncMCPResponse { bool restart_required = 1; }
 message SkillDocument { string id = 1; string name = 2; string description = 3; string body = 4; }
 message SyncSkillsRequest { SandboxTarget target = 1; repeated SkillDocument skills = 2; uint64 version = 3; }
 message SyncSkillsResponse { bool restart_required = 1; }
+
+message RuntimeListRequest { SandboxTarget target = 1; string path = 2; uint32 page_size = 3; string page_token = 4; }
+message RuntimeRemoveRequest { SandboxTarget target = 1; string path = 2; bool recursive = 3; string request_id = 4; }
+message RuntimeMoveRequest { SandboxTarget target = 1; string source = 2; string destination = 3; bool overwrite = 4; string request_id = 5; }

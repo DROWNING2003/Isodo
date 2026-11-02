@@ -39,3 +39,27 @@ func (s *Server) makeDirectory(w http.ResponseWriter, r *http.Request) {
 		s.files.MakeDirectory(w, r, r.PathValue("sandboxID"))
 	}
 }
+
+func (s *Server) statFile(w http.ResponseWriter, r *http.Request) {
+	if s.filesReady(w) {
+		s.files.Stat(w, r, r.PathValue("sandboxID"))
+	}
+}
+
+func (s *Server) listDirectory(w http.ResponseWriter, r *http.Request) {
+	if s.filesReady(w) {
+		s.files.ListDirectory(w, r, r.PathValue("sandboxID"))
+	}
+}
+
+func (s *Server) removeFile(w http.ResponseWriter, r *http.Request) {
+	if s.filesReady(w) {
+		s.files.Remove(w, r, r.PathValue("sandboxID"))
+	}
+}
+
+func (s *Server) moveFile(w http.ResponseWriter, r *http.Request) {
+	if s.filesReady(w) {
+		s.files.Move(w, r, r.PathValue("sandboxID"))
+	}
+}
