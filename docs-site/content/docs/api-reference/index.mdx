@@ -1,9 +1,9 @@
 ---
-title: API Reference
+title: API 参考
 description: Isodo 用户和 SDK 使用的公开 HTTP API。
 ---
 
-# API Reference
+# API 参考
 
 接口页面由公开 OpenAPI 契约生成，按开发任务分组。网页登录回调、会话管理和 API Key 管理属于账号控制接口，见[认证指南](/docs/guides/authentication)。
 
@@ -14,9 +14,11 @@ description: Isodo 用户和 SDK 使用的公开 HTTP API。
 | 沙箱管理 | 创建、查询、修改名称、启动、停止和删除沙箱 |
 | 应用访问 | 获取沙箱应用入口，以及供客户端打开的应用链接 |
 | 命令执行 | 在运行中的 Guest 执行有超时和输出上限的非交互式命令 |
-| HTTP 端口预览 | 为指定 Guest 端口签发短期授权，通过 Gateway 转发 HTTP、WebSocket 和 SSE |
-| 文件 | 工作区文件上传、下载与目录创建；与 Agent 配置复用同一条链路 |
+| HTTP 端口预览 | 管理 Guest 端口公开性与私有授权，转发 HTTP、WebSocket 和 SSE |
+| 文件 | 上传、下载、创建目录、Stat、分页列目录、Remove 和 Move |
 | 安全连接 | 管理持久注入规则；读取规则材料属于敏感操作，需满足该端点的授权条件 |
+| MCP 市场 | 官方与自定义 MCP 的收藏、连接及沙箱绑定 |
+| Skill 市场 | Skill 制作、收藏及远程沙箱应用 |
 | Agent 配置 | 账号级配置文档与沙箱应用选择；使用交互式会话授权 |
 | 模板管理 | 查看系统与个人模板、修改元数据、设置可见性和派生已有版本 |
 | 模板构建 | 提交构建配方、查询构建状态 |
@@ -26,9 +28,27 @@ description: Isodo 用户和 SDK 使用的公开 HTTP API。
 
 [`RunSandboxCommand`](/docs/api-reference/endpoints/RunSandboxCommand) 接受 argv 数组，需提供 `Idempotency-Key`；API Key 需要独立 `sandboxes:execute` 权限。HTTP 200 后仍需检查 `exit_code` 和输出完整性。
 
-[`CreateSandboxPreview`](/docs/api-reference/endpoints/CreateSandboxPreview) 接受 Guest 端口，API Key 需要独立 `sandboxes:preview` 权限。浏览器应打开 `authorization_url`，仅知道 `url` 不授予访问权。授权固定五分钟，生命周期变化会提前撤销；禁用管理端口 1024 和工作台端口 8080。
+[`CreateSandboxPreview`](/docs/api-reference/endpoints/CreateSandboxPreview) 接受 Guest 端口，API Key 需要独立 `sandboxes:preview` 权限。未显式配置的通用端口默认 `public`，直接打开 `url`，无需 Token/Cookie；切换 `private` 后匿名请求返回 401，浏览器通过 `authorization_url` 获取短期授权。私有授权五分钟内有效，生命周期变化会提前撤销。管理端口 31024、31080、38080 及旧端口 1024、1080、8080 始终禁止通用预览；T3 工作台鉴权保持独立。
 
 从创建远程沙箱到启动 Python HTTP 服务的完整示例，见[HTTP 服务预览指南](/docs/guides/http-port-preview)。
+
+## 在线调试命令
+
+服务器选择 `https://api.drowning.top:18443`，不要将文档域名当作 API 地址。沙箱必须处于 running，API Key 需具备 `sandboxes:execute`。每个新请求使用新的 `Idempotency-Key`，相同请求的重试保留原值。
+
+切到 JSON 请求体，先执行：
+
+```json
+{"argv":["/bin/ls","-la","/workspace"],"cwd":"/workspace","timeout_seconds":30}
+```
+
+`argv[0]` 是可执行文件，其余元素是参数；`cwd` 是工作目录。重定向、管道等 Shell 语法必须显式启动 Shell：
+
+```json
+{"argv":["/bin/sh","-lc","echo waw >> qwe.txt"],"cwd":"/workspace","timeout_seconds":30}
+```
+
+不要把整条 Shell 命令放进单个 `argv[0]`，也不要把 `ls` 填入 `cwd`。无需环境变量时移除调试器生成的 `property1` 等占位内容。
 
 ## 模板创建与构建
 

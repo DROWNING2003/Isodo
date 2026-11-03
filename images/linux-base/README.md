@@ -88,4 +88,4 @@ ISODO_BASE_MODULES_ROOT=/var/lib/isodo/guest-kernels/6.8.0-147/root \
 
 输出目录必须不存在且位于冷源目录之外。新 manifest 固定暂停时的两盘种子、内存、CHV state/config、内核、精确 VMM binary 摘要及 CPU 指纹；`SourceDigest` 指向冷源 manifest，新 warm manifest 使用独立摘要。`probe-artifact` 经 `StartRuntime` 恢复两个实例，验证身份、随机样本及双盘写入隔离，报告完整校验与缓存恢复/首命令的分别耗时。
 
-持久化工件沿用 `publish-system` 发布；它强制运行上述双实例探针再上传和 CAS 更新 Registry。Node 的 S3Store 首次获取完整验证，随后在同进程内用校验凭据复用只读缓存；Node 重启后重新验证。运行目录与缓存必须在同一文件系统以建立硬链接；资源规格、CPU 或 VMM binary 不匹配会明确拒绝，不回退冷启动。2026-10-24 的 v5 发布与 Node 验证记录见 [预热模板规格](../../specs/warm-template-startup.md)。
+持久化工件沿用 `publish-system` 发布；它强制运行上述双实例探针再上传和 CAS 更新 Registry。Node 的 S3Store 首次获取完整验证，随后在同进程内用校验凭据复用只读缓存；Node 重启后重新验证。运行目录与缓存必须在同一文件系统以建立硬链接；资源规格、CPU 或 VMM binary 不匹配会明确拒绝，不回退冷启动。2026-10-24 的 v5 发布与 Node 验证记录见 [预热模板规格](../../docs/current-status.md)。

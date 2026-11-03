@@ -1,9 +1,9 @@
 ---
-title: MVP 架构与模块分工
+title: 整体架构与模块分工
 description: 当前实现的模块规格、调用边界、数据归属与开发分工。
 ---
 
-# MVP 架构与模块分工
+# 整体架构与模块分工
 
 Isodo 以沙箱为主体，任务、文件、Agent 配置和外部连接属于沙箱上下文。App 使用同一个 SandboxClient 管理本地 Lima 与云端 CHV，差异集中在 Transport Adapter 和 Node Runtime。
 
@@ -21,6 +21,27 @@ Isodo 以沙箱为主体，任务、文件、Agent 配置和外部连接属于�
 | 工件存储 | 不可变 manifest 与工件 | S3 上传、下载、校验、Node 缓存；`internal/templateartifact` |
 | 持久数据 | PostgreSQL、Node journal、实例盘 | 账号与期望状态、操作记录、运行时事实与工作文件各自归属 |
 
+## 中间件与基础设施
+
+| 组件 | 当前用途 |
+| --- | --- |
+| Nginx | HTTPS 入口，按域名转发 Web、API、文档与预览 |
+| Casdoor | Isodo 登录会话与 GitHub 身份提供方 |
+| PostgreSQL | 账号、沙箱、模板、授权、端口配置与事务 Outbox |
+| SeaweedFS / S3 | 模板镜像和 manifest 工件存储 |
+| Nomad / Docker | 远程 Control 及其依赖的部署与进程管理 |
+| systemd | Node、独立 Nginx 与文档站服务管理 |
+| Lima / Cloud Hypervisor | macOS 本地 Linux VM 与远程 Linux VM |
+| gRPC / mTLS / Vsock | 服务间认证、运行时 RPC 与宿主到 Guest 通道 |
+
+当前生命周期不依赖 Redis 队列；仓库基础设施示例中的可选服务不等于核心运行必需项。
+
+## MCP、Skill 与预览
+
+MCP 长期凭证保存在 Control 的受保护存储，Guest 经 Node 出站链路调用 Broker。Broker 同时检查账号连接、沙箱绑定与运行时身份。收藏不等于沙箱授权。Skill 在用户选择后同步到远程沙箱的 Codex 技能目录，由新任务加载。
+
+通用 HTTP Preview 默认 public，Gateway 限流并限制连接数；指定端口可切换 private，通过短期授权访问。两种模式都保留 Node 与 Guest 运行状态和身份校验；T3 工作台仍使用独立鉴权。
+
 ## 生命周期与数据流
 
 云端创建先在 PostgreSQL 事务中固定模板 build、Sandbox 与 outbox。Worker 向指定 Node 发出动作，Node 使用校验后的工件启动 CHV，绑定 Guest 运行身份，完成后由 Control 更新该 revision 的结果。
@@ -33,10 +54,10 @@ Isodo 以沙箱为主体，任务、文件、Agent 配置和外部连接属于�
 
 用户先通过 Control 的账号鉴权和归属检查获取短期应用入口。Preview Gateway 建立 Cookie 后，通过 Node Relay 访问当前 Guest 的 Agent 工作台；工作台本身仍执行自己的配对和连接协议。
 
-远端控制链路是 SSH 加 mTLS，Guest 入站与模型出站使用 Vsock。实机验证中的 Guest 与终端以 UID/GID 1000、NoNewPrivs=1 运行。此结果不等于完成所有越权、撤销、旧实例凭证与生产安全场景的验收。
+Control 到 Node 的业务链路使用 mTLS；SSH 用于运维。CHV Guest 通道使用 Vsock。新标准模板的 Guest Agent、终端、Commands 与 T3 以 Guest root（UID/GID 0）运行，保留 NoNewPrivileges；旧镜像仍可能使用 UID/GID 1000。VM root 不等于宿主 root，公开 Files 仍限制在 /workspace。
 
 ## 开发与维护分工
 
 仓库维护入口为 DROWNING2003；现有 Git 提交显示名包括 DROWNING、DROWNING2003，具体贡献以提交和 PR 为依据。模块按上表划分职责；本轮 Codex 辅助实现统一 API、联调、测试及文档整理。最终交付应保留真实提交与 PR 过程记录。
 
-原始基线使用现有 `v0` tag，指向 `05d0b8c`。不移动该 tag。公开 SDK、App 快照流转、跨节点自动接管及生产调度治理属于后续范围，不能作为当前 MVP 的已交付能力。
+原始基线使用现有 `v0` tag，指向 `05d0b8c`。不移动该 tag。独立发布的外部 SDK、App 快照流转、跨节点自动接管及生产调度治理属于后续范围，不能作为当前版本 的已交付能力。

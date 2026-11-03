@@ -1,114 +1,118 @@
 ---
 openapi: 3.0.3
 info:
-  title: Isodo Control API
+  title: Isodo 账号控制 API
   version: 0.1.0
-  description: Control-plane API for browser login, sessions, API-key management,
-    and health checks.
+  description: 提供浏览器登录、会话、API Key 管理和健康检查的控制面接口。
 paths:
   "/auth/login":
     get:
       operationId: Login
       tags:
-      - Web
+        - 登录会话
       security: []
       responses:
         '302':
-          description: Success
+          description: 请求成功
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema:
                 "$ref": "#/components/schemas/Error"
+      summary: 发起网页登录
   "/auth/callback":
     get:
       operationId: Callback
       tags:
-      - Web
+        - 登录会话
       security: []
       responses:
         '302':
-          description: Success
+          description: 请求成功
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema:
                 "$ref": "#/components/schemas/Error"
+      summary: 完成登录回调
   "/auth/me":
     get:
       operationId: GetSession
       tags:
-      - Web
+        - 登录会话
       security:
-      - SessionCookie: []
+        - SessionCookie: []
       responses:
         '200':
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
                 "$ref": "#/components/schemas/Session"
         default:
-          description: Request, authentication, authorization or server error
+          description: 请求、认证、权限或服务端错误
           content:
             application/json:
               schema:
                 "$ref": "#/components/schemas/Error"
+      summary: 查询当前登录会话
   "/auth/logout":
     post:
       operationId: Logout
       tags:
-      - Web
+        - 登录会话
       security:
-      - SessionCookie: []
+        - SessionCookie: []
       responses:
         '204':
-          description: Success
+          description: 请求成功
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema:
                 "$ref": "#/components/schemas/Error"
+      summary: 退出登录
   "/v1/api-keys":
     get:
       operationId: ListAPIKeys
       tags:
-      - Keys
+        - API Key
       security:
-      - SessionCookie: []
-      - BearerAuth: []
+        - SessionCookie: []
+        - BearerAuth: []
       responses:
         '200':
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
                 "$ref": "#/components/schemas/APIKeyList"
         default:
-          description: Request, authentication, authorization or server error
+          description: 请求、认证、权限或服务端错误
           content:
             application/json:
               schema:
                 "$ref": "#/components/schemas/Error"
+      summary: 列出 API Key
     post:
       operationId: CreateAPIKey
       tags:
-      - Keys
+        - API Key
       security:
-      - SessionCookie: []
-      - BearerAuth: []
+        - SessionCookie: []
+        - BearerAuth: []
       responses:
         '201':
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
                 "$ref": "#/components/schemas/CreatedAPIKey"
         default:
-          description: Request, authentication, authorization or server error
+          description: 请求、认证、权限或服务端错误
           content:
             application/json:
               schema:
@@ -119,42 +123,45 @@ paths:
           application/json:
             schema:
               "$ref": "#/components/schemas/CreateAPIKey"
+      summary: 创建 API Key
   "/v1/api-keys/{keyID}":
     delete:
       operationId: RevokeAPIKey
       tags:
-      - Keys
+        - API Key
       security:
-      - SessionCookie: []
-      - BearerAuth: []
+        - SessionCookie: []
+        - BearerAuth: []
       responses:
         '204':
-          description: Success
+          description: 请求成功
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema:
                 "$ref": "#/components/schemas/Error"
       parameters:
-      - name: keyID
-        in: path
-        required: true
-        schema:
-          type: string
+        - name: keyID
+          in: path
+          required: true
+          schema:
+            type: string
+      summary: 撤销 API Key
   "/healthz":
     get:
       operationId: Health
       tags:
-      - Web
+        - 登录会话
       security: []
       responses:
         '200':
-          description: Process is serving; not a database readiness probe.
+          description: 进程正在提供服务；此接口不代表数据库已就绪。
           content:
             text/plain:
               schema:
                 type: string
+      summary: 查询服务健康状态
 components:
   securitySchemes:
     SessionCookie:
@@ -178,10 +185,10 @@ components:
             message:
               type: string
           required:
-          - code
-          - message
+            - code
+            - message
       required:
-      - error
+        - error
     Account:
       type: object
       additionalProperties: false
@@ -191,8 +198,8 @@ components:
         provider:
           type: string
       required:
-      - name
-      - provider
+        - name
+        - provider
     Session:
       type: object
       additionalProperties: false
@@ -205,18 +212,18 @@ components:
           type: string
           format: date-time
       required:
-      - user
-      - csrf_token
-      - expires_at
+        - user
+        - csrf_token
+        - expires_at
     APIKeyScope:
       type: string
       enum:
-      - sandboxes:read
-      - sandboxes:write
-      - sandboxes:execute
-      - sandboxes:preview
-      - templates:read
-      - templates:write
+        - sandboxes:read
+        - sandboxes:write
+        - sandboxes:execute
+        - sandboxes:preview
+        - templates:read
+        - templates:write
       x-go-type: string
     APIKey:
       type: object
@@ -249,14 +256,14 @@ components:
           format: date-time
           nullable: true
       required:
-      - id
-      - name
-      - prefix
-      - scopes
-      - created_at
-      - expires_at
-      - last_used_at
-      - revoked_at
+        - id
+        - name
+        - prefix
+        - scopes
+        - created_at
+        - expires_at
+        - last_used_at
+        - revoked_at
     CreateAPIKey:
       type: object
       additionalProperties: false
@@ -277,21 +284,21 @@ components:
           format: date-time
           nullable: true
       required:
-      - name
-      - scopes
+        - name
+        - scopes
     CreatedAPIKey:
       type: object
       additionalProperties: false
       required:
-      - id
-      - name
-      - prefix
-      - scopes
-      - created_at
-      - expires_at
-      - last_used_at
-      - revoked_at
-      - api_key
+        - id
+        - name
+        - prefix
+        - scopes
+        - created_at
+        - expires_at
+        - last_used_at
+        - revoked_at
+        - api_key
       properties:
         id:
           type: string
@@ -331,4 +338,4 @@ components:
           items:
             "$ref": "#/components/schemas/APIKey"
       required:
-      - items
+        - items

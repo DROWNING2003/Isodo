@@ -104,6 +104,6 @@ ISODO_GUEST_MODULES=/path/to/matching/vsock/modules \
 
 数据库持久化与删除竞态可用 `scripts/test-preview-visibility-postgres.sh` 在新建专用容器中复现，不读取 `.env`。生成客户端提供 Go/TS 的 GetSandboxPortPreview、SetSandboxPortPreview；POST CreateSandboxPreview 返回 visibility，private 才附带授权字段。
 
-本次默认 public 策略的具体测试范围、原始运行标识和限制见[2026-11-02 验证记录](validation/http-preview-visibility-20261102.md)。
+本次默认 public 策略的具体测试范围、原始运行标识和限制见[2026-11-02 验证记录](current-status.md)。
 
 Guest 内部服务现使用五位数端口 31024 / 31080 / 38080，旧 1024 / 1080 / 8080 在迁移期也继续禁止通用预览。Node、Guest 与镜像需匹配，详见[内部端口说明](runtime-service-ports.md)。

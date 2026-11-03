@@ -21,6 +21,8 @@ await generateFiles({
     const groups = new Map([
       ['沙箱管理', []],
       ['应用访问', []],
+      ['命令执行', []],
+      ['HTTP 端口预览', []],
       ['文件', []],
       ['安全连接', []],
       ['MCP 市场', []],
@@ -40,7 +42,9 @@ await generateFiles({
       else if (route.startsWith('/v1/mcp/') || /\/mcp(?:\/|$)/.test(route)) group = 'MCP 市场';
       else if (route.startsWith('/v1/injection-rules') || route.endsWith('/injections')) group = '安全连接';
       else if (route.startsWith('/v1/credential-documents')) group = 'Agent 配置';
-      else if (/\/(files|directories)$/.test(route)) group = '文件';
+      else if (/\/commands(?:\/|$)/.test(route)) group = '命令执行';
+      else if (/\/previews(?:\/|$)/.test(route)) group = 'HTTP 端口预览';
+      else if (/\/(files|directories)(?:\/|$)/.test(route)) group = '文件';
       else if (/\/app(?:-link)?$/.test(route)) group = '应用访问';
       else if (route.startsWith('/v1/sandboxes')) group = '沙箱管理';
       else if (route.includes('/builds')) group = '模板构建';
@@ -53,7 +57,7 @@ await generateFiles({
       path: 'meta.json',
       content: JSON.stringify({
         title: 'HTTP 端点',
-        pages: [...groups].flatMap(([title, pages]) => [`---${title}---`, ...pages]),
+        pages: [...groups].filter(([, pages]) => pages.length > 0).flatMap(([title, pages]) => [`---${title}---`, ...pages]),
       }, null, 2) + '\n',
     });
   },

@@ -28,16 +28,11 @@ Skill 是可读指令文件，会进入 Guest 磁盘及包含该磁盘的快照�
 
 ## 部署与验收边界
 
-需要 migration `0018_skill_market.sql`，并以迁移 owner 更新 `deploy/sql/grant-mcp-market.sql` 的应用角色授权，再使用匹配的 API、Node 和 Web。协议生成产物及 API 文档随代码更新。不需要 Guest RPC、Nginx、公开端口或 VM 网卡变化。已按用户授权部署到 jfcs1024 演示环境：API/Node `skill-20261102-v1`，Web `skill-20261102-web2`；备份与证据见下方验收记录。
+需要 migration `0018_skill_market.sql`，并以迁移 owner 更新 `deploy/sql/grant-mcp-market.sql` 的应用角色授权，再使用匹配的 API、Node 和 Web。协议生成产物及 API 文档随代码更新。不需要 Guest RPC、Nginx、公开端口或 VM 网卡变化。实际部署版本见[当前状态](current-status.md)。
 
 测试包括：真实临时 PostgreSQL 中的账号隔离、收藏、选择、同步结果持久化、停止准入与删除触发器；上游 Runtime 是 fixture。安装器组件测试在临时目录执行同一 Python 脚本，验证安装、重试、移除、手工文件保留、旧版本拒绝和符号链接拒绝。前端验证制作表单、收藏、选择恢复、失败状态、账号切换及统一保存。
 
-上述自动化测试中的 fixture 不等同于 CHV。部署后已另外完成 [真实 Web / CHV / Codex 验收](validation/skill-market-web-chv-20261102.md)，覆盖制作、收藏、工作台选择、Guest 文件及原生发现、任务使用、移除、Stop/Start 和删除清理。测试专用沙箱已直接删除。
-
-
-### 本轮执行结果
-
-2026-11-02 在独立工作分支 `drowning/skill-market` 完成：`go test ./...`、相关 `go test -race`、`go vet ./...`、`make generate-check`、Web TypeScript 检查、Web 生产构建与相关前端测试（补充自动补全接线后为 30 文件 / 146 测试）。真实临时 PostgreSQL 17.4 的 Skill/MCP 测试及迁移 Down→Up 通过；容器和临时数据库凭证已清理，未连接现有业务数据库。Node 是 fixture，安装器在临时目录执行，没有创建业务或测试 VM。后续真实 CHV / Codex 部署验收结果见上述独立记录。
+上述自动化测试中的 fixture 不等同于 CHV。部署后已另外完成 [真实 Web / CHV / Codex 验收](current-status.md)，覆盖制作、收藏、工作台选择、Guest 文件及原生发现、任务使用、移除、Stop/Start 和删除清理。测试专用沙箱已直接删除。
 
 
 ### 工作台菜单接线

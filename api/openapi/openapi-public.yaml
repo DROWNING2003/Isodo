@@ -1,32 +1,32 @@
 openapi: 3.0.3
 info:
-  title: Isodo Public API
+  title: Isodo 公开 API
   version: 0.1.0
-  description: Sandbox APIs support sessions, Casdoor bearer tokens and scoped API keys. MCP account operations require interactive account authentication; the one-time OAuth callback is browser-facing.
+  description: 沙箱接口支持登录会话、Casdoor Bearer Token 和带权限范围的 API Key。MCP 账号操作需要交互式账号认证；一次性 OAuth 回调供浏览器访问。
 servers:
   - url: https://api.drowning.top:18443
-    description: Isodo hosted HTTPS API
+    description: Isodo 托管 HTTPS API
 paths:
   /v1/skills:
     get:
       operationId: ListSkills
-      tags: [Skills]
+      tags: [Skill 市场]
       summary: 列出平台与本人私有 Skill
       security: [{SessionCookie: []}, {BearerAuth: []}]
       responses:
         '200':
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema: {$ref: "#/components/schemas/SkillCatalog"}
         default:
-          description: Error; account session required, scoped Sandbox API keys rejected
+          description: 账号会话认证失败或请求错误；不接受沙箱 API Key
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
     post:
       operationId: CreateSkill
-      tags: [Skills]
+      tags: [Skill 市场]
       summary: 制作个人 Skill（指令正文，自动收藏）
       security: [{SessionCookie: []}, {BearerAuth: []}]
       requestBody:
@@ -36,68 +36,68 @@ paths:
             schema: {$ref: "#/components/schemas/SkillCreate"}
       responses:
         '201':
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema: {$ref: "#/components/schemas/SkillEntry"}
         default:
-          description: Error; account session required, scoped Sandbox API keys rejected
+          description: 账号会话认证失败或请求错误；不接受沙箱 API Key
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/skills/{skillID}/favorite:
     put:
       operationId: FavoriteSkill
-      tags: [Skills]
+      tags: [Skill 市场]
       summary: 收藏 Skill
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: skillID, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
         '204':
-          description: Success
+          description: 请求成功
         default:
-          description: Error; account session required, scoped Sandbox API keys rejected
+          description: 账号会话认证失败或请求错误；不接受沙箱 API Key
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
     delete:
       operationId: UnfavoriteSkill
-      tags: [Skills]
+      tags: [Skill 市场]
       summary: 取消收藏（不自动移除沙箱中的 Skill）
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: skillID, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
         '204':
-          description: Success
+          description: 请求成功
         default:
-          description: Error; account session required, scoped Sandbox API keys rejected
+          description: 账号会话认证失败或请求错误；不接受沙箱 API Key
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/sandboxes/{sandboxID}/skills:
     get:
       operationId: GetSandboxSkills
-      tags: [Skills]
+      tags: [Skill 市场]
       summary: 读取沙箱 Skill 选择与同步状态
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: sandboxID, in: path, required: true, schema: {type: string, format: uuid}}
       responses:
         '200':
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema: {$ref: "#/components/schemas/SkillSelection"}
         default:
-          description: Error; account session required, scoped Sandbox API keys rejected
+          description: 账号会话认证失败或请求错误；不接受沙箱 API Key
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
     put:
       operationId: SetSandboxSkills
-      tags: [Skills]
+      tags: [Skill 市场]
       summary: 保存完整 Skill 选择并同步；停止状态保留为 pending
       description: 最多 32 个 Skill，合计序列化内容不超过 96 KiB。返回 applied 仅代表文件已同步，新 Agent 任务加载。
       security: [{SessionCookie: []}, {BearerAuth: []}]
@@ -110,26 +110,26 @@ paths:
             schema: {$ref: "#/components/schemas/SkillSelectionInput"}
       responses:
         '200':
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema: {$ref: "#/components/schemas/SkillSelection"}
         '202':
-          description: Saved; runtime synchronization pending or failed
+          description: 已保存；运行时同步尚未完成或失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/SkillSelection"}
         default:
-          description: Error; account session required, scoped Sandbox API keys rejected
+          description: 账号会话认证失败或请求错误；不接受沙箱 API Key
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/mcp/oauth/callback:
     get:
       operationId: CompleteMCPOAuth
-      summary: Complete one-time GitHub OAuth callback in the system browser
-      description: Fixed HTTPS callback. State binds the account and PKCE transaction. Does not accept Isodo API keys or return OAuth tokens. Query strings must never be logged.
-      tags: [MCP]
+      summary: 完成浏览器中的一次性 MCP OAuth 回调
+      description: 固定 HTTPS 回调。state 绑定账号和 PKCE 事务；不接受 Isodo API Key，也不返回 OAuth 令牌。查询参数不得写入日志。
+      tags: [MCP 市场]
       security: []
       parameters:
         - {name: state, in: query, required: true, schema: {type: string}}
@@ -138,18 +138,18 @@ paths:
         - {name: iss, in: query, schema: {type: string}}
       responses:
         '200':
-          description: Authorization and tool discovery complete; return to Electron
+          description: 授权与工具发现完成，可返回应用
           content:
             text/plain:
               schema: {type: string}
         default:
-          description: Invalid, expired or replayed state; authorization failure
+          description: state 无效、过期、被重放，或第三方授权失败
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Error'}
   /v1/mcp/custom:
     post:
-      tags: [MCP]
+      tags: [MCP 市场]
       operationId: CreateCustomMCP
       security: [{SessionCookie: []}, {BearerAuth: []}]
       summary: 添加账号私有 HTTPS MCP 并验证工具发现
@@ -166,7 +166,7 @@ paths:
             application/json:
               schema: {$ref: '#/components/schemas/MCPCatalogEntry'}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Error'}
@@ -174,310 +174,311 @@ paths:
     parameters:
       - {name: customID, in: path, required: true, schema: {type: string, format: uuid}}
     delete:
-      tags: [MCP]
+      tags: [MCP 市场]
       operationId: DeleteCustomMCP
       security: [{SessionCookie: []}, {BearerAuth: []}]
       summary: 删除自己的私有 MCP 并撤销全部沙箱绑定
       responses:
         '204': {description: 已删除或已不存在}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: '#/components/schemas/Error'}
   /v1/mcp/catalog:
     get:
       operationId: ListMCPCatalog
-      summary: List available MCP services
-      tags: [MCP]
+      summary: 列出可用的 MCP 服务
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       responses:
         "200":
-          description: List available MCP services
+          description: 列出可用的 MCP 服务
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MCPCatalogList"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/mcp/catalog/{marketID}:
     get:
       operationId: GetMCPCatalog
-      summary: Get MCP catalog service
-      tags: [MCP]
+      summary: 查询 MCP 服务详情
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: marketID, in: path, required: true, schema: {type: string}}
       responses:
         "200":
-          description: Get MCP catalog service
+          description: 查询 MCP 服务详情
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MCPCatalogList"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/mcp/favorites:
     get:
       operationId: ListMCPFavorites
-      summary: List account favorites
-      tags: [MCP]
+      summary: 列出账号收藏的 MCP
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       responses:
         "200":
-          description: List account favorites
+          description: 列出账号收藏的 MCP
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MCPCatalogList"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/mcp/favorites/{marketID}:
     put:
       operationId: FavoriteMCP
-      summary: Favorite without authorizing
-      tags: [MCP]
+      summary: 收藏 MCP 服务
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: marketID, in: path, required: true, schema: {type: string}}
       responses:
         "204":
-          description: Favorite without authorizing
+          description: 收藏 MCP 服务
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
     delete:
       operationId: UnfavoriteMCP
-      summary: Unfavorite without revoking OAuth
-      tags: [MCP]
+      summary: 取消收藏，保留现有 OAuth 授权
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: marketID, in: path, required: true, schema: {type: string}}
       responses:
         "204":
-          description: Unfavorite without revoking OAuth
+          description: 取消收藏，保留现有 OAuth 授权
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/mcp/connections/{marketID}:
     get:
       operationId: GetMCPOAuthConnection
-      summary: Get connection without secrets
-      tags: [MCP]
+      summary: 查询连接状态（不返回秘密）
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: marketID, in: path, required: true, schema: {type: string}}
       responses:
         "200":
-          description: Get connection without secrets
+          description: 查询连接状态（不返回秘密）
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MCPOAuthConnection"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
     delete:
       operationId: DisconnectMCPOAuth
-      summary: Disconnect and invalidate sandbox calls
-      tags: [MCP]
+      summary: 断开连接并禁止后续沙箱调用
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: marketID, in: path, required: true, schema: {type: string}}
       responses:
         "204":
-          description: Disconnect and invalidate sandbox calls
+          description: 断开连接并禁止后续沙箱调用
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/mcp/connections/{marketID}/authorize:
     post:
       operationId: StartMCPOAuth
-      summary: Connect an official MCP using PKCE and provider registration
-      description: GitHub uses the pre-registered App. Notion discovers OAuth metadata and registers through DCR with PKCE S256. No PAT or CIMD fallback.
-      tags: [MCP]
+      summary: 使用 PKCE 和供应方注册信息连接官方 MCP
+      description: GitHub 使用预注册的 GitHub App；Notion 发现 OAuth 元数据并通过 DCR 注册，使用 PKCE S256。不使用 PAT 或 CIMD 回退。
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: marketID, in: path, required: true, schema: {type: string}}
       responses:
         "200":
-          description: Start or reconnect using registered App and PKCE
+          description: 使用已注册应用和 PKCE 发起或重新发起授权
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MCPOAuthStart"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/mcp/connections/{marketID}/tools:
     get:
       operationId: ListMCPTools
-      summary: Discover allowed upstream tools
-      tags: [MCP]
+      summary: 查询允许使用的上游工具
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: marketID, in: path, required: true, schema: {type: string}}
       responses:
         "200":
-          description: Discover allowed upstream tools
+          description: 查询允许使用的上游工具
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MCPToolList"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/mcp/oauth/transactions/{transactionID}:
     get:
       operationId: GetMCPOAuthTransaction
-      summary: Poll account authorization transaction
-      tags: [MCP]
+      summary: 查询账号授权事务状态
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: transactionID, in: path, required: true, schema: {type: string}}
       responses:
         "200":
-          description: Poll account authorization transaction
+          description: 查询账号授权事务状态
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MCPOAuthTransaction"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
     delete:
       operationId: CancelMCPOAuthTransaction
-      summary: Cancel authorization transaction
-      tags: [MCP]
+      summary: 取消授权事务
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: transactionID, in: path, required: true, schema: {type: string}}
       responses:
         "204":
-          description: Cancel authorization transaction
+          description: 取消授权事务
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/sandboxes/{sandboxID}/mcp:
     get:
       operationId: ListSandboxMCPBindings
-      summary: List explicit sandbox bindings
-      tags: [MCP]
+      summary: 列出沙箱显式授权的 MCP 绑定
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: sandboxID, in: path, required: true, schema: {type: string}}
       responses:
         "200":
-          description: List explicit sandbox bindings
+          description: 列出沙箱显式授权的 MCP 绑定
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MCPBindingList"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/sandboxes/{sandboxID}/mcp/{marketID}:
     put:
       operationId: BindSandboxMCP
-      summary: Bind authorized MCP and sync Codex config
-      tags: [MCP]
+      summary: 绑定已授权 MCP 并同步 Codex 配置
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: sandboxID, in: path, required: true, schema: {type: string}}
         - {name: marketID, in: path, required: true, schema: {type: string}}
       responses:
         "200":
-          description: Bind authorized MCP and sync Codex config
+          description: 绑定已授权 MCP 并同步 Codex 配置
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MCPSync"}
         "202":
-          description: Binding committed but config pending or failed; retry sync
+          description: 绑定已保存，但配置仍待同步或同步失败；可重试同步
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MCPSync"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
     delete:
       operationId: UnbindSandboxMCP
-      summary: Revoke binding before syncing config
-      tags: [MCP]
+      summary: 先撤销沙箱绑定，再同步配置
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: sandboxID, in: path, required: true, schema: {type: string}}
         - {name: marketID, in: path, required: true, schema: {type: string}}
       responses:
         "200":
-          description: Revoke binding before syncing config
+          description: 先撤销沙箱绑定，再同步配置
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MCPSync"}
         "202":
-          description: Binding committed but config pending or failed; retry sync
+          description: 绑定已保存，但配置仍待同步或同步失败；可重试同步
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MCPSync"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/sandboxes/{sandboxID}/mcp/{marketID}/sync:
     post:
       operationId: SyncSandboxMCP
-      summary: Apply saved MCP config; Agent restart required
-      tags: [MCP]
+      summary: 应用已保存的 MCP 配置；新 Agent 会话加载更改
+      tags: [MCP 市场]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       parameters:
         - {name: sandboxID, in: path, required: true, schema: {type: string}}
         - {name: marketID, in: path, required: true, schema: {type: string}}
       responses:
         "200":
-          description: Apply saved MCP config; Agent restart required
+          description: 应用已保存的 MCP 配置；新 Agent 会话加载更改
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MCPSync"}
         "202":
-          description: Binding committed but config pending or failed; retry sync
+          description: 绑定已保存，但配置仍待同步或同步失败；可重试同步
           content:
             application/json:
               schema: {$ref: "#/components/schemas/MCPSync"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/sandboxes/{sandboxID}/files:
     parameters:
       - {name: sandboxID, in: path, required: true, schema: {type: string}}
-      - {name: path, in: query, required: true, schema: {type: string}, description: Canonical absolute path under /workspace}
+      - {name: path, in: query, required: true, schema: {type: string}, description: /workspace 内的规范绝对路径}
     post:
       operationId: UploadSandboxFile
-      summary: Upload and atomically commit one file
-      description: Defaults to overwrite=true. One multipart part named file, up to 256 MiB. Upload bytes are staged in bounded private temporary storage before forwarding through Node and Guest. Success means Guest confirmed the SHA256 and atomic commit. COMMIT_UNKNOWN must be verified by reading the target before retrying.
-      tags: [Files]
+      summary: 上传并原子提交文件
+      description: 默认 overwrite=true。请求包含名为 file 的单个 multipart 文件部分，最大 256 MiB。上传内容先在有界私有临时空间暂存，再经 Node 转发至 Guest。成功代表 Guest
+        已确认 SHA-256 和原子提交。遇到 COMMIT_UNKNOWN 时应先读取目标文件确认结果，再决定是否重试。
+      tags: [工作区文件]
       security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
       parameters:
         - {name: overwrite, in: query, schema: {type: boolean, default: true}}
@@ -492,47 +493,47 @@ paths:
                 file: {type: string, format: binary}
       responses:
         "200":
-          description: Guest confirmed atomic commit
+          description: Guest 已确认文件原子提交
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FileWriteResult"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
     get:
       operationId: DownloadSandboxFile
-      summary: Download a verified binary file
-      description: Stages at most 256 MiB in private temporary storage and verifies the Guest completion digest before responding. X-Content-SHA256 describes the complete response body.
-      tags: [Files]
+      summary: 下载经过完整性校验的文件
+      description: 在私有临时空间暂存最多 256 MiB，校验 Guest 完成摘要后再返回响应。X-Content-SHA256 表示完整响应体的摘要。
+      tags: [工作区文件]
       security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
       responses:
         "200":
-          description: Verified binary content
+          description: 经过校验的二进制文件内容
           headers:
             X-Content-SHA256: {schema: {type: string}}
           content:
             application/octet-stream:
               schema: {type: string, format: binary}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
     delete:
       operationId: RemoveSandboxFile
-      summary: Remove a workspace file or directory
-      description: Idempotent for missing paths. Removes symlinks themselves. Empty directories require no recursive flag; nonempty directories require recursive=true and are limited to 4096 entries. Workspace root and runtime-owned paths are forbidden. Mutations reject symlink parents.
-      tags: [Files]
+      summary: 删除工作区文件或目录
+      description: 不存在的路径也视为成功。符号链接只删除链接本身；空目录可直接删除，非空目录要求 recursive=true，最多处理 4096 个条目。禁止删除工作区根目录和运行时保护路径，拒绝符号链接父目录。
+      tags: [工作区文件]
       security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
       parameters:
         - {name: recursive, in: query, schema: {type: boolean, default: false}}
       responses:
         "204":
-          description: Success
+          description: 请求成功
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
@@ -541,8 +542,8 @@ paths:
       - {name: sandboxID, in: path, required: true, schema: {type: string}}
     post:
       operationId: MakeSandboxDirectory
-      summary: Create a workspace directory
-      tags: [Files]
+      summary: 创建工作区目录
+      tags: [工作区文件]
       security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
       requestBody:
         required: true
@@ -556,20 +557,21 @@ paths:
                 parents: {type: boolean, default: true}
       responses:
         "200":
-          description: Directory exists
+          description: 目录已存在或已创建
           content:
             application/json:
               schema: {type: object, required: [path], properties: {path: {type: string}}}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
     get:
       operationId: ListSandboxDirectory
-      summary: List a workspace directory
-      description: Lexical name order. page_size defaults to 100 and is limited to 500. Pass next_page_token unchanged to page_token; tokens are name cursors, not a consistent snapshot across concurrent mutations. A directory is limited to 4096 entries. Symlink metadata is returned without following the final symlink.
-      tags: [Files]
+      summary: 列出工作区目录
+      description: 按名称字典序返回条目。page_size 默认 100、最大 500；将 next_page_token 原样传回 page_token。令牌是名称游标，不保证并发修改下的一致性快照。单目录最多 4096
+        个条目；返回最终符号链接的元数据，不跟随该链接。
+      tags: [工作区文件]
       security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
       parameters:
         - {name: path, in: query, required: true, schema: {type: string}}
@@ -577,33 +579,33 @@ paths:
         - {name: page_token, in: query, schema: {type: string, maxLength: 1024}}
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FileDirectoryPage"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/sandboxes/{sandboxID}/files/stat:
     parameters:
       - {name: sandboxID, in: path, required: true, schema: {type: string}}
-      - {name: path, in: query, required: true, schema: {type: string}, description: Canonical absolute path under /workspace}
+      - {name: path, in: query, required: true, schema: {type: string}, description: /workspace 内的规范绝对路径}
     get:
       operationId: StatSandboxFile
-      summary: Inspect workspace path metadata
-      description: Returns lstat metadata, including symlink_target for a final symlink, without following it. Workspace root is allowed; paths outside workspace are rejected.
-      tags: [Files]
+      summary: 查询工作区路径元数据
+      description: 返回 lstat 元数据；最终路径为符号链接时包含 symlink_target，不跟随该链接。允许查询 /workspace 本身，拒绝工作区外的路径。
+      tags: [工作区文件]
       security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FileMetadata"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
@@ -612,9 +614,10 @@ paths:
       - {name: sandboxID, in: path, required: true, schema: {type: string}}
     post:
       operationId: MoveSandboxFile
-      summary: Move a workspace file or directory
-      description: Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
-      tags: [Files]
+      summary: 移动工作区文件或目录
+      description: 默认 overwrite=true，与文件上传一致。只有普通文件可以覆盖已有普通文件，不覆盖目录。overwrite=false
+        使用原子禁止覆盖操作。源和目标都必须是工作区内的规范路径；禁止工作区根、运行时保护路径和符号链接父目录。源和目标相同时返回当前元数据。
+      tags: [工作区文件]
       security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
       requestBody:
         required: true
@@ -630,12 +633,12 @@ paths:
                 overwrite: {type: boolean, default: true}
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema: {$ref: "#/components/schemas/FileMetadata"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
@@ -644,25 +647,25 @@ paths:
       - {name: sandboxID, in: path, required: true, schema: {type: string}}
     get:
       operationId: GetSandboxInjections
-      summary: Read masked host-side injection configuration
-      tags: [Sandboxes]
+      summary: 读取脱敏后的沙箱凭证注入配置
+      tags: [沙箱管理]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       responses:
         "200":
-          description: Masked configuration; never contains secret material
+          description: 脱敏配置，不包含秘密材料
           content:
             application/json:
               schema: {$ref: "#/components/schemas/SandboxInjectionState"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
     put:
       operationId: SetSandboxInjections
-      summary: Replace sandbox host-side injection rules
-      description: Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
-      tags: [Sandboxes]
+      summary: 替换沙箱的宿主侧凭证注入规则
+      description: 需要所有者的交互式授权。秘密材料仅通过 Node mTLS 传递，不写入 Guest 文件。Control 和 Node 均校验生命周期 revision。
+      tags: [沙箱管理]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       requestBody:
         required: true
@@ -675,12 +678,12 @@ paths:
                 rules: {type: array, maxItems: 32, items: {$ref: "#/components/schemas/SandboxInjection"}}
       responses:
         "200":
-          description: Masked applied configuration
+          description: 已应用的脱敏配置
           content:
             application/json:
               schema: {$ref: "#/components/schemas/SandboxInjectionState"}
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
@@ -689,13 +692,13 @@ paths:
       - {name: kind, in: path, required: true, schema: {type: string}}
     get:
       operationId: ListCredentialDocuments
-      summary: List encrypted account credential configurations
-      description: Interactive login required. Kind is agents or sandboxes. Values are decrypted only for the owning account.
-      tags: [Credentials]
+      summary: 列出账号加密保存的凭证配置文档
+      description: 需要交互式登录。kind 为 agents 或 sandboxes，只有所属账号可以解密读取配置内容。
+      tags: [凭证配置]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       responses:
         "200":
-          description: Configurations owned by the current account
+          description: 当前账号拥有的配置
           content:
             application/json:
               schema:
@@ -711,7 +714,7 @@ paths:
                         id: {type: string}
                         value: {type: object, additionalProperties: true}
         default:
-          description: Authentication, validation or storage error
+          description: 认证、参数校验或存储错误
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
@@ -721,9 +724,10 @@ paths:
       - {name: id, in: path, required: true, schema: {type: string, maxLength: 160}}
     put:
       operationId: PutCredentialDocument
-      summary: Save an account Agent configuration or sandbox credential selection
-      description: Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
-      tags: [Credentials]
+      summary: 保存账号 Agent 配置或沙箱凭证选择
+      description: Agent 配置包含 id、name、agent、connectionId、modelNames、defaultModel、filePath、content、updatedAt。沙箱配置包含
+        agentIds、credentialIds 和已应用的模型快照。所引用的 Agent 必须属于当前账号，API Key 不能管理这些记录。
+      tags: [凭证配置]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       requestBody:
         required: true
@@ -732,7 +736,7 @@ paths:
             schema: {type: object, additionalProperties: true}
       responses:
         "200":
-          description: Configuration persisted with encryption at rest
+          description: 配置已加密持久化
           content:
             application/json:
               schema:
@@ -742,42 +746,42 @@ paths:
                   id: {type: string}
                   value: {type: object, additionalProperties: true}
         default:
-          description: Authentication, validation or storage error
+          description: 认证、参数校验或存储错误
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
     delete:
       operationId: DeleteCredentialDocument
-      summary: Delete one configuration owned by the current account
-      tags: [Credentials]
+      summary: 删除当前账号的一份配置
+      tags: [凭证配置]
       security: [{SessionCookie: []}, {BearerAuth: []}]
       responses:
-        "204": {description: Configuration deleted; referenced API credential is retained}
+        "204": {description: 配置已删除，保留其引用的 API 凭证}
         default:
-          description: Authentication, validation or storage error
+          description: 认证、参数校验或存储错误
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/sandboxes:
     get:
       operationId: ListSandboxes
-      summary: List sandboxes
-      description: Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
+      summary: 列出沙箱
+      description: 返回当前认证用户拥有的沙箱，使用 limit 和 offset 分页。
       tags:
-        - Sandboxes
+        - 沙箱管理
       security:
         - SessionCookie: []
         - BearerAuth: []
         - APIKeyAuth: []
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SandboxList"
         default:
-          description: Request, authentication, authorization or server error
+          description: 请求、认证、权限或服务端错误
           content:
             application/json:
               schema:
@@ -799,24 +803,23 @@ paths:
             default: 0
     post:
       operationId: CreateSandbox
-      summary: Create a sandbox
-      description: Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime
-        availability depends on the configured backend.
+      summary: 创建沙箱
+      description: 为当前认证用户创建沙箱并登记初始期望状态。运行时可用性取决于已配置的后端；应继续查询实际运行状态。
       tags:
-        - Sandboxes
+        - 沙箱管理
       security:
         - SessionCookie: []
         - BearerAuth: []
         - APIKeyAuth: []
       responses:
         "202":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Sandbox"
         default:
-          description: Request, authentication, authorization or server error
+          description: 请求、认证、权限或服务端错误
           content:
             application/json:
               schema:
@@ -830,23 +833,23 @@ paths:
   /v1/sandboxes/{sandboxID}:
     get:
       operationId: GetSandbox
-      summary: Get a sandbox
-      description: Returns one sandbox owned by the authenticated user. A sandbox owned by another user is reported as not found.
+      summary: 查询沙箱
+      description: 返回当前用户拥有的一个沙箱；其他用户的沙箱统一返回未找到。
       tags:
-        - Sandboxes
+        - 沙箱管理
       security:
         - SessionCookie: []
         - BearerAuth: []
         - APIKeyAuth: []
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Sandbox"
         default:
-          description: Request, authentication, authorization or server error
+          description: 请求、认证、权限或服务端错误
           content:
             application/json:
               schema:
@@ -859,23 +862,23 @@ paths:
             type: string
     patch:
       operationId: UpdateSandbox
-      summary: Update a sandbox
-      description: Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+      summary: 更新沙箱信息
+      description: 更新当前用户所拥有沙箱的可变名称和元数据。
       tags:
-        - Sandboxes
+        - 沙箱管理
       security:
         - SessionCookie: []
         - BearerAuth: []
         - APIKeyAuth: []
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Sandbox"
         default:
-          description: Request, authentication, authorization or server error
+          description: 请求、认证、权限或服务端错误
           content:
             application/json:
               schema:
@@ -894,24 +897,24 @@ paths:
             type: string
     delete:
       operationId: DeleteSandbox
-      summary: Delete a sandbox
-      description: Requests Node cleanup. The resource remains readable until cleanup completes; repeated deletion returns the same action while pending or completed. Missing resources return 204.
+      summary: 删除沙箱
+      description: 请求 Node 清理资源。清理完成前资源仍可读取；重复删除返回同一删除动作的当前结果。不存在的资源返回 204。
       tags:
-        - Sandboxes
+        - 沙箱管理
       security:
         - SessionCookie: []
         - BearerAuth: []
         - APIKeyAuth: []
       responses:
         "202":
-          description: Cleanup accepted or its current result
+          description: 已接受清理请求，或返回当前清理结果
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Sandbox"}
         "204":
-          description: Sandbox does not exist
+          description: 沙箱不存在
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema:
@@ -925,23 +928,23 @@ paths:
   /v1/sandboxes/{sandboxID}/start:
     post:
       operationId: StartSandbox
-      summary: Start a stopped sandbox
-      description: Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
+      summary: 启动已停止的沙箱
+      description: 对当前用户拥有且已停止的云端沙箱执行保留磁盘的冷启动。这是异步操作，应轮询直至 observed_state 为 running。
       tags:
-        - Sandboxes
+        - 沙箱管理
       security:
         - SessionCookie: []
         - BearerAuth: []
         - APIKeyAuth: []
       responses:
         "202":
-          description: Start accepted
+          description: 已接受启动请求
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Sandbox"
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema:
@@ -955,23 +958,23 @@ paths:
   /v1/sandboxes/{sandboxID}/stop:
     post:
       operationId: StopSandbox
-      summary: Stop a running sandbox
-      description: Requests a graceful stop for a cloud sandbox owned by the authenticated user while preserving its instance disks. The operation is asynchronous; poll the sandbox until observed_state becomes stopped.
+      summary: 停止运行中的沙箱
+      description: 优雅停止当前用户拥有的云端沙箱并保留实例磁盘。这是异步操作，应轮询直至 observed_state 为 stopped。
       tags:
-        - Sandboxes
+        - 沙箱管理
       security:
         - SessionCookie: []
         - BearerAuth: []
         - APIKeyAuth: []
       responses:
         "202":
-          description: Stop accepted
+          description: 已接受停止请求
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Sandbox"
         default:
-          description: Error
+          description: 请求失败
           content:
             application/json:
               schema:
@@ -985,34 +988,34 @@ paths:
   /v1/sandboxes/{sandboxID}/app:
     get:
       operationId: GetSandboxApp
-      summary: Open a sandbox application
-      description: Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and redirects the browser to the sandbox application.
+      summary: 打开沙箱应用
+      description: 为已认证的沙箱所有者创建短期 Agent 工作台配对链接，并将浏览器重定向至沙箱应用。
       tags:
-        - Sandboxes
+        - 沙箱管理
       security:
         - SessionCookie: []
         - BearerAuth: []
       responses:
         "303":
-          description: Redirects to the sandbox application's Agent workbench pairing page. The pairing credential is short-lived and is carried in the URL fragment.
+          description: 重定向至 Agent 工作台配对页面；短期配对凭证放在 URL fragment 中。
           headers:
             Location:
               schema:
                 type: string
         "401":
-          description: Authentication is required
+          description: 需要身份认证
         "403":
-          description: An interactive Isodo session is required
+          description: 需要交互式 Isodo 登录会话
         "404":
-          description: Sandbox not found
+          description: 未找到沙箱
         "409":
-          description: Sandbox is not running
+          description: 沙箱未运行
         "501":
-          description: The configured sandbox backend does not support application links
+          description: 当前沙箱后端不支持应用链接
         "502":
-          description: The Node returned an invalid or unreachable application link
+          description: Node 返回了无效或无法访问的应用链接
         "503":
-          description: Sandbox application service is unavailable
+          description: 沙箱应用服务暂不可用
       parameters:
         - name: sandboxID
           in: path
@@ -1022,34 +1025,35 @@ paths:
   /v1/sandboxes/{sandboxID}/app-link:
     post:
       operationId: CreateSandboxAppLink
-      summary: Create a sandbox application link
-      description: Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and returns it as JSON. Desktop clients and SDKs use this endpoint; browsers can use `GET /v1/sandboxes/{sandboxID}/app` instead. The pairing credential is carried in the `pairing_url` fragment and is never sent to the Isodo API.
+      summary: 获取沙箱应用链接
+      description: 为已认证的沙箱所有者创建短期 Agent 工作台配对链接，并返回 JSON。桌面客户端使用此接口；浏览器也可访问 GET /v1/sandboxes/{sandboxID}/app。配对凭证位于
+        pairing_url 的 fragment 中，不通过该链接发送至 Isodo API。
       tags:
-        - Sandboxes
+        - 沙箱管理
       security:
         - SessionCookie: []
         - BearerAuth: []
       responses:
         "200":
-          description: The sandbox application link.
+          description: 沙箱应用入口与配对链接
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/SandboxAppLink"
         "401":
-          description: Authentication is required
+          description: 需要身份认证
         "403":
-          description: An interactive Isodo session is required
+          description: 需要交互式 Isodo 登录会话
         "404":
-          description: Sandbox not found
+          description: 未找到沙箱
         "409":
-          description: Sandbox is not running
+          description: 沙箱未运行
         "501":
-          description: The configured sandbox backend does not support application links
+          description: 当前沙箱后端不支持应用链接
         "502":
-          description: The Node returned an invalid or unreachable application link
+          description: Node 返回了无效或无法访问的应用链接
         "503":
-          description: Sandbox application service is unavailable
+          description: 沙箱应用服务暂不可用
       parameters:
         - name: sandboxID
           in: path
@@ -1061,8 +1065,9 @@ paths:
       - {name: sandboxID, in: path, required: true, schema: {type: string}}
     post:
       operationId: CreateSandboxPreview
-      summary: Authorize a sandbox HTTP port preview
-      description: Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+      summary: 获取沙箱 HTTP 端口预览入口
+      description: 需要运行中的远程 CHV 沙箱；API Key 需要 sandboxes:preview。未配置的端口默认为 public，返回可直接访问的 URL。private 端口返回有效期五分钟、绑定账号、策略
+        revision 和当前 Guest 运行身份的 authorization_url。禁止访问运行时端口 31024、31080、38080 及旧端口 1024、1080、8080。启停、删除和策略变化会撤销私有授权。
       tags: [Previews]
       security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
       requestBody:
@@ -1077,7 +1082,7 @@ paths:
                 port: {type: integer, minimum: 1, maximum: 65535}
       responses:
         "201":
-          description: Public ports return a directly accessible url. Private ports additionally return a short-lived authorization_url and expires_at; treat authorization_url as a secret.
+          description: public 端口返回可直接访问的 url。private 端口额外返回短期 authorization_url 和 expires_at；authorization_url 属于秘密，不应泄露。
           content:
             application/json:
               schema:
@@ -1089,7 +1094,7 @@ paths:
                   authorization_url: {type: string, format: uri}
                   expires_at: {type: string, format: date-time}
         default:
-          description: Authentication, port validation or runtime error.
+          description: 认证、端口校验或运行时错误
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
@@ -1099,25 +1104,26 @@ paths:
       - {name: port, in: path, required: true, schema: {type: integer, minimum: 1, maximum: 65535}}
     get:
       operationId: GetSandboxPortPreview
-      summary: Get a sandbox HTTP port visibility
-      description: Requires ownership and sandboxes:read. Unconfigured ports default to public. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited.
+      summary: 查询 HTTP 端口可见性
+      description: 需要沙箱所有权和 sandboxes:read。未配置的端口默认为 public。禁止使用运行时端口 31024、31080、38080 及旧端口 1024、1080、8080。
       tags: [Previews]
       security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
       responses:
         "200":
-          description: Current persisted policy or the public default.
+          description: 已持久化的端口策略，或默认 public 策略
           content:
             application/json:
               schema: {$ref: "#/components/schemas/PortPreviewPolicy"}
         default:
-          description: Request, ownership or storage error.
+          description: 请求、资源归属或存储错误
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
     put:
       operationId: SetSandboxPortPreview
-      summary: Change a sandbox HTTP port visibility
-      description: Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+      summary: 修改 HTTP 端口可见性
+      description: 需要沙箱所有权和 sandboxes:preview。策略在停止、启动后保留，删除沙箱时清理。新请求读取已提交的策略；确认切换前取消本 Gateway 的活动流，其他 Gateway 最迟每 100ms
+        重新校验。T3 工作台鉴权保持不变。
       tags: [Previews]
       security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
       requestBody:
@@ -1127,12 +1133,12 @@ paths:
             schema: {$ref: "#/components/schemas/PortPreviewPolicy"}
       responses:
         "200":
-          description: Persisted policy.
+          description: 已持久化的端口策略
           content:
             application/json:
               schema: {$ref: "#/components/schemas/PortPreviewPolicy"}
         default:
-          description: Request, ownership or storage error.
+          description: 请求、资源归属或存储错误
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
@@ -1141,8 +1147,9 @@ paths:
       - {name: sandboxID, in: path, required: true, schema: {type: string}}
     post:
       operationId: RunSandboxCommand
-      summary: Run a bounded non-interactive command inside a sandbox Guest
-      description: Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+      summary: 在沙箱 Guest 内执行命令
+      description: 在运行中的 Guest 内执行 argv，不在宿主 Shell 执行。必须提供 8–128 个安全 ASCII 字符组成的 Idempotency-Key；同一请求重试时复用该键。命令以非零退出码结束时，HTTP
+        仍返回 200，应检查 exit_code。
       tags: [Commands]
       security: [{SessionCookie: []}, {BearerAuth: []}, {APIKeyAuth: []}]
       parameters:
@@ -1157,20 +1164,20 @@ paths:
             schema: {$ref: "#/components/schemas/CommandRunRequest"}
       responses:
         "200":
-          description: Guest completed the command and returned its exit status.
+          description: Guest 已完成命令并返回退出状态
           content:
             application/json:
               schema: {$ref: "#/components/schemas/CommandRunResult"}
         default:
-          description: Authentication, execution or runtime error.
+          description: 认证、命令执行或运行时错误
           content:
             application/json:
               schema: {$ref: "#/components/schemas/Error"}
   /v1/injection-rules:
     get:
       operationId: ListInjectionRules
-      summary: List account injection rules
-      description: Returns the authenticated account's persistent injection rules. Secrets are never returned; only a short masked hint is exposed.
+      summary: 列出账号凭证注入规则
+      description: 返回当前账号的持久注入规则。只返回简短脱敏提示，不返回秘密内容。
       tags:
         - Secure Connections
       security:
@@ -1178,21 +1185,21 @@ paths:
         - BearerAuth: []
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/InjectionRuleList"
         default:
-          description: Request, authentication or server error
+          description: 请求、认证或服务端错误
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
     post:
       operationId: CreateInjectionRule
-      summary: Create an account injection rule
-      description: Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+      summary: 创建账号凭证注入规则
+      description: 创建账号级持久规则，所有者可将其授权给沙箱。秘密材料在写入存储前加密封装。
       tags:
         - Secure Connections
       security:
@@ -1200,13 +1207,13 @@ paths:
         - BearerAuth: []
       responses:
         "201":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/InjectionRule"
         default:
-          description: Request, authentication or server error
+          description: 请求、认证或服务端错误
           content:
             application/json:
               schema:
@@ -1226,7 +1233,7 @@ paths:
           type: string
     get:
       operationId: GetInjectionRule
-      summary: Get an account injection rule
+      summary: 查询账号凭证注入规则
       tags:
         - Secure Connections
       security:
@@ -1234,21 +1241,21 @@ paths:
         - BearerAuth: []
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/InjectionRule"
         default:
-          description: Request, authentication or server error
+          description: 请求、认证或服务端错误
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/Error"
     patch:
       operationId: UpdateInjectionRule
-      summary: Update an account injection rule
-      description: Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+      summary: 更新账号凭证注入规则
+      description: 更新当前账号拥有的规则；省略 secret 时保留已有的加密秘密材料。
       tags:
         - Secure Connections
       security:
@@ -1256,13 +1263,13 @@ paths:
         - BearerAuth: []
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/InjectionRule"
         default:
-          description: Request, authentication or server error
+          description: 请求、认证或服务端错误
           content:
             application/json:
               schema:
@@ -1275,7 +1282,7 @@ paths:
               $ref: "#/components/schemas/PatchInjectionRule"
     delete:
       operationId: DeleteInjectionRule
-      summary: Delete an account injection rule
+      summary: 删除账号凭证注入规则
       tags:
         - Secure Connections
       security:
@@ -1283,9 +1290,9 @@ paths:
         - BearerAuth: []
       responses:
         "204":
-          description: Success
+          description: 请求成功
         default:
-          description: Request, authentication or server error
+          description: 请求、认证或服务端错误
           content:
             application/json:
               schema:
@@ -1299,8 +1306,8 @@ paths:
           type: string
     get:
       operationId: GetInjectionRuleMaterial
-      summary: Read injection material
-      description: Returns the plaintext header/key for the authenticated owner so a trusted local runtime can apply it. The response is never cached; secrets are never logged.
+      summary: 读取凭证注入材料
+      description: 为已认证所有者返回明文请求头或密钥，以供受信任的本地运行时应用。响应禁止缓存，秘密不得写入日志。
       tags:
         - Secure Connections
       security:
@@ -1308,13 +1315,13 @@ paths:
         - BearerAuth: []
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/InjectionRuleMaterial"
         default:
-          description: Request, authentication or server error
+          description: 请求、认证或服务端错误
           content:
             application/json:
               schema:
@@ -1322,22 +1329,22 @@ paths:
   /v1/system-templates:
     get:
       operationId: ListSystemTemplates
-      summary: List platform default templates
+      summary: 列出平台默认模板
       tags:
-        - Templates
+        - 模板管理
       security: &a1
         - SessionCookie: []
         - BearerAuth: []
         - APIKeyAuth: []
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
                 $ref: "#/components/schemas/TemplateList"
         default: &a2
-          description: Request, authentication, authorization or server error
+          description: 请求、认证、权限或服务端错误
           content:
             application/json:
               schema:
@@ -1362,13 +1369,13 @@ paths:
   /v1/templates:
     get:
       operationId: ListTemplates
-      summary: List templates visible to the authenticated user
+      summary: 列出当前用户可见的模板
       tags:
-        - Templates
+        - 模板管理
       security: *a1
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
@@ -1389,13 +1396,13 @@ paths:
             default: owned
     post:
       operationId: CreateTemplate
-      summary: Create a personal template
+      summary: 创建个人模板
       tags:
-        - Templates
+        - 模板管理
       security: *a1
       responses:
         "201":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
@@ -1416,13 +1423,13 @@ paths:
           type: string
     get:
       operationId: GetTemplate
-      summary: Get a template
+      summary: 查询模板
       tags:
-        - Templates
+        - 模板管理
       security: *a1
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
@@ -1430,13 +1437,13 @@ paths:
         default: *a2
     patch:
       operationId: UpdateTemplate
-      summary: Update an owned template
+      summary: 更新本人拥有的模板
       tags:
-        - Templates
+        - 模板管理
       security: *a1
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
@@ -1450,13 +1457,13 @@ paths:
               $ref: "#/components/schemas/PatchTemplate"
     delete:
       operationId: DeleteTemplate
-      summary: Delete an owned template
+      summary: 删除本人拥有的模板
       tags:
-        - Templates
+        - 模板管理
       security: *a1
       responses:
         "204":
-          description: Success
+          description: 请求成功
         default: *a2
   /v1/templates/{templateID}/builds:
     parameters:
@@ -1467,13 +1474,13 @@ paths:
           type: string
     post:
       operationId: CreateTemplateBuild
-      summary: Queue an immutable template build
+      summary: 提交不可变模板构建任务
       tags:
-        - Templates
+        - 模板管理
       security: *a1
       responses:
         "202":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
@@ -1499,13 +1506,13 @@ paths:
           type: string
     get:
       operationId: GetTemplateBuild
-      summary: Get template build status
+      summary: 查询模板构建状态
       tags:
-        - Templates
+        - 模板管理
       security: *a1
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
@@ -1525,13 +1532,13 @@ paths:
           type: string
     get:
       operationId: GetTemplateTag
-      summary: Resolve a Ready build tag
+      summary: 解析 Ready 构建标签
       tags:
-        - Templates
+        - 模板管理
       security: *a1
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
@@ -1539,13 +1546,13 @@ paths:
         default: *a2
     put:
       operationId: SetTemplateTag
-      summary: Atomically publish a Ready build under a tag
+      summary: 将 Ready 构建原子发布至标签
       tags:
-        - Templates
+        - 模板管理
       security: *a1
       responses:
         "200":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
@@ -1559,13 +1566,13 @@ paths:
               $ref: "#/components/schemas/SetTemplateTag"
     delete:
       operationId: DeleteTemplateTag
-      summary: Remove a template build tag
+      summary: 移除模板构建标签
       tags:
-        - Templates
+        - 模板管理
       security: *a1
       responses:
         "204":
-          description: Success
+          description: 请求成功
         default: *a2
   /v1/templates/{templateID}/fork:
     parameters:
@@ -1576,13 +1583,13 @@ paths:
           type: string
     post:
       operationId: ForkTemplate
-      summary: Fork an accessible Ready build into a personal template
+      summary: 从可访问的 Ready 构建派生个人模板
       tags:
-        - Templates
+        - 模板管理
       security: *a1
       responses:
         "201":
-          description: Success
+          description: 请求成功
           content:
             application/json:
               schema:
@@ -1616,15 +1623,15 @@ components:
         name: {type: string}
         kind: {type: string, enum: [regular, directory, symlink]}
         size_bytes: {type: integer, format: int64, minimum: 0}
-        mode: {type: integer, minimum: 0, maximum: 511, description: Unix permission bits as a decimal integer}
+        mode: {type: integer, minimum: 0, maximum: 511, description: 以十进制整数表示的 Unix 权限位}
         modified_at: {type: string, format: date-time}
-        symlink_target: {type: string, description: Raw symlink metadata only; never followed outside workspace}
+        symlink_target: {type: string, description: 符号链接的原始元数据，不通过链接访问工作区外路径}
     FileDirectoryPage:
       type: object
       required: [entries, next_page_token]
       properties:
         entries: {type: array, items: {$ref: "#/components/schemas/FileMetadata"}}
-        next_page_token: {type: string, description: Empty when there are no more entries}
+        next_page_token: {type: string, description: 没有后续条目时为空}
     SkillCreate:
       type: object
       additionalProperties: false
@@ -1676,7 +1683,19 @@ components:
         token: {type: string, maxLength: 4096, writeOnly: true}
     MCPCatalogEntry:
       type: object
-      required: [market_mcp_id, name, provider, description, endpoint, transport, auth_kind, favorite, status, oauth_configured]
+      required:
+        [
+          market_mcp_id,
+          name,
+          provider,
+          description,
+          endpoint,
+          transport,
+          auth_kind,
+          favorite,
+          status,
+          oauth_configured
+        ]
       properties:
         market_mcp_id: {type: string}
         name: {type: string}
@@ -1935,7 +1954,7 @@ components:
         revision:
           type: string
           pattern: '^[1-9][0-9]*$'
-          description: Lifecycle intent revision. PATCH name or metadata does not change it.
+          description: 生命周期意图的 revision。仅修改名称或元数据不会改变此值。
         last_action:
           $ref: '#/components/schemas/SandboxAction'
         deletion:
@@ -1945,7 +1964,7 @@ components:
           format: date-time
         runtime_id:
           type: string
-          description: Opaque handle for the current running instance, never caller-selected.
+          description: 当前运行实例的不透明标识，由运行时分配，客户端不能指定。
         resources:
           $ref: "#/components/schemas/SandboxResources"
         desired_state:
@@ -1976,7 +1995,7 @@ components:
           maxLength: 128
         template:
           type: string
-          description: System catalog name or template UUID, optionally followed by :tag. Defaults to base:default. Resolved to an immutable build at creation.
+          description: 系统模板目录名或模板 UUID，可附加 :tag。默认 base:default，创建时解析并固定为不可变 build。
           example: base
         metadata:
           $ref: "#/components/schemas/Metadata"
@@ -2021,15 +2040,15 @@ components:
           type: string
           enum:
             - t3
-          description: The named Guest service this link targets.
+          description: 此链接访问的 Guest 服务名称
         url:
           type: string
           format: uri
-          description: The application base URL. Clients must treat this value as opaque and must not construct or rewrite it.
+          description: 应用基础 URL。客户端必须将其视为不透明地址，不自行构造或改写。
         pairing_url:
           type: string
           format: uri
-          description: A ready-to-open URL whose fragment carries the short-lived Agent workbench pairing credential.
+          description: 可直接打开的 URL，其 fragment 携带短期 Agent 工作台配对凭证。
         status:
           type: string
           enum:
@@ -2043,12 +2062,12 @@ components:
           format: date-time
         generation:
           type: string
-          description: Opaque runtime generation. When present, the link is valid only for this generation; a Stop/Start/Restore changes it. Clients must not parse it.
+          description: 不透明的运行时 generation。存在时链接只对该 generation 有效；停止、启动或恢复后会改变。客户端不得解析此值。
         capabilities:
           type: array
           items:
             type: string
-          description: Named capabilities available through this application link, for example `terminal` and `files`. Clients must treat unknown values as optional.
+          description: 该应用链接提供的能力名称，例如 terminal 和 files；客户端应将未知能力视为可选项。
       required:
         - sandbox_id
         - service
@@ -2360,7 +2379,7 @@ components:
           format: date-time
         publication_error:
           type: string
-          description: Present when the Ready build was retained but its requested tag changed during the build.
+          description: Ready 构建已保留、但请求的标签在构建期间被其他操作修改时出现。
       required:
         - id
         - template_id

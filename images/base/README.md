@@ -62,50 +62,10 @@ sudo env ISODO_BASE_IMAGE=isodo-base:0.1.0-dev ISODO_BASE_NAME=base \
 
 `/sbin/isodo-t3` 由 `/etc/inittab` respawn，以 Guest 内 uid/gid 0 运行 T3；Guest Agent 以同一用户执行 pairing CLI。工作区是独立 ext4 盘，T3 bundle 不能放在 `/workspace`，否则会被工作盘挂载覆盖。
 
-2026-11-03：新标准模板改为 Guest root，本地 Lima 与远程 CHV 已验证系统写入及测试包安装/卸载。详见[当前发布验证](../../docs/validation/guest-root-runtime-20261103.md)。下文 2026-10-25 记录保留当时的验收范围。
+## 当前验证与发布
 
-## 本地已核对的证据（2026-10-25）
+新标准模板使用 Guest root，本地 Lima 与远程 CHV 均完成系统写入、测试包安装/卸载及 T3 用户验证。具体 Sandbox ID 和部署版本见[当前状态](../../docs/current-status.md)。
 
-在 macOS/OrbStack 上用 `--platform linux/amd64` 构建 `isodo-linux-base:0.1.0-dev` 和 `isodo-base:0.1.0-dev` 后：
+当前内部端口为 Guest 31024、出站代理 31080、T3 38080，镜像、Node 和 API 必须匹配；旧镜像不自动迁移。CHV 模型与 Broker 出站复用 Vsock，不要求额外 VM 网卡或宿主 TCP 监听。
 
-- `node --version` → `v24.13.1`；
-- `/opt/isodo/t3/bin.mjs`、`@ff-labs/fff-bin-linux-x64-gnu/libfff_c.so`、`codex`、`claude` 存在；
-- 容器内启动 `/sbin/isodo-t3` 后 `curl http://127.0.0.1:8080/` → `200`，返回 T3 HTML；
-- pairing CLI 返回 credential，scopes 含 `terminal:operate`、`orchestration:read`、`relay:read`。
-
-这些是 Docker 容器内的镜像证据，不是 CHV 模板/Vsock/T3 浏览器端到端证据。
-
-## 真实 CHV 验证（2026-10-25）
-
-在 `jfcs1024`（Linux 5.15、KVM、CHV v54）和 `isodo-test`（Linux 6.8、KVM、CHV v54）上用 `isodo-template probe-t3` 验证了从候选工件冷启动到 T3 的真实 Vsock 链路：
-
-```json
-{"sandbox_id":"0f1d5e3f-7916-4124-bbfc-f252fdb87c7a","guest_epoch":"3660356c05f5d82143c7144c92f9d092","boot_to_ready_ms":7262,"boot_to_t3_ms":17792,"t3_http_status":200,"t3_html_ok":true,"pairing_ok":true,"credential_issued":true,"scopes":["orchestration:read","orchestration:operate","terminal:operate","review:write","relay:read"]}
-```
-
-```json
-{"sandbox_id":"48c06866-4f6b-4a15-9d1d-160f6cbd26da","guest_epoch":"740ba6a6e4c39332a4aae01563d6db38","boot_to_ready_ms":15358,"boot_to_t3_ms":29405,"t3_http_status":200,"t3_html_ok":true,"pairing_ok":true,"credential_issued":true,"scopes":["orchestration:read","orchestration:operate","terminal:operate","review:write","relay:read"]}
-```
-
-同时在 `jfcs1024` 上通过 `probe-bound` 验证了两个 t3-base VM 的独立身份、跨绑定拒绝和 ACPI 回收（`boot_to_bound_ready_ms` 1815/1777，`cross_bind_rejected:true`，`shutdown_verified:true`）。
-
-为减小发布体积，后续使用 **4 GiB rootfs** 的 `t3-base-003`（digest `78d5b97aee4fa553c9de3cf1c05a7595d4547ac7aee6debf961318c8158e9366`）。`probe-t3` 在 18.1 秒内返回 T3 HTTP 200/pairing；`probe-node-t3` 走真实 `CHVServer.ApplyOperation` → `CreateSandboxAppLink` → relay → T3，`create_to_app_link_ms=37114`、HTTP 200、pairing token 存在、stop/delete 成功。
-
-`probe-api-t3` 进一步走真实 `sandbox.Handler` + `preview.Publisher` + `httpapi`：`POST /app-link` 返回 `http://8080-<id>.localhost:43123/`，signed cookie 后 Preview Gateway 反代 T3 返回 200，capabilities 为 `["terminal","files"]`，最后 stop/delete 成功。
-
-`probe-node-t3` 还覆盖 **stop → start**：Start 复用同一实例盘做冷启动，产生新的 boot ID/guest epoch，T3 再次返回 200（`restart_to_app_link_ms=11882`），随后 stop/delete。
-
-注意：`jfcs1024` 的候选使用宿主 5.15 内核，打包时用 `ISODO_ALLOW_NO_VMGENID=true` 生成冷启动 initramfs，因此不支持 warm snapshot；需要 snapshot 时应在带 VMGENID 的 guest kernel 上重新打包。
-
-## 未验证
-
-- `base` 的 S3 发布与 Registry 事务（`publish-system` 正在执行/待记录）。
-- 当时的 CLI 登录注入和凭证代理；Guest root 当前策略见 [Guest root 策略](../../docs/guest-root-runtime.md)。
-- ARM64 bundle：T3 当前 bundle 带 x64 原生库，本镜像固定 amd64。
-- 云端 API/Preview Gateway 的浏览器端到端（需要启动 API/Node 并配置 wildcard DNS/TLS 或 SSH 端口转发）。
-
-## 出网与 Registry（2026-10-25）
-
-`t3-base-005`（4 GiB，digest `774db6cc221b24207f4e77be752d8e837bb34240dfcc08aa6f3304cb76261dbd`）在 initramfs 中加入 `virtio_net`，Guest `isodo-init` 根据 `isodo.net=<ip>,<gateway>` 配置 `eth0`；Host 侧使用 `scripts/setup-chv-network.sh` 建 `isodo0` bridge/NAT。真实 CHV 结果：`https://1.1.1.1` 301、`https://www.cloudflare.com` 200，T3 仍返回 200。
-
-`probe-node-t3 --network-bridge isodo0` 验证 Node 自动分配 TAP/IP 后的 create→stop→start→T3；本地 SeaweedFS/PostgreSQL 上的 `publish-system` + `probe-node` 验证了 registry 上传/拉取和 cache reuse。生产 isodo-test 的发布仍未完成。
+镜像存在、容器探针成功和模板发布是不同阶段。发布前必须真实验证 Guest Ready、工作台配对、模型请求和 MCP 工具调用；只操作专用测试 VM。早期容器及 CHV 探针输出可由 Git 历史追溯。

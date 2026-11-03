@@ -14,11 +14,11 @@ Isodo 是面向个人用户的 AI Agent 安全工作空间。选择本地或云�
 - [快速开始](/docs/guides/quickstart)：启动 App 和依赖，创建第一个沙箱。
 - [演示与当前能力](/docs/guides/demo)：查看已验证的流程、录屏步骤和能力边界。
 - [本地与云端接入](/docs/guides/runtime)：了解 Lima、CHV、S3 与 Preview 的部署关系。
-- [HTTP 服务预览](/docs/guides/http-port-preview)：用 API Key 在远程沙箱启动 Python 服务并获取授权链接。
+- [HTTP 服务预览](/docs/guides/http-port-preview)：用 API Key 在远程沙箱启动 Python 服务并获取公开或私有预览链接。
 - [身份认证](/docs/guides/authentication)：了解网页登录会话、Casdoor Bearer Token 和 API Key。
 - [Sandbox 概念](/docs/concepts/sandbox)：了解 Sandbox 的状态、归属和隔离边界。
-- [API Reference](/docs/api-reference)：浏览由公开 OpenAPI 契约生成的接口文档。
-- [MVP 架构与模块分工](/docs/concepts/architecture)：从 App 到 Guest，再到外部模型的实际链路。
+- [API 参考](/docs/api-reference)：浏览由公开 OpenAPI 契约生成的接口文档。
+- [整体架构与模块分工](/docs/concepts/architecture)：从 App 到 Guest，再到外部模型的实际链路。
 
 ## 产品结构
 
@@ -27,7 +27,7 @@ Isodo 是面向个人用户的 AI Agent 安全工作空间。选择本地或云�
 | Isodo App | 统一 SandboxClient；本地 IPC、云端 HTTP 只在适配层区分 |
 | Control | OAuth 会话、资源归属、生命周期意图、数据库 outbox 与 Node mTLS |
 | Node Runtime | Lima / CHV 生命周期、Guest RPC、文件转发、Vsock 与凭证代理 |
-| Guest / Agent 工作台 | 非 root 执行、工作区文件、任务、模型调用和终端 |
+| Guest / Agent 工作台 | 新模板 Guest root 执行、工作区文件、任务、模型调用和终端 |
 | 模板存储 | SeaweedFS S3，按 manifest digest 校验并缓存工件 |
 
 远程 CHV 已完成专用沙箱中的 Commands、HTTP 端口预览、GitHub / 自定义 MCP，以及 Skill 的 Web 工作台真实验收。可继续阅读 [GitHub 与自定义 MCP](/docs/guides/github-mcp) 和 [Skill 市场](/docs/guides/skills)。这些结果不等同于所有 Agent、本地 Lima 或完整 Electron 桌面端均已验收；App 快照流转、完整跨节点恢复和商业套餐仍有独立的实现及验收边界。
