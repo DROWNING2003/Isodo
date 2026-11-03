@@ -396,8 +396,8 @@ func (s *Server) waitProcess(executionID string, process *guestProcess, stdout, 
 	processExited := process.state == guestv1.ProcessState_PROCESS_STATE_RUNNING
 	process.mu.Unlock()
 	if processExited {
-		// The command's process group is the workload boundary for this rootless
-		// Lima Guest implementation; reap short-lived shell descendants on exit.
+		// Reap descendants that remain in the command's process group. Guest root
+		// can create other sessions; the VM remains the host isolation boundary.
 		_ = syscall.Kill(-process.command.Process.Pid, syscall.SIGKILL)
 	}
 	stdoutDone, stderrDone := process.stdoutDone, process.stderrDone
@@ -617,10 +617,14 @@ func validateProcessEnvironment(environment map[string]string, totalBytes *int) 
 }
 
 func processEnvironment(overrides map[string]string) []string {
+	workloadUser := "nobody"
+	if os.Geteuid() == 0 {
+		workloadUser = "root"
+	}
 	values := map[string]string{
-		"PATH": "/usr/local/bin:/usr/bin:/bin",
+		"PATH": "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 		"HOME": "/workspace/.home",
-		"USER": "nobody",
+		"USER": workloadUser,
 		"LANG": "C.UTF-8",
 	}
 	for key, value := range overrides {

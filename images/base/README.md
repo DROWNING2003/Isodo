@@ -60,7 +60,9 @@ sudo env ISODO_BASE_IMAGE=isodo-base:0.1.0-dev ISODO_BASE_NAME=base \
 | `/workspace/.codex` | Codex 配置 |
 | `/workspace/.isodo/t3-server.log` | T3 启动日志 |
 
-`/sbin/isodo-t3` 由 `/etc/inittab` respawn，以 uid/gid 1000 运行 T3；Guest Agent 以同一用户执行 pairing CLI。工作区是独立 ext4 盘，T3 bundle 不能放在 `/workspace`，否则会被工作盘挂载覆盖。
+`/sbin/isodo-t3` 由 `/etc/inittab` respawn，以 Guest 内 uid/gid 0 运行 T3；Guest Agent 以同一用户执行 pairing CLI。工作区是独立 ext4 盘，T3 bundle 不能放在 `/workspace`，否则会被工作盘挂载覆盖。
+
+2026-11-03：新标准模板改为 Guest root，本地 Lima 与远程 CHV 已验证系统写入及测试包安装/卸载。详见[当前发布验证](../../docs/validation/guest-root-runtime-20261103.md)。下文 2026-10-25 记录保留当时的验收范围。
 
 ## 本地已核对的证据（2026-10-25）
 
@@ -98,7 +100,7 @@ sudo env ISODO_BASE_IMAGE=isodo-base:0.1.0-dev ISODO_BASE_NAME=base \
 ## 未验证
 
 - `base` 的 S3 发布与 Registry 事务（`publish-system` 正在执行/待记录）。
-- 非 root 加固、CLI 登录注入和凭证代理。
+- 当时的 CLI 登录注入和凭证代理；Guest root 当前策略见 [Guest root 策略](../../docs/guest-root-runtime.md)。
 - ARM64 bundle：T3 当前 bundle 带 x64 原生库，本镜像固定 amd64。
 - 云端 API/Preview Gateway 的浏览器端到端（需要启动 API/Node 并配置 wildcard DNS/TLS 或 SSH 端口转发）。
 

@@ -15,7 +15,7 @@ import (
 	"strings"
 )
 
-const baseProvisionerVersion = "v2"
+const baseProvisionerVersion = "v3-root"
 
 const t3ServerGuestPort = runtimeports.Workbench
 
@@ -247,21 +247,18 @@ After=network.target
 
 [Service]
 Type=simple
-User=nobody
-Group=nogroup
+User=root
+Group=root
 Environment=ISODO_TEMPLATE_MODE=true
 Environment=ISODO_GUEST_TRANSPORT=tcp
 Environment=ISODO_GUEST_LISTEN_ADDRESS=127.0.0.1:%d
 Environment=HOME=/workspace/.home
-Environment=PATH=/usr/local/bin:/usr/bin:/bin
+Environment=PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin
 ExecStart=/usr/local/bin/isodo-guest
 Restart=on-failure
 RestartSec=1
 NoNewPrivileges=true
-ProtectSystem=strict
-ProtectHome=true
 PrivateTmp=true
-ReadWritePaths=/workspace
 
 [Install]
 WantedBy=multi-user.target
@@ -278,8 +275,8 @@ WantedBy=multi-user.target
 	commands := [][]string{
 		{"sudo", "install", "-m", "0755", "/tmp/isodo-guest", "/usr/local/bin/isodo-guest"},
 		{"sudo", "install", "-m", "0644", "/tmp/isodo-guest.service", "/etc/systemd/system/isodo-guest.service"},
-		{"sudo", "install", "-d", "-o", "nobody", "-g", "nogroup", "-m", "0750", "/workspace"},
-		{"sudo", "install", "-d", "-o", "nobody", "-g", "nogroup", "-m", "0700", "/workspace/.home"},
+		{"sudo", "install", "-d", "-o", "root", "-g", "root", "-m", "0750", "/workspace"},
+		{"sudo", "install", "-d", "-o", "root", "-g", "root", "-m", "0700", "/workspace/.home"},
 		{"sudo", "install", "-d", "-m", "0755", "/var/lib/isodo"},
 		{"sudo", "systemctl", "daemon-reload"},
 		{"sudo", "systemctl", "enable", "--now", "isodo-guest.service"},

@@ -136,7 +136,7 @@ manifest={'schema_version':1,'name':sys.argv[2],'version':sys.argv[3],'arch':'am
  'initramfs':artifact('initramfs.cpio'),'rootfs':{**artifact('rootfs.raw'),'format':'raw','filesystem':'ext4','partitioned':False},
  'workspace':{'filesystem':'ext4','minimum_size_bytes':4<<30},'guest_protocol':{'major':1,'minimum_minor':0},
  'guest_agent':{'version':sys.argv[3],'capabilities':['ready.v1']},
- 'workload_user':{'name':'isodo','uid':1000,'gid':1000},'minimum_memory_mib':512}
+ 'workload_user':{'name':'root','uid':0,'gid':0},'minimum_memory_mib':512}
 data=(json.dumps(manifest,sort_keys=True,separators=(',',':'))+'\n').encode()
 (root/'manifest.json').write_bytes(data)
 print('Unpublished candidate manifest SHA-256:',hashlib.sha256(data).hexdigest())

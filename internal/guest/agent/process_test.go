@@ -118,3 +118,24 @@ func TestGuestProcessSignalTerminatesProcessGroup(t *testing.T) {
 	}
 	t.Fatal("process did not terminate before deadline")
 }
+
+func TestProcessEnvironmentIncludesSystemAdministrationTools(t *testing.T) {
+	env := processEnvironment(nil)
+	var path string
+	for _, value := range env {
+		if strings.HasPrefix(value, "PATH=") {
+			path = strings.TrimPrefix(value, "PATH=")
+		}
+	}
+	for _, directory := range []string{"/usr/local/sbin", "/usr/sbin", "/sbin"} {
+		found := false
+		for _, entry := range strings.Split(path, ":") {
+			if entry == directory {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("PATH lacks %s required by package management: %q", directory, path)
+		}
+	}
+}

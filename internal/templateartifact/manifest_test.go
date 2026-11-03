@@ -154,3 +154,20 @@ func TestVerifyKernelConfigurationArtifact(t *testing.T) {
 		t.Fatal("accepted a corrupted kernel configuration")
 	}
 }
+
+func TestManifestWorkloadIdentity(t *testing.T) {
+	for _, tc := range []struct {
+		name     string
+		uid, gid uint32
+		valid    bool
+	}{
+		{"root", 0, 0, true}, {"isodo", 1000, 1000, true},
+		{"root", 1000, 1000, false}, {"isodo", 0, 0, false}, {"root", 0, 1000, false},
+	} {
+		_, m := fixture(t)
+		m.WorkloadUser.Name, m.WorkloadUser.UID, m.WorkloadUser.GID = tc.name, tc.uid, tc.gid
+		if err := m.Validate(); (err == nil) != tc.valid {
+			t.Errorf("identity %s:%d:%d: %v", tc.name, tc.uid, tc.gid, err)
+		}
+	}
+}
