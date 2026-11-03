@@ -260,19 +260,7 @@ func (s *CHVServer) configureWorkbenchEgress(ctx context.Context, record sandbox
 	client := guestv1.NewGuestServiceClient(connection)
 	suffix := newT3RequestSuffix()
 	// The template supervisor restarts T3. Never accept a caller-supplied PID or command.
-	if _, err := runT3GuestCommand(ctx, client, identity, "egress-reload-"+suffix, []string{"/bin/sh", "-c", `python3 - <<'PY'
-import os, signal, time
-p=int(open("/workspace/.isodo/t3.pid").read())
-c=open("/proc/%d/cmdline"%p,"rb").read().split(b"\0")
-assert p>1 and c[0]==b"/usr/local/bin/node" and b"bin.mjs" in c and b"serve" in c
-os.kill(p,signal.SIGTERM)
-for _ in range(200):
-    if not os.path.exists("/proc/%d"%p):
-        break
-    time.sleep(0.05)
-else:
-    raise RuntimeError("old T3 process did not exit")
-PY`}); err != nil {
+	if _, err := runT3GuestCommand(ctx, client, identity, "egress-reload-"+suffix, []string{"python3", "-c", t3WorkbenchRestartProgram, "/workspace/.isodo/t3.pid", t3NodeBinary}); err != nil {
 		return fmt.Errorf("configure T3 proxy; a template with the egress launcher is required: %w", err)
 	}
 	s.mu.Lock()
