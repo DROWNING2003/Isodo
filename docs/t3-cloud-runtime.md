@@ -2,7 +2,7 @@
 
 当前开发版内部服务端口已迁移到 31024 / 31080 / 38080，需匹配升级 Node、Guest 与镜像；下方历史验证使用旧版本。详见[端口说明](runtime-service-ports.md)。
 
-状态：2026-10-25。本文描述当前代码实际具备的本地/云端 T3 链路、已验证证据和明确未实现的能力。运行步骤见 [cloud-t3 runbook](runbooks/cloud-t3.md)，协议细节见 [sandbox-endpoints](../specs/sandbox-endpoints.md)。
+状态：2026-10-25。本文描述当前代码实际具备的本地/云端 T3 链路、已验证证据和明确未实现的能力。运行步骤见 [cloud-t3 runbook](runbooks/cloud-t3.md)，协议细节见 [sandbox-endpoints](current-status.md)。
 
 ## 目标与范围
 
@@ -59,7 +59,7 @@ Browser ── /_isodo/auth/... ── Set-Cookie isodo_preview (host-scoped)
 1. `isodo_preview` 与 `isodo_session` 不转发给上游；T3 自己的 cookie 保留。
 2. pairing token 只在 fragment，不出现在 API 日志或上游请求。
 3. Node relay 只监听 `127.0.0.1`；公网入口只能是 API/Preview Gateway。
-4. Guest 内 T3 以非 root 运行；CLI 凭证由 T3 pairing 产生，不来自 Control DB。
+4. 新标准模板的 Guest 内 T3 以 root 运行；旧模板保留原用户；CLI 凭证由 T3 pairing 产生，不来自 Control DB。
 5. Stop/Start 的 boot ID/guest epoch 由 Node 生成；旧 app link 在 Stop 时关闭。
 
 ## 已验证证据（真实 CHV）
@@ -75,7 +75,7 @@ Browser ── /_isodo/auth/... ── Set-Cookie isodo_preview (host-scoped)
 | `probe-t3`（`t3-base-005`） | CHV egress：`1.1.1.1` 301、`www.cloudflare.com` 200；T3 200 |
 | `publish-system` + `probe-node` | 本地 SeaweedFS/PostgreSQL 发布 `t3-base`，registry 拉取、克隆、cache reuse |
 
-完整 JSON 与限制见 [验证记录](validation/t3-base-chv-20261025.md)。
+完整 JSON 与限制见 [验证记录](current-status.md)。
 
 ## 未实现与风险
 

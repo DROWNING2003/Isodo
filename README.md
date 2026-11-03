@@ -2,131 +2,80 @@
 
 <p align="center"><img src="assets/brand/isodo-mascot.png" alt="Isodo 吉祥物" width="132" /></p>
 
-**给 AI Agent 一个安全、持久、可以连接真实模型的工作空间。**
+**让 AI Agent 在隔离、持久、可授权的工作空间中完成真实任务。**
 
-同一个 Isodo App，通过统一 Sandbox API 管理本地 Lima 和云端 Cloud Hypervisor。用户创建沙箱、授权模型连接、进入 Agent 工作台，让 Agent 执行任务，并检查文件和测试结果。真实模型密钥在沙箱外管理，Guest 配置使用占位符。
+Isodo 将沙箱、Agent 工作台、模型连接、MCP 和 Skill 放在同一个产品里。用户可以在 macOS 本地 Lima 或远程 Cloud Hypervisor 虚拟机中工作，授权自己的模型与工具连接，让 Agent 编写代码、运行测试、操作文件，并通过 HTTPS 预览服务。
 
-## 当前 MVP
+[使用文档](https://docs.drowning.top:18443/docs) · [Web 控制台](https://web.drowning.top:18443/sandboxes) · [当前功能与验收](docs/current-status.md) · [架构与模块分工](docs-site/content/docs/concepts/architecture.mdx) · [路演与冻结清单](docs/roadshow.md)
 
-2026-10-25 至 26 日已实测：
+> 托管演示环境通过 VPN/内部解析访问。文档站、代码合并和运行时部署分别管理，当前部署边界见[版本状态](docs/current-status.md#部署与代码版本)。
 
-- App → Control → SSH/mTLS → 独立 Node → CHV → Guest Ready → Agent 工作台。
-- Codex 选择 gpt-6.1-sol，实际创建 Python 文件并运行两个 unittest。
-- 无网卡 CHV 通过 Vsock 出站代理完成模型请求；宿主注入计数增加，Guest 认证文件只包含占位符。
-- 零字节、文本和二进制 Files 往返校验、禁止覆盖及工作区边界拒绝。
-- 修复 devpts 挂载后，真实 App 终端可用，UID/GID 1000；保盘重启后任务和文件保留。
-- 同一 App 创建新的 Lima 沙箱、应用 Agent 配置并连接工作台通过。本轮未据此声明完整本地模型回归已完成。
+## 可以做什么
+
+| 场景 | 当前能力 |
+| --- | --- |
+| 创建工作空间 | Web 管理远程 CHV；Electron 同时管理本地 Lima 和远程沙箱，支持创建、查询、启停、重命名和删除 |
+| 使用真实 Agent | Guest 内运行 T3 工作台，管理任务、终端、文件和模型选择；Codex 已完成真实模型任务验收 |
+| 管理文件 | 上传、下载、创建目录、查询元数据、目录分页、移动、删除，公开 Files API 限定 `/workspace` |
+| 从 API 执行命令 | 远程 CHV Commands API 支持 argv、stdout/stderr、退出码、超时、取消与幂等 |
+| 预览应用 | 通用 HTTP 端口默认 public，可按端口切换 private；支持 HTTP、WebSocket、SSE，管理端口始终受保护 |
+| 连接 MCP | 市场、收藏、GitHub/Notion OAuth、沙箱绑定、Broker 工具调用；可添加无认证或 Bearer Token 的自定义 HTTPS MCP |
+| 制作与使用 Skill | 制作个人 SKILL.md、收藏市场技能、为远程沙箱选择并同步到 Codex 技能目录 |
+| 管理模型凭证 | 账号级加密保存配置，按沙箱授权；Guest 使用占位符，真实凭证在 Control/Node 可信边界管理 |
+| 安装系统软件 | 新标准 Lima/CHV 沙箱内使用 Guest root；停止、启动保留工作盘，既有模板不会自动改变用户 |
+
+本地与远程能力有明确差异：Commands/通用 Ports、市场 MCP/Skill 的本轮完整接入优先支持远程 CHV；工作台中的终端不等同于已公开独立 PTY API。快照流转、商业订阅及完整跨节点接管不属于本次路演的完成声明。详见[能力矩阵](docs/current-status.md)。
+
+## 演示
 
 <video src="https://github.com/user-attachments/assets/ed5cb878-9206-4775-a566-a4d9311ca7e7" controls width="960"></video>
 
-[点击打开 Isodo Demo 视频](https://github.com/user-attachments/assets/ed5cb878-9206-4775-a566-a4d9311ca7e7) · [Demo 预览图](assets/isodo-demo-preview.jpg)。架构、模块规格与分工见 [MVP 架构文档](docs-site/content/docs/concepts/architecture.mdx)。
+[打开已有演示视频](https://github.com/user-attachments/assets/ed5cb878-9206-4775-a566-a4d9311ca7e7) · [预览图](assets/isodo-demo-preview.jpg)
 
-## 运行
+建议路演顺序：创建云端沙箱 → 授权已有模型连接 → Agent 生成并测试代码 → 查看文件/终端 → 启动 HTTP 服务并预览 → 展示 MCP 与 Skill 的按沙箱授权。旧视频展示基础工作流；新增市场功能与最新版本请结合[路演步骤](docs/roadshow.md)演示。
 
-需要 Node.js 24.13.1、pnpm 11.10.0、Go 1.26.9、Docker Compose；本地沙箱需要 Lima，远端需要 Linux x86_64/KVM 和匹配的 Cloud Hypervisor。
+## 整体架构
+
+```mermaid
+flowchart LR
+  App[Web / Electron] -->|HTTPS| Nginx[Nginx]
+  Nginx --> Control[Control API / Preview Gateway / MCP Broker]
+  Control -->|OIDC| Casdoor[Casdoor]
+  Control -->|SQL / Outbox| PG[(PostgreSQL)]
+  Control -->|mTLS RPC| Node[远程 Node]
+  Node -->|Vsock| CHV[CHV Guest / T3 / Agent]
+  Node -->|S3 只读拉取| S3[(SeaweedFS)]
+  App -->|Electron IPC| Local[本地 Node / Lima Guest]
+  CHV --> Proxy[Node 出站代理]
+  Proxy --> Model[模型 API]
+  Proxy --> Broker[MCP Broker / 上游 MCP]
+```
+
+- **控制面**：Go HTTP API 负责认证、归属、模板固定、生命周期意图与 PostgreSQL Outbox；公开契约由 OpenAPI 生成 Go/TypeScript 请求绑定。
+- **运行面**：Node 管理 VM、磁盘、journal 与 Guest 身份；Guest Agent 提供进程、文件和端口转发。云端使用 CHV/Vsock，本地使用 Lima。
+- **访问面**：Nginx 提供 HTTPS 入口，Preview Gateway 经 Node RelayPort、Guest PortForward 访问应用；MCP Broker 保留上游凭证并校验沙箱绑定。
+- **部署**：当前托管环境使用 Nomad/Docker 运行服务，systemd 管理 Node、Nginx 和文档站。核心异步编排使用 PostgreSQL Outbox。
+
+源码、状态与持久化职责见[架构文档](docs-site/content/docs/concepts/architecture.mdx)；协议源位于 [api/openapi](api/openapi) 与 [api/proto](api/proto)。
+
+## 本地启动
+
+需要 Go 1.26.9、Node.js 24.13.1、pnpm 11.10.0、Docker Compose；运行本地沙箱还需要 macOS/Lima。远程 CHV 需要 Linux x86_64、KVM、匹配的 Cloud Hypervisor 与已发布模板。
 
 ```sh
 make init
-# 按 .env.example 配置 GitHub OAuth / Casdoor，秘密只保存在本地。
+# 根据 .env.example 配置 Casdoor / GitHub 登录；秘密仅保存在受保护配置中。
 make infra-up
 cd app && corepack pnpm@11.10.0 install && cd ..
 go build -o isodo-node ./cmd/isodo-node
 mkdir -p .tools
-# Apple Silicon；Intel Mac 将 arm64 改为 amd64。
-GOOS=linux GOARCH=arm64 go build -o .tools/isodo-guest-linux-arm64 ./cmd/isodo-guest
-```
-
-分别启动 Control、Web 和桌面端：
-
-```sh
-make api
-make web
-make electron
-```
-
-默认 App Web 地址 `http://127.0.0.1:5734`，Control 地址 `http://127.0.0.1:8080`。Electron 自己启动本地 Lima sidecar；需要单独运行本地 Node 时使用 `make node-local` 或 `make node-local-agent-workspace`，不要为同一 journal 重复启动 Node。
-
-双环境云端演示需要 Control 配置远端 Node 的 mTLS 与 SSH 转发，并发布 Ready 模板；不要将 Node RPC 地址作为 App API 地址。部署说明见 [云端运行手册](docs/runbooks/cloud-t3.md)、[基础镜像](images/base/README.md) 和 [Docker SeaweedFS](deploy/seaweedfs/remote-demo.md)。
-
-## 本机 Preview 配置
-
-App 与 Preview 使用同站点本地子域名，建立 HttpOnly Cookie 后配对。设置以下环境，并在 Casdoor 保留或增加精确回调 `http://app.isodo.localhost:5734/auth/callback`：
-
-```dotenv
-# Control
-ISODO_WEB_ORIGIN=http://app.isodo.localhost:5734
-ISODO_PREVIEW_DOMAIN=isodo.localhost
-ISODO_PREVIEW_SCHEME=http
-# ISODO_PREVIEW_SECRET 使用本地随机秘密，不提交 Git。
-
-# Web 进程
-VITE_ISODO_PREVIEW_DOMAIN=isodo.localhost
-
-# Electron 进程
-ISODO_WEB_URL=http://app.isodo.localhost:5734
-```
-
-Vite 仍监听 `127.0.0.1:5734`。以该 origin 打开 App 并登录。Guest 模型出站使用 Vsock，当前无网卡 CHV 演示不需要开启 bridge/TAP 或修改宿主防火墙。
-
-## 架构
-
-```text
-                         ┌──────────────────────────────┐
-                         │        Isodo App              │
-                         │ SandboxClient / Agent 工作台 │
-                         └──────────────┬───────────────┘
-                                        │ HTTPS / IPC
-                         ┌──────────────▼───────────────┐
-                         │ Control                       │
-                         │ 账号、归属、模板、生命周期意图 │
-                         │ PostgreSQL + outbox           │
-                         └───────┬───────────────────────┘
-                                 │ SSH + mTLS
-                 ┌───────────────▼────────────────┐
-                 │ Node Runtime                    │
-                 │ journal / 运行身份 / relay      │
-                 │ egress proxy / 模板缓存         │
-                 └──────────┬──────────────┬────────┘
-                            │              │
-                   本地 Lima │              │ 云端 Cloud Hypervisor
-                            │              │
-                 ┌──────────▼──────┐  ┌────▼───────────────┐
-                 │ Guest            │  │ Guest               │
-                 │ Guest Agent      │  │ Guest Agent         │
-                 │ Agent 工作台     │  │ Agent 工作台        │
-                 └────────┬─────────┘  └────────┬────────────┘
-                          │                     │
-                          └────── Vsock ────────┘
-                                  │
-                         ┌────────▼────────┐
-                         │ 凭证代理         │
-                         │ 宿主侧规则注入    │
-                         │ 连接真实模型      │
-                         └──────────────────┘
-```
-
-App 通过统一 Sandbox API 管理本地和云端沙箱。Control 保存账号、归属、模板固定和生命周期意图；Node Runtime 保存 journal、运行身份和实际 VM 状态，并把 App 请求转发到对应 Guest；Guest Agent 只提供受限的 `/workspace` 文件、进程和端口能力。Agent 工作台运行在 Guest 内，通过配对后的 Preview/Relay 供 App 使用。
-
-云端链路为 `App → Control → SSH/mTLS → Node Runtime → Cloud Hypervisor → Guest`，本地链路为 `App → 本地 Node Runtime → Lima → Guest`。两条链路共享 Sandbox API 和 Guest 能力，运行时差异收敛在 Node 的 backend adapter。CHV 无网卡运行时，Guest 通过 Vsock 访问 Node 的凭证代理；真实密钥留在沙箱外，Guest 内只使用占位配置。
-
-完整模块规格、数据流和职责见 [MVP 架构文档](docs-site/content/docs/concepts/architecture.mdx)。
-
-## 启动方式
-
-需要 Node.js 24.13.1、pnpm 11.10.0、Go 1.26.9、Docker Compose；云端 CHV 还需要 Linux x86_64、KVM、Cloud Hypervisor、远端 Node 的 mTLS/SSH 配置和已发布的 Ready 模板。先准备本地依赖和环境变量：
-
-```sh
-make init
-# 按 .env.example 填写 Casdoor / GitHub OAuth 等本地配置，秘密不要提交。
-make infra-up
-cd app && corepack pnpm@11.10.0 install && cd ..
-go build -o isodo-node ./cmd/isodo-node
-mkdir -p .tools
-GOOS=linux GOARCH=arm64 go build -o .tools/isodo-guest-linux-arm64 ./cmd/isodo-guest
+# Apple Silicon 使用 arm64；Intel Mac 改为 amd64。
+GOOS=linux GOARCH=arm64 CGO_ENABLED=0 go build -buildvcs=false -trimpath \
+  -o .tools/isodo-guest-linux-arm64 ./cmd/isodo-guest
 make agent-workspace-bundle
 ```
 
-在三个终端按以下顺序启动 Control、Web 和桌面 App：
+在不同终端启动：
 
 ```sh
 make api
@@ -134,30 +83,36 @@ make web
 make electron
 ```
 
-默认地址是 App `http://127.0.0.1:5734`、Control `http://127.0.0.1:8080`。启用本地 Preview 配对时，Control、Web 和 Electron 使用同一组 origin：`ISODO_WEB_ORIGIN=http://app.isodo.localhost:5734`、`ISODO_PREVIEW_DOMAIN=isodo.localhost`、`VITE_ISODO_PREVIEW_DOMAIN=isodo.localhost`、`ISODO_WEB_URL=http://app.isodo.localhost:5734`；Casdoor 需要配置精确回调 `http://app.isodo.localhost:5734/auth/callback`。Vite 仍监听 `127.0.0.1:5734`。CHV 的 Vsock egress 默认不需要启用 TAP/NAT bridge；只有明确配置 `ISODO_CHV_NETWORK_BRIDGE` 时才使用外部网桥。
+默认 Web 为 `http://127.0.0.1:5734`，API 为 `http://127.0.0.1:8080`。Electron 自动管理自己的本地 Node，不要对同一 journal 另外启动 Node。首次准备 Base 需要安装依赖，完成后复用缓存。
 
-## 验证与文档
+- [快速开始](docs-site/content/docs/guides/quickstart.mdx)：认证、开发环境与第一个沙箱。
+- [本地与云端接入](docs-site/content/docs/guides/runtime.mdx)：Preview origin、mTLS、Vsock 与远程模板。
+- [部署说明](docs/deployment-drowning-top.md)：当前托管入口；发布 Web/Node 前执行[发布检查](docs/web-preview-release-checklist.md)。
+
+## 开发者 API
+
+API Key 通过 `X-API-Key` 发送，权限按操作分开授予：`sandboxes:read`、`sandboxes:write`、`sandboxes:execute`、`sandboxes:preview`。账号配置、MCP OAuth 等敏感操作要求账号会话。
 
 ```sh
-go test ./internal/control/sandbox ./internal/control/preview ./internal/control/auth ./internal/node/localapi ./internal/node/orchestrator
-npm ci --prefix docs-site
-npm --prefix docs-site run generate:openapi
-make docs-build
-make docs
+export ISODO_API=https://api.drowning.top:18443
+# ISODO_API_KEY 由安全环境注入，不粘贴真实密钥到文档或仓库。
+curl -fsS -H "X-API-Key: $ISODO_API_KEY" "$ISODO_API/v1/sandboxes"
 ```
 
-文档站入口为 `http://127.0.0.1:3000/docs`。公开 HTTP 契约在 `api/openapi`，Node/Guest gRPC 在 `api/proto`；完整生成入口是 `make generate`。生成文件不手改。
+[中文 API 参考](docs-site/content/docs/api-reference/index.mdx) · [命令执行](docs/runtime-commands.md) · [文件](docs/runtime-files.md) · [HTTP 预览](docs/http-port-preview.md)
 
-- [产品术语](docs/product-context.md) · [产品决策](docs/product-decisions.md)
-- [MVP 验收记录](docs/validation/unified-agent-demo-20261026.md)
-- [统一 API 规格](specs/unified-sandbox-api.md) · [目录职责](specs/directory-responsibilities.md)
-- [API Key 与 Python HTTP 预览指南](docs-site/content/docs/guides/http-port-preview.mdx)
-- [GitHub MCP 市场与 OAuth](docs/github-mcp-market.md) · [MCP 验收记录](docs/validation/github-mcp-market-20261102.md)
-- [安全连接](docs/secure-connections.md) · [文档站开发](docs-site/README.md)
-- [参赛要求与交付核对](docs/competition-requirements.md)
+```sh
+go test ./...
+go vet ./...
+make generate-check
+npm ci --prefix docs-site
+make docs-build
+```
 
-## 范围与交付
+`make generate` 统一生成 Go/TypeScript、Proto 绑定与 API 文档，生成文件不手改。外部数据库、真实 CHV、真实模型/OAuth 测试需要各自环境与授权，不能用默认测试的跳过结果代替真实验收。
 
-公开 SDK、App 快照流转、Skill/MCP 一键接入及商业套餐仍不属于本次已验收的演示能力。完整跨节点恢复和生产安全验收也不在 MVP 完成声明内。
+## 文档与交付
 
-源代码、运行说明、架构与模块分工、真实过程记录和 demo 视频均需上传 GitHub。当前录屏仍需实际录制并上传；本地修改不等于已上传。现有 `v0` tag 保持指向 `05d0b8c`，后续变更按 PR 工作流提交。截止材料记为 2026-10-26 09:00，赛方时区仍需确认，截止后停止修改参赛仓库。
+从[文档索引](docs/README.md)阅读当前版本。功能和验收以[当前状态](docs/current-status.md)、OpenAPI/Proto 和源码为准；过时的讨论及逐次联调日志从当前目录移除，仍可通过 Git 历史追溯。
+
+本轮面向 **2026-11-04 路演**进入冻结准备，只整理文档、修复阻塞并核对演示，不扩展功能范围。已有 `v0` 基线保持指向 `05d0b8c`，实际贡献与过程以 Git 提交及 PR 为依据。

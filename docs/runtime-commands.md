@@ -1,6 +1,6 @@
 # Sandbox Runtime Commands：CHV 非交互执行
 
-> 状态：受限 Node Commands RPC 已通过 Go 1.26.9 编译、目标包 race 测试、正式生成器一致性检查、执行 scope 的 PostgreSQL 集成测试及隔离 CHV 最小命令验收。未部署到现有 Node，仍保留 Draft 等待剩余验证。
+远程 CHV 已接通公开 Commands，正常路径通过真实 API 与 Guest 验证。证据及未验证场景见[当前状态](current-status.md)。
 
 ## API 契约
 
@@ -54,32 +54,8 @@ Node Commands RPC 采用内置 Protobuf `google.protobuf.BytesValue` 承载限�
 - Node 完全从自身 live map/journal 获取 VMM/Guest socket，客户端无法指定宿主机路径、Vsock 或 Node IP。
 - `request_id` 由 Sandbox ID、generation、boot ID、Guest epoch 与客户端幂等键确定性散列产生；停机恢复后的旧请求无法命中新的执行实例。
 - Node 收到请求取消、输出溢出、输出 gap 或未完整退出事件时，使用独立的 3 秒清理 Context 尝试 `SignalProcess(KILL)`。若 StartProcess 已在 Guest 成功但响应在网络中丢失，Node 可能暂时拿不到 ProcessRef；Guest 最大执行超时作为兜底。需要独立故障注入测试确认。
-- 此 PR 没有添加宿主机 `exec.Command`，也没有开放 Guest TCP/Vsock 给 SDK。
-- 初版只支持远程 CHV，不支持 Lima 的通用 Commands。PTY/stdin、异步执行状态查询及更大输出量通过后续独立 Runtime API 提供。
-
-## 合并前检查
-
-```bash
-go version  # 必须 >= go1.26.9
-go test ./internal/control/auth ./internal/control/sandbox ./internal/control/orchestrator ./internal/node/orchestrator ./internal/node/guesttransport
-make generate
-make generate-check
-```
-
-- [x] `make generate`、`make generate-check`；提交正式 Go/TypeScript 绑定和 Commands API 文档。
-- [x] `go build ./cmd/isodo-api ./cmd/isodo-node ./cmd/isodo-guest`。
-- [x] `go test ./...`，默认未启用外部数据库/CHV 的测试按自身条件跳过；外部验证结果另列。
-- [x] auth/sandbox/control orchestrator/node orchestrator/guesttransport 目标包 `go test -race`。
-- [x] Web TypeScript 检查（Node 24；存在仓库已有 suggestion 提示，退出码 0）。
-- [x] 独立 PostgreSQL 18 上 Goose 0013 Up→Down→Up；存在 execute scope 的 Key 时 Down 以 SQLSTATE 23514 拒绝，事务保留原约束；移除测试 Key 后 Down/Up 成功。
-- [x] `TestPostgresCommandKeyScopes`：真实数据库保存/认证 Key，并由 HTTP 中间件验证 write-only Key 403、execute Key 204、五种 scope 组合可保存。
-- [x] 真实 Node→Guest gRPC 组件测试覆盖非零退出码、双输出流、输出 gap、缺失退出事件、128 KiB 上限、取消及 deadline 的独立 KILL 清理。
-- [x] 旧版 Node 没有 Commands RPC 时返回 Unimplemented 的 bufconn 测试；HTTP 将其映射为 501。输出上限 413、进程容量 429、幂等冲突 409 等另有路由测试。
-- [x] jfcs1024 独立无网卡、RAM-root CHV Guest：双输出流/exit7、重试去重/参数冲突、Guest timeout、RPC 取消后进程组未继续写文件、输出上限、停机/重启/删除准入隔离。
-- [ ] 完整 Control 生命周期 worker→持久化 Node journal→CHV Stop/Start/Delete 联合验收。本轮 CHV 测试真实重建 VM，但用测试构造的 journal/live map 驱动命令准入，不等于该联合链路已验证。
-- [ ] StartProcess 响应丢失的真实网络故障注入；当前保留 Guest timeout 兜底的已知边界。
-
-上述隔离测试阶段没有重启 jfcs1024 已有 Node/VM，没有修改其 API、Nginx、E2B 或 client-proxy。独立测试无 NIC、无生产数据库连接。初始化模块和 kernel 只读复用测试资产，所有写入位于专用目录及随机 /tmp 目录。
+- 该链路不使用宿主机 `exec.Command`，也没有开放 Guest TCP/Vsock 给 SDK。
+- 当前只支持远程 CHV，不支持 Lima 的通用 Commands。PTY/stdin、异步执行状态查询及更大输出量通过后续独立 Runtime API 提供。
 
 ## 重现隔离 CHV 验收
 
@@ -92,18 +68,8 @@ ISODO_GUEST_MODULES=/path/to/matching-modules \
 bash scripts/test-runtime-commands-chv.sh
 ```
 
-脚本构建当前 Guest 与 initramfs，`TestRealCHVRuntimeCommands` 自己启动 VMM、生成 Sandbox UUID 与 boot/epoch，只清理自己创建的进程和临时文件；失败时保留 VMM/serial 日志。也可在开发机交叉编译测试二进制和 Guest 后复制到隔离主机，设置 `ISODO_CHV_INTEGRATION=1`、`ISODO_CHV_BINARY`、`ISODO_GUEST_KERNEL`、`ISODO_GUEST_INITRAMFS` 运行测试。本轮采用后一方式，在独立目录 `/opt/isodo/pr23-command-validation` 运行，测试耗时约 7 秒。
+脚本构建当前 Guest 与 initramfs，`TestRealCHVRuntimeCommands` 自己启动 VMM、生成 Sandbox UUID 与 boot/epoch，只清理自己创建的进程和临时文件；失败时保留 VMM/serial 日志。也可在开发机交叉编译测试二进制和 Guest 后复制到隔离主机，设置 `ISODO_CHV_INTEGRATION=1`、`ISODO_CHV_BINARY`、`ISODO_GUEST_KERNEL`、`ISODO_GUEST_INITRAMFS` 运行测试。## 验证边界
 
-## 验证限制
+真实 Commands 与 Python HTTP 预览已运行。StartProcess 响应丢失、完整网络故障注入和所有恢复组合不能由正常路径推断为通过。复现测试时只创建隔离资源，记录 Sandbox ID、阶段耗时、输出完整性及清理结果。
 
-完整 postgres 包集成测试未全绿：已有 `TestPostgresCredentialsLifecycle` 和 `TestPostgresSandboxTenantIsolation` 在创建沙箱时报告 `TEMPLATE_NOT_FOUND` / `template not found or not ready`。这是本轮实际观测到的模板夹具问题，未修改这些测试来放宽断言；本 PR 新增的执行权限数据库测试独立通过。没有据此声称所有集成测试通过。
-
-完整 E2E 计划可在基础 Runtime API 齐全后集中推进，但正式合并仍要求最小可复现的 Guest 命令验证，避免仅凭 Mock 宣称命令可执行。
-
-## 后续真实 API 演示（2026-11-02）
-
-演示环境 Node/API 已部署 `78c513d`。通过真实账号的临时 API Key 调用 Control API，worker 创建 CHV 沙箱后，Commands API 成功执行 `python3 --version`（Python 3.10.12），再启动 Guest loopback 的 Python HTTP 服务。返回 exit_code=0，随后通过公开 HTTPS 预览及真实浏览器看到页面。创建、命令和 HTTP 预览在这次演示中使用真实数据库、Node、Guest 和 Nginx。
-
-这补充了正常路径的真实运行证据，不代表上面列出的完整生命周期组合与网络故障注入已经通过。可复现客户端脚本见[HTTP 服务预览指南](../docs-site/content/docs/guides/http-port-preview.mdx)。
-
-当前 Guest 内部端口为 31024 / 31080 / 38080，Node 与镜像需匹配升级，详见[迁移说明](runtime-service-ports.md)。历史测试记录保留原部署版本的范围。
+当前 Guest 内部端口为 31024 / 31080 / 38080，Node 与镜像需匹配，见[端口策略](runtime-service-ports.md)。

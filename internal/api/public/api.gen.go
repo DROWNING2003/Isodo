@@ -721,7 +721,7 @@ type CreateSandbox struct {
 	Metadata Metadata `json:"metadata,omitempty"`
 	Name     *string  `json:"name,omitempty"`
 
-	// Template System catalog name or template UUID, optionally followed by :tag. Defaults to base:default. Resolved to an immutable build at creation.
+	// Template 系统模板目录名或模板 UUID，可附加 :tag。默认 base:default，创建时解析并固定为不可变 build。
 	//
 	// Example: base
 	Template *string `json:"template,omitempty"`
@@ -764,7 +764,7 @@ type Error struct {
 type FileDirectoryPage struct {
 	Entries []FileMetadata `json:"entries"`
 
-	// NextPageToken Empty when there are no more entries
+	// NextPageToken 没有后续条目时为空
 	NextPageToken string `json:"next_page_token"`
 }
 
@@ -772,14 +772,14 @@ type FileDirectoryPage struct {
 type FileMetadata struct {
 	Kind FileMetadataKind `json:"kind"`
 
-	// Mode Unix permission bits as a decimal integer
+	// Mode 以十进制整数表示的 Unix 权限位
 	Mode       int       `json:"mode"`
 	ModifiedAt time.Time `json:"modified_at"`
 	Name       string    `json:"name"`
 	Path       string    `json:"path"`
 	SizeBytes  int64     `json:"size_bytes"`
 
-	// SymlinkTarget Raw symlink metadata only; never followed outside workspace
+	// SymlinkTarget 符号链接的原始元数据，不通过链接访问工作区外路径
 	SymlinkTarget *string `json:"symlink_target,omitempty"`
 }
 
@@ -998,10 +998,10 @@ type Sandbox struct {
 	ObservedState SandboxObservedState `json:"observed_state"`
 	Resources     *SandboxResources    `json:"resources,omitempty"`
 
-	// Revision Lifecycle intent revision. PATCH name or metadata does not change it.
+	// Revision 生命周期意图的 revision。仅修改名称或元数据不会改变此值。
 	Revision *string `json:"revision,omitempty"`
 
-	// RuntimeId Opaque handle for the current running instance, never caller-selected.
+	// RuntimeId 当前运行实例的不透明标识，由运行时分配，客户端不能指定。
 	RuntimeId       *string   `json:"runtime_id,omitempty"`
 	TemplateBuildID *string   `json:"template_build_id,omitempty"`
 	TemplateDigest  *string   `json:"template_digest,omitempty"`
@@ -1027,26 +1027,26 @@ type SandboxActionType string
 
 // SandboxAppLink defines model for SandboxAppLink.
 type SandboxAppLink struct {
-	// Capabilities Named capabilities available through this application link, for example `terminal` and `files`. Clients must treat unknown values as optional.
+	// Capabilities 该应用链接提供的能力名称，例如 terminal 和 files；客户端应将未知能力视为可选项。
 	Capabilities *[]string `json:"capabilities,omitempty"`
 	ExpiresAt    time.Time `json:"expires_at"`
 
-	// Generation Opaque runtime generation. When present, the link is valid only for this generation; a Stop/Start/Restore changes it. Clients must not parse it.
+	// Generation 不透明的运行时 generation。存在时链接只对该 generation 有效；停止、启动或恢复后会改变。客户端不得解析此值。
 	Generation *string `json:"generation,omitempty"`
 
-	// PairingUrl A ready-to-open URL whose fragment carries the short-lived Agent workbench pairing credential.
+	// PairingUrl 可直接打开的 URL，其 fragment 携带短期 Agent 工作台配对凭证。
 	PairingUrl string `json:"pairing_url"`
 	SandboxId  string `json:"sandbox_id"`
 
-	// Service The named Guest service this link targets.
+	// Service 此链接访问的 Guest 服务名称
 	Service SandboxAppLinkService `json:"service"`
 	Status  SandboxAppLinkStatus  `json:"status"`
 
-	// Url The application base URL. Clients must treat this value as opaque and must not construct or rewrite it.
+	// Url 应用基础 URL。客户端必须将其视为不透明地址，不自行构造或改写。
 	Url string `json:"url"`
 }
 
-// SandboxAppLinkService The named Guest service this link targets.
+// SandboxAppLinkService 此链接访问的 Guest 服务名称
 type SandboxAppLinkService string
 
 // SandboxAppLinkStatus defines model for SandboxAppLink.Status.
@@ -1186,7 +1186,7 @@ type TemplateBuild struct {
 	ManifestDigest *string   `json:"manifest_digest,omitempty"`
 	OperationID    string    `json:"operation_id"`
 
-	// PublicationError Present when the Ready build was retained but its requested tag changed during the build.
+	// PublicationError Ready 构建已保留、但请求的标签在构建期间被其他操作修改时出现。
 	PublicationError *string             `json:"publication_error,omitempty"`
 	SourceBuildID    string              `json:"source_build_id"`
 	Status           TemplateBuildStatus `json:"status"`
@@ -1250,13 +1250,13 @@ type MakeSandboxDirectoryJSONBody struct {
 type RemoveSandboxFileParams struct {
 	Recursive *bool `form:"recursive,omitempty" json:"recursive,omitempty"`
 
-	// Path Canonical absolute path under /workspace
+	// Path /workspace 内的规范绝对路径
 	Path string `form:"path" json:"path"`
 }
 
 // DownloadSandboxFileParams defines parameters for DownloadSandboxFile.
 type DownloadSandboxFileParams struct {
-	// Path Canonical absolute path under /workspace
+	// Path /workspace 内的规范绝对路径
 	Path string `form:"path" json:"path"`
 }
 
@@ -1269,7 +1269,7 @@ type UploadSandboxFileMultipartBody struct {
 type UploadSandboxFileParams struct {
 	Overwrite *bool `form:"overwrite,omitempty" json:"overwrite,omitempty"`
 
-	// Path Canonical absolute path under /workspace
+	// Path /workspace 内的规范绝对路径
 	Path string `form:"path" json:"path"`
 }
 
@@ -1282,7 +1282,7 @@ type MoveSandboxFileJSONBody struct {
 
 // StatSandboxFileParams defines parameters for StatSandboxFile.
 type StatSandboxFileParams struct {
-	// Path Canonical absolute path under /workspace
+	// Path /workspace 内的规范绝对路径
 	Path string `form:"path" json:"path"`
 }
 
@@ -1449,124 +1449,124 @@ func WithRequestEditorFn(fn RequestEditorFn) ClientOption {
 // The interface specification for the client above.
 type ClientInterface interface {
 
-	// ListCredentialDocuments List encrypted account credential configurations
+	// ListCredentialDocuments 列出账号加密保存的凭证配置文档
 	//
-	// Interactive login required. Kind is agents or sandboxes. Values are decrypted only for the owning account.
+	// 需要交互式登录。kind 为 agents 或 sandboxes，只有所属账号可以解密读取配置内容。.
 	//
 	// Corresponds with GET /v1/credential-documents/{kind} (the `ListCredentialDocuments` operationId).
 	ListCredentialDocuments(ctx context.Context, kind string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteCredentialDocument Delete one configuration owned by the current account
+	// DeleteCredentialDocument 删除当前账号的一份配置
 	//
 	// Corresponds with DELETE /v1/credential-documents/{kind}/{id} (the `DeleteCredentialDocument` operationId).
 	DeleteCredentialDocument(ctx context.Context, kind string, id string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PutCredentialDocumentWithBody Save an account Agent configuration or sandbox credential selection
+	// PutCredentialDocumentWithBody 保存账号 Agent 配置或沙箱凭证选择
 	//
-	// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+	// Agent 配置包含 id、name、agent、connectionId、modelNames、defaultModel、filePath、content、updatedAt。沙箱配置包含 agentIds、credentialIds 和已应用的模型快照。所引用的 Agent 必须属于当前账号，API Key 不能管理这些记录。.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /v1/credential-documents/{kind}/{id} (the `PutCredentialDocument` operationId).
 	PutCredentialDocumentWithBody(ctx context.Context, kind string, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// PutCredentialDocument Save an account Agent configuration or sandbox credential selection
+	// PutCredentialDocument 保存账号 Agent 配置或沙箱凭证选择
 	//
-	// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+	// Agent 配置包含 id、name、agent、connectionId、modelNames、defaultModel、filePath、content、updatedAt。沙箱配置包含 agentIds、credentialIds 和已应用的模型快照。所引用的 Agent 必须属于当前账号，API Key 不能管理这些记录。.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PUT /v1/credential-documents/{kind}/{id} (the `PutCredentialDocument` operationId).
 	PutCredentialDocument(ctx context.Context, kind string, id string, body PutCredentialDocumentJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListInjectionRules List account injection rules
+	// ListInjectionRules 列出账号凭证注入规则
 	//
-	// Returns the authenticated account's persistent injection rules. Secrets are never returned; only a short masked hint is exposed.
+	// 返回当前账号的持久注入规则。只返回简短脱敏提示，不返回秘密内容。.
 	//
 	// Corresponds with GET /v1/injection-rules (the `ListInjectionRules` operationId).
 	ListInjectionRules(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateInjectionRuleWithBody Create an account injection rule
+	// CreateInjectionRuleWithBody 创建账号凭证注入规则
 	//
-	// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+	// 创建账号级持久规则，所有者可将其授权给沙箱。秘密材料在写入存储前加密封装。.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /v1/injection-rules (the `CreateInjectionRule` operationId).
 	CreateInjectionRuleWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateInjectionRule Create an account injection rule
+	// CreateInjectionRule 创建账号凭证注入规则
 	//
-	// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+	// 创建账号级持久规则，所有者可将其授权给沙箱。秘密材料在写入存储前加密封装。.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /v1/injection-rules (the `CreateInjectionRule` operationId).
 	CreateInjectionRule(ctx context.Context, body CreateInjectionRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteInjectionRule Delete an account injection rule
+	// DeleteInjectionRule 删除账号凭证注入规则
 	//
 	// Corresponds with DELETE /v1/injection-rules/{ruleID} (the `DeleteInjectionRule` operationId).
 	DeleteInjectionRule(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetInjectionRule Get an account injection rule
+	// GetInjectionRule 查询账号凭证注入规则
 	//
 	// Corresponds with GET /v1/injection-rules/{ruleID} (the `GetInjectionRule` operationId).
 	GetInjectionRule(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateInjectionRuleWithBody Update an account injection rule
+	// UpdateInjectionRuleWithBody 更新账号凭证注入规则
 	//
-	// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+	// 更新当前账号拥有的规则；省略 secret 时保留已有的加密秘密材料。.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PATCH /v1/injection-rules/{ruleID} (the `UpdateInjectionRule` operationId).
 	UpdateInjectionRuleWithBody(ctx context.Context, ruleID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateInjectionRule Update an account injection rule
+	// UpdateInjectionRule 更新账号凭证注入规则
 	//
-	// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+	// 更新当前账号拥有的规则；省略 secret 时保留已有的加密秘密材料。.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PATCH /v1/injection-rules/{ruleID} (the `UpdateInjectionRule` operationId).
 	UpdateInjectionRule(ctx context.Context, ruleID string, body UpdateInjectionRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetInjectionRuleMaterial Read injection material
+	// GetInjectionRuleMaterial 读取凭证注入材料
 	//
-	// Returns the plaintext header/key for the authenticated owner so a trusted local runtime can apply it. The response is never cached; secrets are never logged.
+	// 为已认证所有者返回明文请求头或密钥，以供受信任的本地运行时应用。响应禁止缓存，秘密不得写入日志。.
 	//
 	// Corresponds with GET /v1/injection-rules/{ruleID}/material (the `GetInjectionRuleMaterial` operationId).
 	GetInjectionRuleMaterial(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListMCPCatalog List available MCP services
+	// ListMCPCatalog 列出可用的 MCP 服务
 	//
 	// Corresponds with GET /v1/mcp/catalog (the `ListMCPCatalog` operationId).
 	ListMCPCatalog(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetMCPCatalog Get MCP catalog service
+	// GetMCPCatalog 查询 MCP 服务详情
 	//
 	// Corresponds with GET /v1/mcp/catalog/{marketID} (the `GetMCPCatalog` operationId).
 	GetMCPCatalog(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DisconnectMCPOAuth Disconnect and invalidate sandbox calls
+	// DisconnectMCPOAuth 断开连接并禁止后续沙箱调用
 	//
 	// Corresponds with DELETE /v1/mcp/connections/{marketID} (the `DisconnectMCPOAuth` operationId).
 	DisconnectMCPOAuth(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetMCPOAuthConnection Get connection without secrets
+	// GetMCPOAuthConnection 查询连接状态（不返回秘密）
 	//
 	// Corresponds with GET /v1/mcp/connections/{marketID} (the `GetMCPOAuthConnection` operationId).
 	GetMCPOAuthConnection(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// StartMCPOAuth Connect an official MCP using PKCE and provider registration
+	// StartMCPOAuth 使用 PKCE 和供应方注册信息连接官方 MCP
 	//
-	// GitHub uses the pre-registered App. Notion discovers OAuth metadata and registers through DCR with PKCE S256. No PAT or CIMD fallback.
+	// GitHub 使用预注册的 GitHub App；Notion 发现 OAuth 元数据并通过 DCR 注册，使用 PKCE S256。不使用 PAT 或 CIMD 回退。.
 	//
 	// Corresponds with POST /v1/mcp/connections/{marketID}/authorize (the `StartMCPOAuth` operationId).
 	StartMCPOAuth(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListMCPTools Discover allowed upstream tools
+	// ListMCPTools 查询允许使用的上游工具
 	//
 	// Corresponds with GET /v1/mcp/connections/{marketID}/tools (the `ListMCPTools` operationId).
 	ListMCPTools(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1594,276 +1594,276 @@ type ClientInterface interface {
 	// Corresponds with DELETE /v1/mcp/custom/{customID} (the `DeleteCustomMCP` operationId).
 	DeleteCustomMCP(ctx context.Context, customID openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListMCPFavorites List account favorites
+	// ListMCPFavorites 列出账号收藏的 MCP
 	//
 	// Corresponds with GET /v1/mcp/favorites (the `ListMCPFavorites` operationId).
 	ListMCPFavorites(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UnfavoriteMCP Unfavorite without revoking OAuth
+	// UnfavoriteMCP 取消收藏，保留现有 OAuth 授权
 	//
 	// Corresponds with DELETE /v1/mcp/favorites/{marketID} (the `UnfavoriteMCP` operationId).
 	UnfavoriteMCP(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// FavoriteMCP Favorite without authorizing
+	// FavoriteMCP 收藏 MCP 服务
 	//
 	// Corresponds with PUT /v1/mcp/favorites/{marketID} (the `FavoriteMCP` operationId).
 	FavoriteMCP(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CompleteMCPOAuth Complete one-time GitHub OAuth callback in the system browser
+	// CompleteMCPOAuth 完成浏览器中的一次性 MCP OAuth 回调
 	//
-	// Fixed HTTPS callback. State binds the account and PKCE transaction. Does not accept Isodo API keys or return OAuth tokens. Query strings must never be logged.
+	// 固定 HTTPS 回调。state 绑定账号和 PKCE 事务；不接受 Isodo API Key，也不返回 OAuth 令牌。查询参数不得写入日志。.
 	//
 	// Corresponds with GET /v1/mcp/oauth/callback (the `CompleteMCPOAuth` operationId).
 	CompleteMCPOAuth(ctx context.Context, params *CompleteMCPOAuthParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CancelMCPOAuthTransaction Cancel authorization transaction
+	// CancelMCPOAuthTransaction 取消授权事务
 	//
 	// Corresponds with DELETE /v1/mcp/oauth/transactions/{transactionID} (the `CancelMCPOAuthTransaction` operationId).
 	CancelMCPOAuthTransaction(ctx context.Context, transactionID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetMCPOAuthTransaction Poll account authorization transaction
+	// GetMCPOAuthTransaction 查询账号授权事务状态
 	//
 	// Corresponds with GET /v1/mcp/oauth/transactions/{transactionID} (the `GetMCPOAuthTransaction` operationId).
 	GetMCPOAuthTransaction(ctx context.Context, transactionID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListSandboxes List sandboxes
+	// ListSandboxes 列出沙箱
 	//
-	// Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
+	// 返回当前认证用户拥有的沙箱，使用 limit 和 offset 分页。.
 	//
 	// Corresponds with GET /v1/sandboxes (the `ListSandboxes` operationId).
 	ListSandboxes(ctx context.Context, params *ListSandboxesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateSandboxWithBody Create a sandbox
+	// CreateSandboxWithBody 创建沙箱
 	//
-	// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+	// 为当前认证用户创建沙箱并登记初始期望状态。运行时可用性取决于已配置的后端；应继续查询实际运行状态。.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /v1/sandboxes (the `CreateSandbox` operationId).
 	CreateSandboxWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateSandbox Create a sandbox
+	// CreateSandbox 创建沙箱
 	//
-	// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+	// 为当前认证用户创建沙箱并登记初始期望状态。运行时可用性取决于已配置的后端；应继续查询实际运行状态。.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /v1/sandboxes (the `CreateSandbox` operationId).
 	CreateSandbox(ctx context.Context, body CreateSandboxJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteSandbox Delete a sandbox
+	// DeleteSandbox 删除沙箱
 	//
-	// Requests Node cleanup. The resource remains readable until cleanup completes; repeated deletion returns the same action while pending or completed. Missing resources return 204.
+	// 请求 Node 清理资源。清理完成前资源仍可读取；重复删除返回同一删除动作的当前结果。不存在的资源返回 204。.
 	//
 	// Corresponds with DELETE /v1/sandboxes/{sandboxID} (the `DeleteSandbox` operationId).
 	DeleteSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetSandbox Get a sandbox
+	// GetSandbox 查询沙箱
 	//
-	// Returns one sandbox owned by the authenticated user. A sandbox owned by another user is reported as not found.
+	// 返回当前用户拥有的一个沙箱；其他用户的沙箱统一返回未找到。.
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID} (the `GetSandbox` operationId).
 	GetSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateSandboxWithBody Update a sandbox
+	// UpdateSandboxWithBody 更新沙箱信息
 	//
-	// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+	// 更新当前用户所拥有沙箱的可变名称和元数据。.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PATCH /v1/sandboxes/{sandboxID} (the `UpdateSandbox` operationId).
 	UpdateSandboxWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateSandbox Update a sandbox
+	// UpdateSandbox 更新沙箱信息
 	//
-	// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+	// 更新当前用户所拥有沙箱的可变名称和元数据。.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PATCH /v1/sandboxes/{sandboxID} (the `UpdateSandbox` operationId).
 	UpdateSandbox(ctx context.Context, sandboxID string, body UpdateSandboxJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetSandboxApp Open a sandbox application
+	// GetSandboxApp 打开沙箱应用
 	//
-	// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and redirects the browser to the sandbox application.
+	// 为已认证的沙箱所有者创建短期 Agent 工作台配对链接，并将浏览器重定向至沙箱应用。.
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID}/app (the `GetSandboxApp` operationId).
 	GetSandboxApp(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateSandboxAppLink Create a sandbox application link
+	// CreateSandboxAppLink 获取沙箱应用链接
 	//
-	// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and returns it as JSON. Desktop clients and SDKs use this endpoint; browsers can use `GET /v1/sandboxes/{sandboxID}/app` instead. The pairing credential is carried in the `pairing_url` fragment and is never sent to the Isodo API.
+	// 为已认证的沙箱所有者创建短期 Agent 工作台配对链接，并返回 JSON。桌面客户端使用此接口；浏览器也可访问 GET /v1/sandboxes/{sandboxID}/app。配对凭证位于 pairing_url 的 fragment 中，不通过该链接发送至 Isodo API。.
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/app-link (the `CreateSandboxAppLink` operationId).
 	CreateSandboxAppLink(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// RunSandboxCommandWithBody Run a bounded non-interactive command inside a sandbox Guest
+	// RunSandboxCommandWithBody 在沙箱 Guest 内执行命令
 	//
-	// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+	// 在运行中的 Guest 内执行 argv，不在宿主 Shell 执行。必须提供 8–128 个安全 ASCII 字符组成的 Idempotency-Key；同一请求重试时复用该键。命令以非零退出码结束时，HTTP 仍返回 200，应检查 exit_code。.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/commands/run (the `RunSandboxCommand` operationId).
 	RunSandboxCommandWithBody(ctx context.Context, sandboxID string, params *RunSandboxCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// RunSandboxCommand Run a bounded non-interactive command inside a sandbox Guest
+	// RunSandboxCommand 在沙箱 Guest 内执行命令
 	//
-	// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+	// 在运行中的 Guest 内执行 argv，不在宿主 Shell 执行。必须提供 8–128 个安全 ASCII 字符组成的 Idempotency-Key；同一请求重试时复用该键。命令以非零退出码结束时，HTTP 仍返回 200，应检查 exit_code。.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/commands/run (the `RunSandboxCommand` operationId).
 	RunSandboxCommand(ctx context.Context, sandboxID string, params *RunSandboxCommandParams, body RunSandboxCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListSandboxDirectory List a workspace directory
+	// ListSandboxDirectory 列出工作区目录
 	//
-	// Lexical name order. page_size defaults to 100 and is limited to 500. Pass next_page_token unchanged to page_token; tokens are name cursors, not a consistent snapshot across concurrent mutations. A directory is limited to 4096 entries. Symlink metadata is returned without following the final symlink.
+	// 按名称字典序返回条目。page_size 默认 100、最大 500；将 next_page_token 原样传回 page_token。令牌是名称游标，不保证并发修改下的一致性快照。单目录最多 4096 个条目；返回最终符号链接的元数据，不跟随该链接。.
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID}/directories (the `ListSandboxDirectory` operationId).
 	ListSandboxDirectory(ctx context.Context, sandboxID string, params *ListSandboxDirectoryParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// MakeSandboxDirectoryWithBody Create a workspace directory
+	// MakeSandboxDirectoryWithBody 创建工作区目录
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
 	MakeSandboxDirectoryWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// MakeSandboxDirectory Create a workspace directory
+	// MakeSandboxDirectory 创建工作区目录
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
 	MakeSandboxDirectory(ctx context.Context, sandboxID string, body MakeSandboxDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// RemoveSandboxFile Remove a workspace file or directory
+	// RemoveSandboxFile 删除工作区文件或目录
 	//
-	// Idempotent for missing paths. Removes symlinks themselves. Empty directories require no recursive flag; nonempty directories require recursive=true and are limited to 4096 entries. Workspace root and runtime-owned paths are forbidden. Mutations reject symlink parents.
+	// 不存在的路径也视为成功。符号链接只删除链接本身；空目录可直接删除，非空目录要求 recursive=true，最多处理 4096 个条目。禁止删除工作区根目录和运行时保护路径，拒绝符号链接父目录。.
 	//
 	// Corresponds with DELETE /v1/sandboxes/{sandboxID}/files (the `RemoveSandboxFile` operationId).
 	RemoveSandboxFile(ctx context.Context, sandboxID string, params *RemoveSandboxFileParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DownloadSandboxFile Download a verified binary file
+	// DownloadSandboxFile 下载经过完整性校验的文件
 	//
-	// Stages at most 256 MiB in private temporary storage and verifies the Guest completion digest before responding. X-Content-SHA256 describes the complete response body.
+	// 在私有临时空间暂存最多 256 MiB，校验 Guest 完成摘要后再返回响应。X-Content-SHA256 表示完整响应体的摘要。.
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID}/files (the `DownloadSandboxFile` operationId).
 	DownloadSandboxFile(ctx context.Context, sandboxID string, params *DownloadSandboxFileParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UploadSandboxFileWithBody Upload and atomically commit one file
+	// UploadSandboxFileWithBody 上传并原子提交文件
 	//
-	// Defaults to overwrite=true. One multipart part named file, up to 256 MiB. Upload bytes are staged in bounded private temporary storage before forwarding through Node and Guest. Success means Guest confirmed the SHA256 and atomic commit. COMMIT_UNKNOWN must be verified by reading the target before retrying.
+	// 默认 overwrite=true。请求包含名为 file 的单个 multipart 文件部分，最大 256 MiB。上传内容先在有界私有临时空间暂存，再经 Node 转发至 Guest。成功代表 Guest 已确认 SHA-256 和原子提交。遇到 COMMIT_UNKNOWN 时应先读取目标文件确认结果，再决定是否重试。.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/files (the `UploadSandboxFile` operationId).
 	UploadSandboxFileWithBody(ctx context.Context, sandboxID string, params *UploadSandboxFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// MoveSandboxFileWithBody Move a workspace file or directory
+	// MoveSandboxFileWithBody 移动工作区文件或目录
 	//
-	// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+	// 默认 overwrite=true，与文件上传一致。只有普通文件可以覆盖已有普通文件，不覆盖目录。overwrite=false 使用原子禁止覆盖操作。源和目标都必须是工作区内的规范路径；禁止工作区根、运行时保护路径和符号链接父目录。源和目标相同时返回当前元数据。.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/files/move (the `MoveSandboxFile` operationId).
 	MoveSandboxFileWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// MoveSandboxFile Move a workspace file or directory
+	// MoveSandboxFile 移动工作区文件或目录
 	//
-	// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+	// 默认 overwrite=true，与文件上传一致。只有普通文件可以覆盖已有普通文件，不覆盖目录。overwrite=false 使用原子禁止覆盖操作。源和目标都必须是工作区内的规范路径；禁止工作区根、运行时保护路径和符号链接父目录。源和目标相同时返回当前元数据。.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/files/move (the `MoveSandboxFile` operationId).
 	MoveSandboxFile(ctx context.Context, sandboxID string, body MoveSandboxFileJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// StatSandboxFile Inspect workspace path metadata
+	// StatSandboxFile 查询工作区路径元数据
 	//
-	// Returns lstat metadata, including symlink_target for a final symlink, without following it. Workspace root is allowed; paths outside workspace are rejected.
+	// 返回 lstat 元数据；最终路径为符号链接时包含 symlink_target，不跟随该链接。允许查询 /workspace 本身，拒绝工作区外的路径。.
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID}/files/stat (the `StatSandboxFile` operationId).
 	StatSandboxFile(ctx context.Context, sandboxID string, params *StatSandboxFileParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetSandboxInjections Read masked host-side injection configuration
+	// GetSandboxInjections 读取脱敏后的沙箱凭证注入配置
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID}/injections (the `GetSandboxInjections` operationId).
 	GetSandboxInjections(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// SetSandboxInjectionsWithBody Replace sandbox host-side injection rules
+	// SetSandboxInjectionsWithBody 替换沙箱的宿主侧凭证注入规则
 	//
-	// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+	// 需要所有者的交互式授权。秘密材料仅通过 Node mTLS 传递，不写入 Guest 文件。Control 和 Node 均校验生命周期 revision。.
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
 	SetSandboxInjectionsWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// SetSandboxInjections Replace sandbox host-side injection rules
+	// SetSandboxInjections 替换沙箱的宿主侧凭证注入规则
 	//
-	// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+	// 需要所有者的交互式授权。秘密材料仅通过 Node mTLS 传递，不写入 Guest 文件。Control 和 Node 均校验生命周期 revision。.
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
 	SetSandboxInjections(ctx context.Context, sandboxID string, body SetSandboxInjectionsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListSandboxMCPBindings List explicit sandbox bindings
+	// ListSandboxMCPBindings 列出沙箱显式授权的 MCP 绑定
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID}/mcp (the `ListSandboxMCPBindings` operationId).
 	ListSandboxMCPBindings(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UnbindSandboxMCP Revoke binding before syncing config
+	// UnbindSandboxMCP 先撤销沙箱绑定，再同步配置
 	//
 	// Corresponds with DELETE /v1/sandboxes/{sandboxID}/mcp/{marketID} (the `UnbindSandboxMCP` operationId).
 	UnbindSandboxMCP(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// BindSandboxMCP Bind authorized MCP and sync Codex config
+	// BindSandboxMCP 绑定已授权 MCP 并同步 Codex 配置
 	//
 	// Corresponds with PUT /v1/sandboxes/{sandboxID}/mcp/{marketID} (the `BindSandboxMCP` operationId).
 	BindSandboxMCP(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// SyncSandboxMCP Apply saved MCP config; Agent restart required
+	// SyncSandboxMCP 应用已保存的 MCP 配置；新 Agent 会话加载更改
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/mcp/{marketID}/sync (the `SyncSandboxMCP` operationId).
 	SyncSandboxMCP(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateSandboxPreviewWithBody Authorize a sandbox HTTP port preview
+	// CreateSandboxPreviewWithBody 获取沙箱 HTTP 端口预览入口
 	//
-	// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+	// 需要运行中的远程 CHV 沙箱；API Key 需要 sandboxes:preview。未配置的端口默认为 public，返回可直接访问的 URL。private 端口返回有效期五分钟、绑定账号、策略 revision 和当前 Guest 运行身份的 authorization_url。禁止访问运行时端口 31024、31080、38080 及旧端口 1024、1080、8080。启停、删除和策略变化会撤销私有授权。
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/previews (the `CreateSandboxPreview` operationId).
 	CreateSandboxPreviewWithBody(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateSandboxPreview Authorize a sandbox HTTP port preview
+	// CreateSandboxPreview 获取沙箱 HTTP 端口预览入口
 	//
-	// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+	// 需要运行中的远程 CHV 沙箱；API Key 需要 sandboxes:preview。未配置的端口默认为 public，返回可直接访问的 URL。private 端口返回有效期五分钟、绑定账号、策略 revision 和当前 Guest 运行身份的 authorization_url。禁止访问运行时端口 31024、31080、38080 及旧端口 1024、1080、8080。启停、删除和策略变化会撤销私有授权。
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/previews (the `CreateSandboxPreview` operationId).
 	CreateSandboxPreview(ctx context.Context, sandboxID string, body CreateSandboxPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetSandboxPortPreview Get a sandbox HTTP port visibility
+	// GetSandboxPortPreview 查询 HTTP 端口可见性
 	//
-	// Requires ownership and sandboxes:read. Unconfigured ports default to public. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited.
+	// 需要沙箱所有权和 sandboxes:read。未配置的端口默认为 public。禁止使用运行时端口 31024、31080、38080 及旧端口 1024、1080、8080。
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID}/previews/{port} (the `GetSandboxPortPreview` operationId).
 	GetSandboxPortPreview(ctx context.Context, sandboxID string, port int, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// SetSandboxPortPreviewWithBody Change a sandbox HTTP port visibility
+	// SetSandboxPortPreviewWithBody 修改 HTTP 端口可见性
 	//
-	// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+	// 需要沙箱所有权和 sandboxes:preview。策略在停止、启动后保留，删除沙箱时清理。新请求读取已提交的策略；确认切换前取消本 Gateway 的活动流，其他 Gateway 最迟每 100ms 重新校验。T3 工作台鉴权保持不变。
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /v1/sandboxes/{sandboxID}/previews/{port} (the `SetSandboxPortPreview` operationId).
 	SetSandboxPortPreviewWithBody(ctx context.Context, sandboxID string, port int, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// SetSandboxPortPreview Change a sandbox HTTP port visibility
+	// SetSandboxPortPreview 修改 HTTP 端口可见性
 	//
-	// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+	// 需要沙箱所有权和 sandboxes:preview。策略在停止、启动后保留，删除沙箱时清理。新请求读取已提交的策略；确认切换前取消本 Gateway 的活动流，其他 Gateway 最迟每 100ms 重新校验。T3 工作台鉴权保持不变。
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -1893,16 +1893,16 @@ type ClientInterface interface {
 	// Corresponds with PUT /v1/sandboxes/{sandboxID}/skills (the `SetSandboxSkills` operationId).
 	SetSandboxSkills(ctx context.Context, sandboxID openapi_types.UUID, body SetSandboxSkillsJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// StartSandbox Start a stopped sandbox
+	// StartSandbox 启动已停止的沙箱
 	//
-	// Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
+	// 对当前用户拥有且已停止的云端沙箱执行保留磁盘的冷启动。这是异步操作，应轮询直至 observed_state 为 running。.
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/start (the `StartSandbox` operationId).
 	StartSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// StopSandbox Stop a running sandbox
+	// StopSandbox 停止运行中的沙箱
 	//
-	// Requests a graceful stop for a cloud sandbox owned by the authenticated user while preserving its instance disks. The operation is asynchronous; poll the sandbox until observed_state becomes stopped.
+	// 优雅停止当前用户拥有的云端沙箱并保留实例磁盘。这是异步操作，应轮询直至 observed_state 为 stopped。.
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/stop (the `StopSandbox` operationId).
 	StopSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error)
@@ -1936,105 +1936,105 @@ type ClientInterface interface {
 	// Corresponds with PUT /v1/skills/{skillID}/favorite (the `FavoriteSkill` operationId).
 	FavoriteSkill(ctx context.Context, skillID openapi_types.UUID, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListSystemTemplates List platform default templates
+	// ListSystemTemplates 列出平台默认模板
 	//
 	// Corresponds with GET /v1/system-templates (the `ListSystemTemplates` operationId).
 	ListSystemTemplates(ctx context.Context, params *ListSystemTemplatesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ListTemplates List templates visible to the authenticated user
+	// ListTemplates 列出当前用户可见的模板
 	//
 	// Corresponds with GET /v1/templates (the `ListTemplates` operationId).
 	ListTemplates(ctx context.Context, params *ListTemplatesParams, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateTemplateWithBody Create a personal template
+	// CreateTemplateWithBody 创建个人模板
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /v1/templates (the `CreateTemplate` operationId).
 	CreateTemplateWithBody(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateTemplate Create a personal template
+	// CreateTemplate 创建个人模板
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /v1/templates (the `CreateTemplate` operationId).
 	CreateTemplate(ctx context.Context, body CreateTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteTemplate Delete an owned template
+	// DeleteTemplate 删除本人拥有的模板
 	//
 	// Corresponds with DELETE /v1/templates/{templateID} (the `DeleteTemplate` operationId).
 	DeleteTemplate(ctx context.Context, templateID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetTemplate Get a template
+	// GetTemplate 查询模板
 	//
 	// Corresponds with GET /v1/templates/{templateID} (the `GetTemplate` operationId).
 	GetTemplate(ctx context.Context, templateID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateTemplateWithBody Update an owned template
+	// UpdateTemplateWithBody 更新本人拥有的模板
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PATCH /v1/templates/{templateID} (the `UpdateTemplate` operationId).
 	UpdateTemplateWithBody(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// UpdateTemplate Update an owned template
+	// UpdateTemplate 更新本人拥有的模板
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with PATCH /v1/templates/{templateID} (the `UpdateTemplate` operationId).
 	UpdateTemplate(ctx context.Context, templateID string, body UpdateTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateTemplateBuildWithBody Queue an immutable template build
+	// CreateTemplateBuildWithBody 提交不可变模板构建任务
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /v1/templates/{templateID}/builds (the `CreateTemplateBuild` operationId).
 	CreateTemplateBuildWithBody(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// CreateTemplateBuild Queue an immutable template build
+	// CreateTemplateBuild 提交不可变模板构建任务
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /v1/templates/{templateID}/builds (the `CreateTemplateBuild` operationId).
 	CreateTemplateBuild(ctx context.Context, templateID string, body CreateTemplateBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetTemplateBuild Get template build status
+	// GetTemplateBuild 查询模板构建状态
 	//
 	// Corresponds with GET /v1/templates/{templateID}/builds/{buildID} (the `GetTemplateBuild` operationId).
 	GetTemplateBuild(ctx context.Context, templateID string, buildID string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ForkTemplateWithBody Fork an accessible Ready build into a personal template
+	// ForkTemplateWithBody 从可访问的 Ready 构建派生个人模板
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with POST /v1/templates/{templateID}/fork (the `ForkTemplate` operationId).
 	ForkTemplateWithBody(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// ForkTemplate Fork an accessible Ready build into a personal template
+	// ForkTemplate 从可访问的 Ready 构建派生个人模板
 	//
 	// Takes a body of the `application/json` content type.
 	//
 	// Corresponds with POST /v1/templates/{templateID}/fork (the `ForkTemplate` operationId).
 	ForkTemplate(ctx context.Context, templateID string, body ForkTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// DeleteTemplateTag Remove a template build tag
+	// DeleteTemplateTag 移除模板构建标签
 	//
 	// Corresponds with DELETE /v1/templates/{templateID}/tags/{tag} (the `DeleteTemplateTag` operationId).
 	DeleteTemplateTag(ctx context.Context, templateID string, tag string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// GetTemplateTag Resolve a Ready build tag
+	// GetTemplateTag 解析 Ready 构建标签
 	//
 	// Corresponds with GET /v1/templates/{templateID}/tags/{tag} (the `GetTemplateTag` operationId).
 	GetTemplateTag(ctx context.Context, templateID string, tag string, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// SetTemplateTagWithBody Atomically publish a Ready build under a tag
+	// SetTemplateTagWithBody 将 Ready 构建原子发布至标签
 	//
 	// Takes any type of body and a specified content type.
 	//
 	// Corresponds with PUT /v1/templates/{templateID}/tags/{tag} (the `SetTemplateTag` operationId).
 	SetTemplateTagWithBody(ctx context.Context, templateID string, tag string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*http.Response, error)
 
-	// SetTemplateTag Atomically publish a Ready build under a tag
+	// SetTemplateTag 将 Ready 构建原子发布至标签
 	//
 	// Takes a body of the `application/json` content type.
 	//
@@ -2042,9 +2042,9 @@ type ClientInterface interface {
 	SetTemplateTag(ctx context.Context, templateID string, tag string, body SetTemplateTagJSONRequestBody, reqEditors ...RequestEditorFn) (*http.Response, error)
 }
 
-// ListCredentialDocuments List encrypted account credential configurations
+// ListCredentialDocuments 列出账号加密保存的凭证配置文档
 //
-// Interactive login required. Kind is agents or sandboxes. Values are decrypted only for the owning account.
+// 需要交互式登录。kind 为 agents 或 sandboxes，只有所属账号可以解密读取配置内容。.
 //
 // Corresponds with GET /v1/credential-documents/{kind} (the `ListCredentialDocuments` operationId).
 func (c *Client) ListCredentialDocuments(ctx context.Context, kind string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2059,7 +2059,7 @@ func (c *Client) ListCredentialDocuments(ctx context.Context, kind string, reqEd
 	return c.Client.Do(req)
 }
 
-// DeleteCredentialDocument Delete one configuration owned by the current account
+// DeleteCredentialDocument 删除当前账号的一份配置
 //
 // Corresponds with DELETE /v1/credential-documents/{kind}/{id} (the `DeleteCredentialDocument` operationId).
 func (c *Client) DeleteCredentialDocument(ctx context.Context, kind string, id string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2074,9 +2074,9 @@ func (c *Client) DeleteCredentialDocument(ctx context.Context, kind string, id s
 	return c.Client.Do(req)
 }
 
-// PutCredentialDocumentWithBody Save an account Agent configuration or sandbox credential selection
+// PutCredentialDocumentWithBody 保存账号 Agent 配置或沙箱凭证选择
 //
-// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+// Agent 配置包含 id、name、agent、connectionId、modelNames、defaultModel、filePath、content、updatedAt。沙箱配置包含 agentIds、credentialIds 和已应用的模型快照。所引用的 Agent 必须属于当前账号，API Key 不能管理这些记录。.
 //
 // Takes any type of body and a specified content type.
 //
@@ -2093,9 +2093,9 @@ func (c *Client) PutCredentialDocumentWithBody(ctx context.Context, kind string,
 	return c.Client.Do(req)
 }
 
-// PutCredentialDocument Save an account Agent configuration or sandbox credential selection
+// PutCredentialDocument 保存账号 Agent 配置或沙箱凭证选择
 //
-// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+// Agent 配置包含 id、name、agent、connectionId、modelNames、defaultModel、filePath、content、updatedAt。沙箱配置包含 agentIds、credentialIds 和已应用的模型快照。所引用的 Agent 必须属于当前账号，API Key 不能管理这些记录。.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2112,9 +2112,9 @@ func (c *Client) PutCredentialDocument(ctx context.Context, kind string, id stri
 	return c.Client.Do(req)
 }
 
-// ListInjectionRules List account injection rules
+// ListInjectionRules 列出账号凭证注入规则
 //
-// Returns the authenticated account's persistent injection rules. Secrets are never returned; only a short masked hint is exposed.
+// 返回当前账号的持久注入规则。只返回简短脱敏提示，不返回秘密内容。.
 //
 // Corresponds with GET /v1/injection-rules (the `ListInjectionRules` operationId).
 func (c *Client) ListInjectionRules(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2129,9 +2129,9 @@ func (c *Client) ListInjectionRules(ctx context.Context, reqEditors ...RequestEd
 	return c.Client.Do(req)
 }
 
-// CreateInjectionRuleWithBody Create an account injection rule
+// CreateInjectionRuleWithBody 创建账号凭证注入规则
 //
-// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+// 创建账号级持久规则，所有者可将其授权给沙箱。秘密材料在写入存储前加密封装。.
 //
 // Takes any type of body and a specified content type.
 //
@@ -2148,9 +2148,9 @@ func (c *Client) CreateInjectionRuleWithBody(ctx context.Context, contentType st
 	return c.Client.Do(req)
 }
 
-// CreateInjectionRule Create an account injection rule
+// CreateInjectionRule 创建账号凭证注入规则
 //
-// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+// 创建账号级持久规则，所有者可将其授权给沙箱。秘密材料在写入存储前加密封装。.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2167,7 +2167,7 @@ func (c *Client) CreateInjectionRule(ctx context.Context, body CreateInjectionRu
 	return c.Client.Do(req)
 }
 
-// DeleteInjectionRule Delete an account injection rule
+// DeleteInjectionRule 删除账号凭证注入规则
 //
 // Corresponds with DELETE /v1/injection-rules/{ruleID} (the `DeleteInjectionRule` operationId).
 func (c *Client) DeleteInjectionRule(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2182,7 +2182,7 @@ func (c *Client) DeleteInjectionRule(ctx context.Context, ruleID string, reqEdit
 	return c.Client.Do(req)
 }
 
-// GetInjectionRule Get an account injection rule
+// GetInjectionRule 查询账号凭证注入规则
 //
 // Corresponds with GET /v1/injection-rules/{ruleID} (the `GetInjectionRule` operationId).
 func (c *Client) GetInjectionRule(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2197,9 +2197,9 @@ func (c *Client) GetInjectionRule(ctx context.Context, ruleID string, reqEditors
 	return c.Client.Do(req)
 }
 
-// UpdateInjectionRuleWithBody Update an account injection rule
+// UpdateInjectionRuleWithBody 更新账号凭证注入规则
 //
-// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+// 更新当前账号拥有的规则；省略 secret 时保留已有的加密秘密材料。.
 //
 // Takes any type of body and a specified content type.
 //
@@ -2216,9 +2216,9 @@ func (c *Client) UpdateInjectionRuleWithBody(ctx context.Context, ruleID string,
 	return c.Client.Do(req)
 }
 
-// UpdateInjectionRule Update an account injection rule
+// UpdateInjectionRule 更新账号凭证注入规则
 //
-// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+// 更新当前账号拥有的规则；省略 secret 时保留已有的加密秘密材料。.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2235,9 +2235,9 @@ func (c *Client) UpdateInjectionRule(ctx context.Context, ruleID string, body Up
 	return c.Client.Do(req)
 }
 
-// GetInjectionRuleMaterial Read injection material
+// GetInjectionRuleMaterial 读取凭证注入材料
 //
-// Returns the plaintext header/key for the authenticated owner so a trusted local runtime can apply it. The response is never cached; secrets are never logged.
+// 为已认证所有者返回明文请求头或密钥，以供受信任的本地运行时应用。响应禁止缓存，秘密不得写入日志。.
 //
 // Corresponds with GET /v1/injection-rules/{ruleID}/material (the `GetInjectionRuleMaterial` operationId).
 func (c *Client) GetInjectionRuleMaterial(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2252,7 +2252,7 @@ func (c *Client) GetInjectionRuleMaterial(ctx context.Context, ruleID string, re
 	return c.Client.Do(req)
 }
 
-// ListMCPCatalog List available MCP services
+// ListMCPCatalog 列出可用的 MCP 服务
 //
 // Corresponds with GET /v1/mcp/catalog (the `ListMCPCatalog` operationId).
 func (c *Client) ListMCPCatalog(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2267,7 +2267,7 @@ func (c *Client) ListMCPCatalog(ctx context.Context, reqEditors ...RequestEditor
 	return c.Client.Do(req)
 }
 
-// GetMCPCatalog Get MCP catalog service
+// GetMCPCatalog 查询 MCP 服务详情
 //
 // Corresponds with GET /v1/mcp/catalog/{marketID} (the `GetMCPCatalog` operationId).
 func (c *Client) GetMCPCatalog(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2282,7 +2282,7 @@ func (c *Client) GetMCPCatalog(ctx context.Context, marketID string, reqEditors 
 	return c.Client.Do(req)
 }
 
-// DisconnectMCPOAuth Disconnect and invalidate sandbox calls
+// DisconnectMCPOAuth 断开连接并禁止后续沙箱调用
 //
 // Corresponds with DELETE /v1/mcp/connections/{marketID} (the `DisconnectMCPOAuth` operationId).
 func (c *Client) DisconnectMCPOAuth(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2297,7 +2297,7 @@ func (c *Client) DisconnectMCPOAuth(ctx context.Context, marketID string, reqEdi
 	return c.Client.Do(req)
 }
 
-// GetMCPOAuthConnection Get connection without secrets
+// GetMCPOAuthConnection 查询连接状态（不返回秘密）
 //
 // Corresponds with GET /v1/mcp/connections/{marketID} (the `GetMCPOAuthConnection` operationId).
 func (c *Client) GetMCPOAuthConnection(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2312,9 +2312,9 @@ func (c *Client) GetMCPOAuthConnection(ctx context.Context, marketID string, req
 	return c.Client.Do(req)
 }
 
-// StartMCPOAuth Connect an official MCP using PKCE and provider registration
+// StartMCPOAuth 使用 PKCE 和供应方注册信息连接官方 MCP
 //
-// GitHub uses the pre-registered App. Notion discovers OAuth metadata and registers through DCR with PKCE S256. No PAT or CIMD fallback.
+// GitHub 使用预注册的 GitHub App；Notion 发现 OAuth 元数据并通过 DCR 注册，使用 PKCE S256。不使用 PAT 或 CIMD 回退。.
 //
 // Corresponds with POST /v1/mcp/connections/{marketID}/authorize (the `StartMCPOAuth` operationId).
 func (c *Client) StartMCPOAuth(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2329,7 +2329,7 @@ func (c *Client) StartMCPOAuth(ctx context.Context, marketID string, reqEditors 
 	return c.Client.Do(req)
 }
 
-// ListMCPTools Discover allowed upstream tools
+// ListMCPTools 查询允许使用的上游工具
 //
 // Corresponds with GET /v1/mcp/connections/{marketID}/tools (the `ListMCPTools` operationId).
 func (c *Client) ListMCPTools(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2397,7 +2397,7 @@ func (c *Client) DeleteCustomMCP(ctx context.Context, customID openapi_types.UUI
 	return c.Client.Do(req)
 }
 
-// ListMCPFavorites List account favorites
+// ListMCPFavorites 列出账号收藏的 MCP
 //
 // Corresponds with GET /v1/mcp/favorites (the `ListMCPFavorites` operationId).
 func (c *Client) ListMCPFavorites(ctx context.Context, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2412,7 +2412,7 @@ func (c *Client) ListMCPFavorites(ctx context.Context, reqEditors ...RequestEdit
 	return c.Client.Do(req)
 }
 
-// UnfavoriteMCP Unfavorite without revoking OAuth
+// UnfavoriteMCP 取消收藏，保留现有 OAuth 授权
 //
 // Corresponds with DELETE /v1/mcp/favorites/{marketID} (the `UnfavoriteMCP` operationId).
 func (c *Client) UnfavoriteMCP(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2427,7 +2427,7 @@ func (c *Client) UnfavoriteMCP(ctx context.Context, marketID string, reqEditors 
 	return c.Client.Do(req)
 }
 
-// FavoriteMCP Favorite without authorizing
+// FavoriteMCP 收藏 MCP 服务
 //
 // Corresponds with PUT /v1/mcp/favorites/{marketID} (the `FavoriteMCP` operationId).
 func (c *Client) FavoriteMCP(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2442,9 +2442,9 @@ func (c *Client) FavoriteMCP(ctx context.Context, marketID string, reqEditors ..
 	return c.Client.Do(req)
 }
 
-// CompleteMCPOAuth Complete one-time GitHub OAuth callback in the system browser
+// CompleteMCPOAuth 完成浏览器中的一次性 MCP OAuth 回调
 //
-// Fixed HTTPS callback. State binds the account and PKCE transaction. Does not accept Isodo API keys or return OAuth tokens. Query strings must never be logged.
+// 固定 HTTPS 回调。state 绑定账号和 PKCE 事务；不接受 Isodo API Key，也不返回 OAuth 令牌。查询参数不得写入日志。.
 //
 // Corresponds with GET /v1/mcp/oauth/callback (the `CompleteMCPOAuth` operationId).
 func (c *Client) CompleteMCPOAuth(ctx context.Context, params *CompleteMCPOAuthParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2459,7 +2459,7 @@ func (c *Client) CompleteMCPOAuth(ctx context.Context, params *CompleteMCPOAuthP
 	return c.Client.Do(req)
 }
 
-// CancelMCPOAuthTransaction Cancel authorization transaction
+// CancelMCPOAuthTransaction 取消授权事务
 //
 // Corresponds with DELETE /v1/mcp/oauth/transactions/{transactionID} (the `CancelMCPOAuthTransaction` operationId).
 func (c *Client) CancelMCPOAuthTransaction(ctx context.Context, transactionID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2474,7 +2474,7 @@ func (c *Client) CancelMCPOAuthTransaction(ctx context.Context, transactionID st
 	return c.Client.Do(req)
 }
 
-// GetMCPOAuthTransaction Poll account authorization transaction
+// GetMCPOAuthTransaction 查询账号授权事务状态
 //
 // Corresponds with GET /v1/mcp/oauth/transactions/{transactionID} (the `GetMCPOAuthTransaction` operationId).
 func (c *Client) GetMCPOAuthTransaction(ctx context.Context, transactionID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2489,9 +2489,9 @@ func (c *Client) GetMCPOAuthTransaction(ctx context.Context, transactionID strin
 	return c.Client.Do(req)
 }
 
-// ListSandboxes List sandboxes
+// ListSandboxes 列出沙箱
 //
-// Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
+// 返回当前认证用户拥有的沙箱，使用 limit 和 offset 分页。.
 //
 // Corresponds with GET /v1/sandboxes (the `ListSandboxes` operationId).
 func (c *Client) ListSandboxes(ctx context.Context, params *ListSandboxesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2506,9 +2506,9 @@ func (c *Client) ListSandboxes(ctx context.Context, params *ListSandboxesParams,
 	return c.Client.Do(req)
 }
 
-// CreateSandboxWithBody Create a sandbox
+// CreateSandboxWithBody 创建沙箱
 //
-// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+// 为当前认证用户创建沙箱并登记初始期望状态。运行时可用性取决于已配置的后端；应继续查询实际运行状态。.
 //
 // Takes any type of body and a specified content type.
 //
@@ -2525,9 +2525,9 @@ func (c *Client) CreateSandboxWithBody(ctx context.Context, contentType string, 
 	return c.Client.Do(req)
 }
 
-// CreateSandbox Create a sandbox
+// CreateSandbox 创建沙箱
 //
-// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+// 为当前认证用户创建沙箱并登记初始期望状态。运行时可用性取决于已配置的后端；应继续查询实际运行状态。.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2544,9 +2544,9 @@ func (c *Client) CreateSandbox(ctx context.Context, body CreateSandboxJSONReques
 	return c.Client.Do(req)
 }
 
-// DeleteSandbox Delete a sandbox
+// DeleteSandbox 删除沙箱
 //
-// Requests Node cleanup. The resource remains readable until cleanup completes; repeated deletion returns the same action while pending or completed. Missing resources return 204.
+// 请求 Node 清理资源。清理完成前资源仍可读取；重复删除返回同一删除动作的当前结果。不存在的资源返回 204。.
 //
 // Corresponds with DELETE /v1/sandboxes/{sandboxID} (the `DeleteSandbox` operationId).
 func (c *Client) DeleteSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2561,9 +2561,9 @@ func (c *Client) DeleteSandbox(ctx context.Context, sandboxID string, reqEditors
 	return c.Client.Do(req)
 }
 
-// GetSandbox Get a sandbox
+// GetSandbox 查询沙箱
 //
-// Returns one sandbox owned by the authenticated user. A sandbox owned by another user is reported as not found.
+// 返回当前用户拥有的一个沙箱；其他用户的沙箱统一返回未找到。.
 //
 // Corresponds with GET /v1/sandboxes/{sandboxID} (the `GetSandbox` operationId).
 func (c *Client) GetSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2578,9 +2578,9 @@ func (c *Client) GetSandbox(ctx context.Context, sandboxID string, reqEditors ..
 	return c.Client.Do(req)
 }
 
-// UpdateSandboxWithBody Update a sandbox
+// UpdateSandboxWithBody 更新沙箱信息
 //
-// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+// 更新当前用户所拥有沙箱的可变名称和元数据。.
 //
 // Takes any type of body and a specified content type.
 //
@@ -2597,9 +2597,9 @@ func (c *Client) UpdateSandboxWithBody(ctx context.Context, sandboxID string, co
 	return c.Client.Do(req)
 }
 
-// UpdateSandbox Update a sandbox
+// UpdateSandbox 更新沙箱信息
 //
-// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+// 更新当前用户所拥有沙箱的可变名称和元数据。.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2616,9 +2616,9 @@ func (c *Client) UpdateSandbox(ctx context.Context, sandboxID string, body Updat
 	return c.Client.Do(req)
 }
 
-// GetSandboxApp Open a sandbox application
+// GetSandboxApp 打开沙箱应用
 //
-// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and redirects the browser to the sandbox application.
+// 为已认证的沙箱所有者创建短期 Agent 工作台配对链接，并将浏览器重定向至沙箱应用。.
 //
 // Corresponds with GET /v1/sandboxes/{sandboxID}/app (the `GetSandboxApp` operationId).
 func (c *Client) GetSandboxApp(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2633,9 +2633,9 @@ func (c *Client) GetSandboxApp(ctx context.Context, sandboxID string, reqEditors
 	return c.Client.Do(req)
 }
 
-// CreateSandboxAppLink Create a sandbox application link
+// CreateSandboxAppLink 获取沙箱应用链接
 //
-// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and returns it as JSON. Desktop clients and SDKs use this endpoint; browsers can use `GET /v1/sandboxes/{sandboxID}/app` instead. The pairing credential is carried in the `pairing_url` fragment and is never sent to the Isodo API.
+// 为已认证的沙箱所有者创建短期 Agent 工作台配对链接，并返回 JSON。桌面客户端使用此接口；浏览器也可访问 GET /v1/sandboxes/{sandboxID}/app。配对凭证位于 pairing_url 的 fragment 中，不通过该链接发送至 Isodo API。.
 //
 // Corresponds with POST /v1/sandboxes/{sandboxID}/app-link (the `CreateSandboxAppLink` operationId).
 func (c *Client) CreateSandboxAppLink(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2650,9 +2650,9 @@ func (c *Client) CreateSandboxAppLink(ctx context.Context, sandboxID string, req
 	return c.Client.Do(req)
 }
 
-// RunSandboxCommandWithBody Run a bounded non-interactive command inside a sandbox Guest
+// RunSandboxCommandWithBody 在沙箱 Guest 内执行命令
 //
-// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+// 在运行中的 Guest 内执行 argv，不在宿主 Shell 执行。必须提供 8–128 个安全 ASCII 字符组成的 Idempotency-Key；同一请求重试时复用该键。命令以非零退出码结束时，HTTP 仍返回 200，应检查 exit_code。.
 //
 // Takes any type of body and a specified content type.
 //
@@ -2669,9 +2669,9 @@ func (c *Client) RunSandboxCommandWithBody(ctx context.Context, sandboxID string
 	return c.Client.Do(req)
 }
 
-// RunSandboxCommand Run a bounded non-interactive command inside a sandbox Guest
+// RunSandboxCommand 在沙箱 Guest 内执行命令
 //
-// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+// 在运行中的 Guest 内执行 argv，不在宿主 Shell 执行。必须提供 8–128 个安全 ASCII 字符组成的 Idempotency-Key；同一请求重试时复用该键。命令以非零退出码结束时，HTTP 仍返回 200，应检查 exit_code。.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2688,9 +2688,9 @@ func (c *Client) RunSandboxCommand(ctx context.Context, sandboxID string, params
 	return c.Client.Do(req)
 }
 
-// ListSandboxDirectory List a workspace directory
+// ListSandboxDirectory 列出工作区目录
 //
-// Lexical name order. page_size defaults to 100 and is limited to 500. Pass next_page_token unchanged to page_token; tokens are name cursors, not a consistent snapshot across concurrent mutations. A directory is limited to 4096 entries. Symlink metadata is returned without following the final symlink.
+// 按名称字典序返回条目。page_size 默认 100、最大 500；将 next_page_token 原样传回 page_token。令牌是名称游标，不保证并发修改下的一致性快照。单目录最多 4096 个条目；返回最终符号链接的元数据，不跟随该链接。.
 //
 // Corresponds with GET /v1/sandboxes/{sandboxID}/directories (the `ListSandboxDirectory` operationId).
 func (c *Client) ListSandboxDirectory(ctx context.Context, sandboxID string, params *ListSandboxDirectoryParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2705,7 +2705,7 @@ func (c *Client) ListSandboxDirectory(ctx context.Context, sandboxID string, par
 	return c.Client.Do(req)
 }
 
-// MakeSandboxDirectoryWithBody Create a workspace directory
+// MakeSandboxDirectoryWithBody 创建工作区目录
 //
 // Takes any type of body and a specified content type.
 //
@@ -2722,7 +2722,7 @@ func (c *Client) MakeSandboxDirectoryWithBody(ctx context.Context, sandboxID str
 	return c.Client.Do(req)
 }
 
-// MakeSandboxDirectory Create a workspace directory
+// MakeSandboxDirectory 创建工作区目录
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2739,9 +2739,9 @@ func (c *Client) MakeSandboxDirectory(ctx context.Context, sandboxID string, bod
 	return c.Client.Do(req)
 }
 
-// RemoveSandboxFile Remove a workspace file or directory
+// RemoveSandboxFile 删除工作区文件或目录
 //
-// Idempotent for missing paths. Removes symlinks themselves. Empty directories require no recursive flag; nonempty directories require recursive=true and are limited to 4096 entries. Workspace root and runtime-owned paths are forbidden. Mutations reject symlink parents.
+// 不存在的路径也视为成功。符号链接只删除链接本身；空目录可直接删除，非空目录要求 recursive=true，最多处理 4096 个条目。禁止删除工作区根目录和运行时保护路径，拒绝符号链接父目录。.
 //
 // Corresponds with DELETE /v1/sandboxes/{sandboxID}/files (the `RemoveSandboxFile` operationId).
 func (c *Client) RemoveSandboxFile(ctx context.Context, sandboxID string, params *RemoveSandboxFileParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2756,9 +2756,9 @@ func (c *Client) RemoveSandboxFile(ctx context.Context, sandboxID string, params
 	return c.Client.Do(req)
 }
 
-// DownloadSandboxFile Download a verified binary file
+// DownloadSandboxFile 下载经过完整性校验的文件
 //
-// Stages at most 256 MiB in private temporary storage and verifies the Guest completion digest before responding. X-Content-SHA256 describes the complete response body.
+// 在私有临时空间暂存最多 256 MiB，校验 Guest 完成摘要后再返回响应。X-Content-SHA256 表示完整响应体的摘要。.
 //
 // Corresponds with GET /v1/sandboxes/{sandboxID}/files (the `DownloadSandboxFile` operationId).
 func (c *Client) DownloadSandboxFile(ctx context.Context, sandboxID string, params *DownloadSandboxFileParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2773,9 +2773,9 @@ func (c *Client) DownloadSandboxFile(ctx context.Context, sandboxID string, para
 	return c.Client.Do(req)
 }
 
-// UploadSandboxFileWithBody Upload and atomically commit one file
+// UploadSandboxFileWithBody 上传并原子提交文件
 //
-// Defaults to overwrite=true. One multipart part named file, up to 256 MiB. Upload bytes are staged in bounded private temporary storage before forwarding through Node and Guest. Success means Guest confirmed the SHA256 and atomic commit. COMMIT_UNKNOWN must be verified by reading the target before retrying.
+// 默认 overwrite=true。请求包含名为 file 的单个 multipart 文件部分，最大 256 MiB。上传内容先在有界私有临时空间暂存，再经 Node 转发至 Guest。成功代表 Guest 已确认 SHA-256 和原子提交。遇到 COMMIT_UNKNOWN 时应先读取目标文件确认结果，再决定是否重试。.
 //
 // Takes any type of body and a specified content type.
 //
@@ -2792,9 +2792,9 @@ func (c *Client) UploadSandboxFileWithBody(ctx context.Context, sandboxID string
 	return c.Client.Do(req)
 }
 
-// MoveSandboxFileWithBody Move a workspace file or directory
+// MoveSandboxFileWithBody 移动工作区文件或目录
 //
-// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+// 默认 overwrite=true，与文件上传一致。只有普通文件可以覆盖已有普通文件，不覆盖目录。overwrite=false 使用原子禁止覆盖操作。源和目标都必须是工作区内的规范路径；禁止工作区根、运行时保护路径和符号链接父目录。源和目标相同时返回当前元数据。.
 //
 // Takes any type of body and a specified content type.
 //
@@ -2811,9 +2811,9 @@ func (c *Client) MoveSandboxFileWithBody(ctx context.Context, sandboxID string, 
 	return c.Client.Do(req)
 }
 
-// MoveSandboxFile Move a workspace file or directory
+// MoveSandboxFile 移动工作区文件或目录
 //
-// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+// 默认 overwrite=true，与文件上传一致。只有普通文件可以覆盖已有普通文件，不覆盖目录。overwrite=false 使用原子禁止覆盖操作。源和目标都必须是工作区内的规范路径；禁止工作区根、运行时保护路径和符号链接父目录。源和目标相同时返回当前元数据。.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2830,9 +2830,9 @@ func (c *Client) MoveSandboxFile(ctx context.Context, sandboxID string, body Mov
 	return c.Client.Do(req)
 }
 
-// StatSandboxFile Inspect workspace path metadata
+// StatSandboxFile 查询工作区路径元数据
 //
-// Returns lstat metadata, including symlink_target for a final symlink, without following it. Workspace root is allowed; paths outside workspace are rejected.
+// 返回 lstat 元数据；最终路径为符号链接时包含 symlink_target，不跟随该链接。允许查询 /workspace 本身，拒绝工作区外的路径。.
 //
 // Corresponds with GET /v1/sandboxes/{sandboxID}/files/stat (the `StatSandboxFile` operationId).
 func (c *Client) StatSandboxFile(ctx context.Context, sandboxID string, params *StatSandboxFileParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2847,7 +2847,7 @@ func (c *Client) StatSandboxFile(ctx context.Context, sandboxID string, params *
 	return c.Client.Do(req)
 }
 
-// GetSandboxInjections Read masked host-side injection configuration
+// GetSandboxInjections 读取脱敏后的沙箱凭证注入配置
 //
 // Corresponds with GET /v1/sandboxes/{sandboxID}/injections (the `GetSandboxInjections` operationId).
 func (c *Client) GetSandboxInjections(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2862,9 +2862,9 @@ func (c *Client) GetSandboxInjections(ctx context.Context, sandboxID string, req
 	return c.Client.Do(req)
 }
 
-// SetSandboxInjectionsWithBody Replace sandbox host-side injection rules
+// SetSandboxInjectionsWithBody 替换沙箱的宿主侧凭证注入规则
 //
-// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+// 需要所有者的交互式授权。秘密材料仅通过 Node mTLS 传递，不写入 Guest 文件。Control 和 Node 均校验生命周期 revision。.
 //
 // Takes any type of body and a specified content type.
 //
@@ -2881,9 +2881,9 @@ func (c *Client) SetSandboxInjectionsWithBody(ctx context.Context, sandboxID str
 	return c.Client.Do(req)
 }
 
-// SetSandboxInjections Replace sandbox host-side injection rules
+// SetSandboxInjections 替换沙箱的宿主侧凭证注入规则
 //
-// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+// 需要所有者的交互式授权。秘密材料仅通过 Node mTLS 传递，不写入 Guest 文件。Control 和 Node 均校验生命周期 revision。.
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2900,7 +2900,7 @@ func (c *Client) SetSandboxInjections(ctx context.Context, sandboxID string, bod
 	return c.Client.Do(req)
 }
 
-// ListSandboxMCPBindings List explicit sandbox bindings
+// ListSandboxMCPBindings 列出沙箱显式授权的 MCP 绑定
 //
 // Corresponds with GET /v1/sandboxes/{sandboxID}/mcp (the `ListSandboxMCPBindings` operationId).
 func (c *Client) ListSandboxMCPBindings(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2915,7 +2915,7 @@ func (c *Client) ListSandboxMCPBindings(ctx context.Context, sandboxID string, r
 	return c.Client.Do(req)
 }
 
-// UnbindSandboxMCP Revoke binding before syncing config
+// UnbindSandboxMCP 先撤销沙箱绑定，再同步配置
 //
 // Corresponds with DELETE /v1/sandboxes/{sandboxID}/mcp/{marketID} (the `UnbindSandboxMCP` operationId).
 func (c *Client) UnbindSandboxMCP(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2930,7 +2930,7 @@ func (c *Client) UnbindSandboxMCP(ctx context.Context, sandboxID string, marketI
 	return c.Client.Do(req)
 }
 
-// BindSandboxMCP Bind authorized MCP and sync Codex config
+// BindSandboxMCP 绑定已授权 MCP 并同步 Codex 配置
 //
 // Corresponds with PUT /v1/sandboxes/{sandboxID}/mcp/{marketID} (the `BindSandboxMCP` operationId).
 func (c *Client) BindSandboxMCP(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2945,7 +2945,7 @@ func (c *Client) BindSandboxMCP(ctx context.Context, sandboxID string, marketID 
 	return c.Client.Do(req)
 }
 
-// SyncSandboxMCP Apply saved MCP config; Agent restart required
+// SyncSandboxMCP 应用已保存的 MCP 配置；新 Agent 会话加载更改
 //
 // Corresponds with POST /v1/sandboxes/{sandboxID}/mcp/{marketID}/sync (the `SyncSandboxMCP` operationId).
 func (c *Client) SyncSandboxMCP(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -2960,9 +2960,9 @@ func (c *Client) SyncSandboxMCP(ctx context.Context, sandboxID string, marketID 
 	return c.Client.Do(req)
 }
 
-// CreateSandboxPreviewWithBody Authorize a sandbox HTTP port preview
+// CreateSandboxPreviewWithBody 获取沙箱 HTTP 端口预览入口
 //
-// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+// 需要运行中的远程 CHV 沙箱；API Key 需要 sandboxes:preview。未配置的端口默认为 public，返回可直接访问的 URL。private 端口返回有效期五分钟、绑定账号、策略 revision 和当前 Guest 运行身份的 authorization_url。禁止访问运行时端口 31024、31080、38080 及旧端口 1024、1080、8080。启停、删除和策略变化会撤销私有授权。
 //
 // Takes any type of body and a specified content type.
 //
@@ -2979,9 +2979,9 @@ func (c *Client) CreateSandboxPreviewWithBody(ctx context.Context, sandboxID str
 	return c.Client.Do(req)
 }
 
-// CreateSandboxPreview Authorize a sandbox HTTP port preview
+// CreateSandboxPreview 获取沙箱 HTTP 端口预览入口
 //
-// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+// 需要运行中的远程 CHV 沙箱；API Key 需要 sandboxes:preview。未配置的端口默认为 public，返回可直接访问的 URL。private 端口返回有效期五分钟、绑定账号、策略 revision 和当前 Guest 运行身份的 authorization_url。禁止访问运行时端口 31024、31080、38080 及旧端口 1024、1080、8080。启停、删除和策略变化会撤销私有授权。
 //
 // Takes a body of the `application/json` content type.
 //
@@ -2998,9 +2998,9 @@ func (c *Client) CreateSandboxPreview(ctx context.Context, sandboxID string, bod
 	return c.Client.Do(req)
 }
 
-// GetSandboxPortPreview Get a sandbox HTTP port visibility
+// GetSandboxPortPreview 查询 HTTP 端口可见性
 //
-// Requires ownership and sandboxes:read. Unconfigured ports default to public. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited.
+// 需要沙箱所有权和 sandboxes:read。未配置的端口默认为 public。禁止使用运行时端口 31024、31080、38080 及旧端口 1024、1080、8080。
 //
 // Corresponds with GET /v1/sandboxes/{sandboxID}/previews/{port} (the `GetSandboxPortPreview` operationId).
 func (c *Client) GetSandboxPortPreview(ctx context.Context, sandboxID string, port int, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3015,9 +3015,9 @@ func (c *Client) GetSandboxPortPreview(ctx context.Context, sandboxID string, po
 	return c.Client.Do(req)
 }
 
-// SetSandboxPortPreviewWithBody Change a sandbox HTTP port visibility
+// SetSandboxPortPreviewWithBody 修改 HTTP 端口可见性
 //
-// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+// 需要沙箱所有权和 sandboxes:preview。策略在停止、启动后保留，删除沙箱时清理。新请求读取已提交的策略；确认切换前取消本 Gateway 的活动流，其他 Gateway 最迟每 100ms 重新校验。T3 工作台鉴权保持不变。
 //
 // Takes any type of body and a specified content type.
 //
@@ -3034,9 +3034,9 @@ func (c *Client) SetSandboxPortPreviewWithBody(ctx context.Context, sandboxID st
 	return c.Client.Do(req)
 }
 
-// SetSandboxPortPreview Change a sandbox HTTP port visibility
+// SetSandboxPortPreview 修改 HTTP 端口可见性
 //
-// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+// 需要沙箱所有权和 sandboxes:preview。策略在停止、启动后保留，删除沙箱时清理。新请求读取已提交的策略；确认切换前取消本 Gateway 的活动流，其他 Gateway 最迟每 100ms 重新校验。T3 工作台鉴权保持不变。
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3106,9 +3106,9 @@ func (c *Client) SetSandboxSkills(ctx context.Context, sandboxID openapi_types.U
 	return c.Client.Do(req)
 }
 
-// StartSandbox Start a stopped sandbox
+// StartSandbox 启动已停止的沙箱
 //
-// Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
+// 对当前用户拥有且已停止的云端沙箱执行保留磁盘的冷启动。这是异步操作，应轮询直至 observed_state 为 running。.
 //
 // Corresponds with POST /v1/sandboxes/{sandboxID}/start (the `StartSandbox` operationId).
 func (c *Client) StartSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3123,9 +3123,9 @@ func (c *Client) StartSandbox(ctx context.Context, sandboxID string, reqEditors 
 	return c.Client.Do(req)
 }
 
-// StopSandbox Stop a running sandbox
+// StopSandbox 停止运行中的沙箱
 //
-// Requests a graceful stop for a cloud sandbox owned by the authenticated user while preserving its instance disks. The operation is asynchronous; poll the sandbox until observed_state becomes stopped.
+// 优雅停止当前用户拥有的云端沙箱并保留实例磁盘。这是异步操作，应轮询直至 observed_state 为 stopped。.
 //
 // Corresponds with POST /v1/sandboxes/{sandboxID}/stop (the `StopSandbox` operationId).
 func (c *Client) StopSandbox(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3219,7 +3219,7 @@ func (c *Client) FavoriteSkill(ctx context.Context, skillID openapi_types.UUID, 
 	return c.Client.Do(req)
 }
 
-// ListSystemTemplates List platform default templates
+// ListSystemTemplates 列出平台默认模板
 //
 // Corresponds with GET /v1/system-templates (the `ListSystemTemplates` operationId).
 func (c *Client) ListSystemTemplates(ctx context.Context, params *ListSystemTemplatesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3234,7 +3234,7 @@ func (c *Client) ListSystemTemplates(ctx context.Context, params *ListSystemTemp
 	return c.Client.Do(req)
 }
 
-// ListTemplates List templates visible to the authenticated user
+// ListTemplates 列出当前用户可见的模板
 //
 // Corresponds with GET /v1/templates (the `ListTemplates` operationId).
 func (c *Client) ListTemplates(ctx context.Context, params *ListTemplatesParams, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3249,7 +3249,7 @@ func (c *Client) ListTemplates(ctx context.Context, params *ListTemplatesParams,
 	return c.Client.Do(req)
 }
 
-// CreateTemplateWithBody Create a personal template
+// CreateTemplateWithBody 创建个人模板
 //
 // Takes any type of body and a specified content type.
 //
@@ -3266,7 +3266,7 @@ func (c *Client) CreateTemplateWithBody(ctx context.Context, contentType string,
 	return c.Client.Do(req)
 }
 
-// CreateTemplate Create a personal template
+// CreateTemplate 创建个人模板
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3283,7 +3283,7 @@ func (c *Client) CreateTemplate(ctx context.Context, body CreateTemplateJSONRequ
 	return c.Client.Do(req)
 }
 
-// DeleteTemplate Delete an owned template
+// DeleteTemplate 删除本人拥有的模板
 //
 // Corresponds with DELETE /v1/templates/{templateID} (the `DeleteTemplate` operationId).
 func (c *Client) DeleteTemplate(ctx context.Context, templateID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3298,7 +3298,7 @@ func (c *Client) DeleteTemplate(ctx context.Context, templateID string, reqEdito
 	return c.Client.Do(req)
 }
 
-// GetTemplate Get a template
+// GetTemplate 查询模板
 //
 // Corresponds with GET /v1/templates/{templateID} (the `GetTemplate` operationId).
 func (c *Client) GetTemplate(ctx context.Context, templateID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3313,7 +3313,7 @@ func (c *Client) GetTemplate(ctx context.Context, templateID string, reqEditors 
 	return c.Client.Do(req)
 }
 
-// UpdateTemplateWithBody Update an owned template
+// UpdateTemplateWithBody 更新本人拥有的模板
 //
 // Takes any type of body and a specified content type.
 //
@@ -3330,7 +3330,7 @@ func (c *Client) UpdateTemplateWithBody(ctx context.Context, templateID string, 
 	return c.Client.Do(req)
 }
 
-// UpdateTemplate Update an owned template
+// UpdateTemplate 更新本人拥有的模板
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3347,7 +3347,7 @@ func (c *Client) UpdateTemplate(ctx context.Context, templateID string, body Upd
 	return c.Client.Do(req)
 }
 
-// CreateTemplateBuildWithBody Queue an immutable template build
+// CreateTemplateBuildWithBody 提交不可变模板构建任务
 //
 // Takes any type of body and a specified content type.
 //
@@ -3364,7 +3364,7 @@ func (c *Client) CreateTemplateBuildWithBody(ctx context.Context, templateID str
 	return c.Client.Do(req)
 }
 
-// CreateTemplateBuild Queue an immutable template build
+// CreateTemplateBuild 提交不可变模板构建任务
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3381,7 +3381,7 @@ func (c *Client) CreateTemplateBuild(ctx context.Context, templateID string, bod
 	return c.Client.Do(req)
 }
 
-// GetTemplateBuild Get template build status
+// GetTemplateBuild 查询模板构建状态
 //
 // Corresponds with GET /v1/templates/{templateID}/builds/{buildID} (the `GetTemplateBuild` operationId).
 func (c *Client) GetTemplateBuild(ctx context.Context, templateID string, buildID string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3396,7 +3396,7 @@ func (c *Client) GetTemplateBuild(ctx context.Context, templateID string, buildI
 	return c.Client.Do(req)
 }
 
-// ForkTemplateWithBody Fork an accessible Ready build into a personal template
+// ForkTemplateWithBody 从可访问的 Ready 构建派生个人模板
 //
 // Takes any type of body and a specified content type.
 //
@@ -3413,7 +3413,7 @@ func (c *Client) ForkTemplateWithBody(ctx context.Context, templateID string, co
 	return c.Client.Do(req)
 }
 
-// ForkTemplate Fork an accessible Ready build into a personal template
+// ForkTemplate 从可访问的 Ready 构建派生个人模板
 //
 // Takes a body of the `application/json` content type.
 //
@@ -3430,7 +3430,7 @@ func (c *Client) ForkTemplate(ctx context.Context, templateID string, body ForkT
 	return c.Client.Do(req)
 }
 
-// DeleteTemplateTag Remove a template build tag
+// DeleteTemplateTag 移除模板构建标签
 //
 // Corresponds with DELETE /v1/templates/{templateID}/tags/{tag} (the `DeleteTemplateTag` operationId).
 func (c *Client) DeleteTemplateTag(ctx context.Context, templateID string, tag string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3445,7 +3445,7 @@ func (c *Client) DeleteTemplateTag(ctx context.Context, templateID string, tag s
 	return c.Client.Do(req)
 }
 
-// GetTemplateTag Resolve a Ready build tag
+// GetTemplateTag 解析 Ready 构建标签
 //
 // Corresponds with GET /v1/templates/{templateID}/tags/{tag} (the `GetTemplateTag` operationId).
 func (c *Client) GetTemplateTag(ctx context.Context, templateID string, tag string, reqEditors ...RequestEditorFn) (*http.Response, error) {
@@ -3460,7 +3460,7 @@ func (c *Client) GetTemplateTag(ctx context.Context, templateID string, tag stri
 	return c.Client.Do(req)
 }
 
-// SetTemplateTagWithBody Atomically publish a Ready build under a tag
+// SetTemplateTagWithBody 将 Ready 构建原子发布至标签
 //
 // Takes any type of body and a specified content type.
 //
@@ -3477,7 +3477,7 @@ func (c *Client) SetTemplateTagWithBody(ctx context.Context, templateID string, 
 	return c.Client.Do(req)
 }
 
-// SetTemplateTag Atomically publish a Ready build under a tag
+// SetTemplateTag 将 Ready 构建原子发布至标签
 //
 // Takes a body of the `application/json` content type.
 //
@@ -6415,146 +6415,146 @@ func WithBaseURL(baseURL string) ClientOption {
 // ClientWithResponsesInterface is the interface specification for the client with responses above.
 type ClientWithResponsesInterface interface {
 
-	// ListCredentialDocumentsWithResponse List encrypted account credential configurations
+	// ListCredentialDocumentsWithResponse 列出账号加密保存的凭证配置文档
 	//
-	// Interactive login required. Kind is agents or sandboxes. Values are decrypted only for the owning account.
+	// 需要交互式登录。kind 为 agents 或 sandboxes，只有所属账号可以解密读取配置内容。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/credential-documents/{kind} (the `ListCredentialDocuments` operationId).
 	ListCredentialDocumentsWithResponse(ctx context.Context, kind string, reqEditors ...RequestEditorFn) (*ListCredentialDocumentsResponse, error)
 
-	// DeleteCredentialDocumentWithResponse Delete one configuration owned by the current account
+	// DeleteCredentialDocumentWithResponse 删除当前账号的一份配置
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /v1/credential-documents/{kind}/{id} (the `DeleteCredentialDocument` operationId).
 	DeleteCredentialDocumentWithResponse(ctx context.Context, kind string, id string, reqEditors ...RequestEditorFn) (*DeleteCredentialDocumentResponse, error)
 
-	// PutCredentialDocumentWithBodyWithResponse Save an account Agent configuration or sandbox credential selection
+	// PutCredentialDocumentWithBodyWithResponse 保存账号 Agent 配置或沙箱凭证选择
 	//
-	// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+	// Agent 配置包含 id、name、agent、connectionId、modelNames、defaultModel、filePath、content、updatedAt。沙箱配置包含 agentIds、credentialIds 和已应用的模型快照。所引用的 Agent 必须属于当前账号，API Key 不能管理这些记录。.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /v1/credential-documents/{kind}/{id} (the `PutCredentialDocument` operationId).
 	PutCredentialDocumentWithBodyWithResponse(ctx context.Context, kind string, id string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*PutCredentialDocumentResponse, error)
 
-	// PutCredentialDocumentWithResponse Save an account Agent configuration or sandbox credential selection
+	// PutCredentialDocumentWithResponse 保存账号 Agent 配置或沙箱凭证选择
 	//
-	// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+	// Agent 配置包含 id、name、agent、connectionId、modelNames、defaultModel、filePath、content、updatedAt。沙箱配置包含 agentIds、credentialIds 和已应用的模型快照。所引用的 Agent 必须属于当前账号，API Key 不能管理这些记录。.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /v1/credential-documents/{kind}/{id} (the `PutCredentialDocument` operationId).
 	PutCredentialDocumentWithResponse(ctx context.Context, kind string, id string, body PutCredentialDocumentJSONRequestBody, reqEditors ...RequestEditorFn) (*PutCredentialDocumentResponse, error)
 
-	// ListInjectionRulesWithResponse List account injection rules
+	// ListInjectionRulesWithResponse 列出账号凭证注入规则
 	//
-	// Returns the authenticated account's persistent injection rules. Secrets are never returned; only a short masked hint is exposed.
+	// 返回当前账号的持久注入规则。只返回简短脱敏提示，不返回秘密内容。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/injection-rules (the `ListInjectionRules` operationId).
 	ListInjectionRulesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListInjectionRulesResponse, error)
 
-	// CreateInjectionRuleWithBodyWithResponse Create an account injection rule
+	// CreateInjectionRuleWithBodyWithResponse 创建账号凭证注入规则
 	//
-	// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+	// 创建账号级持久规则，所有者可将其授权给沙箱。秘密材料在写入存储前加密封装。.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/injection-rules (the `CreateInjectionRule` operationId).
 	CreateInjectionRuleWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateInjectionRuleResponse, error)
 
-	// CreateInjectionRuleWithResponse Create an account injection rule
+	// CreateInjectionRuleWithResponse 创建账号凭证注入规则
 	//
-	// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+	// 创建账号级持久规则，所有者可将其授权给沙箱。秘密材料在写入存储前加密封装。.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/injection-rules (the `CreateInjectionRule` operationId).
 	CreateInjectionRuleWithResponse(ctx context.Context, body CreateInjectionRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateInjectionRuleResponse, error)
 
-	// DeleteInjectionRuleWithResponse Delete an account injection rule
+	// DeleteInjectionRuleWithResponse 删除账号凭证注入规则
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /v1/injection-rules/{ruleID} (the `DeleteInjectionRule` operationId).
 	DeleteInjectionRuleWithResponse(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*DeleteInjectionRuleResponse, error)
 
-	// GetInjectionRuleWithResponse Get an account injection rule
+	// GetInjectionRuleWithResponse 查询账号凭证注入规则
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/injection-rules/{ruleID} (the `GetInjectionRule` operationId).
 	GetInjectionRuleWithResponse(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*GetInjectionRuleResponse, error)
 
-	// UpdateInjectionRuleWithBodyWithResponse Update an account injection rule
+	// UpdateInjectionRuleWithBodyWithResponse 更新账号凭证注入规则
 	//
-	// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+	// 更新当前账号拥有的规则；省略 secret 时保留已有的加密秘密材料。.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /v1/injection-rules/{ruleID} (the `UpdateInjectionRule` operationId).
 	UpdateInjectionRuleWithBodyWithResponse(ctx context.Context, ruleID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateInjectionRuleResponse, error)
 
-	// UpdateInjectionRuleWithResponse Update an account injection rule
+	// UpdateInjectionRuleWithResponse 更新账号凭证注入规则
 	//
-	// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+	// 更新当前账号拥有的规则；省略 secret 时保留已有的加密秘密材料。.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /v1/injection-rules/{ruleID} (the `UpdateInjectionRule` operationId).
 	UpdateInjectionRuleWithResponse(ctx context.Context, ruleID string, body UpdateInjectionRuleJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateInjectionRuleResponse, error)
 
-	// GetInjectionRuleMaterialWithResponse Read injection material
+	// GetInjectionRuleMaterialWithResponse 读取凭证注入材料
 	//
-	// Returns the plaintext header/key for the authenticated owner so a trusted local runtime can apply it. The response is never cached; secrets are never logged.
+	// 为已认证所有者返回明文请求头或密钥，以供受信任的本地运行时应用。响应禁止缓存，秘密不得写入日志。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/injection-rules/{ruleID}/material (the `GetInjectionRuleMaterial` operationId).
 	GetInjectionRuleMaterialWithResponse(ctx context.Context, ruleID string, reqEditors ...RequestEditorFn) (*GetInjectionRuleMaterialResponse, error)
 
-	// ListMCPCatalogWithResponse List available MCP services
+	// ListMCPCatalogWithResponse 列出可用的 MCP 服务
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/mcp/catalog (the `ListMCPCatalog` operationId).
 	ListMCPCatalogWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMCPCatalogResponse, error)
 
-	// GetMCPCatalogWithResponse Get MCP catalog service
+	// GetMCPCatalogWithResponse 查询 MCP 服务详情
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/mcp/catalog/{marketID} (the `GetMCPCatalog` operationId).
 	GetMCPCatalogWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*GetMCPCatalogResponse, error)
 
-	// DisconnectMCPOAuthWithResponse Disconnect and invalidate sandbox calls
+	// DisconnectMCPOAuthWithResponse 断开连接并禁止后续沙箱调用
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /v1/mcp/connections/{marketID} (the `DisconnectMCPOAuth` operationId).
 	DisconnectMCPOAuthWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*DisconnectMCPOAuthResponse, error)
 
-	// GetMCPOAuthConnectionWithResponse Get connection without secrets
+	// GetMCPOAuthConnectionWithResponse 查询连接状态（不返回秘密）
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/mcp/connections/{marketID} (the `GetMCPOAuthConnection` operationId).
 	GetMCPOAuthConnectionWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*GetMCPOAuthConnectionResponse, error)
 
-	// StartMCPOAuthWithResponse Connect an official MCP using PKCE and provider registration
+	// StartMCPOAuthWithResponse 使用 PKCE 和供应方注册信息连接官方 MCP
 	//
-	// GitHub uses the pre-registered App. Notion discovers OAuth metadata and registers through DCR with PKCE S256. No PAT or CIMD fallback.
+	// GitHub 使用预注册的 GitHub App；Notion 发现 OAuth 元数据并通过 DCR 注册，使用 PKCE S256。不使用 PAT 或 CIMD 回退。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/mcp/connections/{marketID}/authorize (the `StartMCPOAuth` operationId).
 	StartMCPOAuthWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*StartMCPOAuthResponse, error)
 
-	// ListMCPToolsWithResponse Discover allowed upstream tools
+	// ListMCPToolsWithResponse 查询允许使用的上游工具
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -6586,318 +6586,318 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with DELETE /v1/mcp/custom/{customID} (the `DeleteCustomMCP` operationId).
 	DeleteCustomMCPWithResponse(ctx context.Context, customID openapi_types.UUID, reqEditors ...RequestEditorFn) (*DeleteCustomMCPResponse, error)
 
-	// ListMCPFavoritesWithResponse List account favorites
+	// ListMCPFavoritesWithResponse 列出账号收藏的 MCP
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/mcp/favorites (the `ListMCPFavorites` operationId).
 	ListMCPFavoritesWithResponse(ctx context.Context, reqEditors ...RequestEditorFn) (*ListMCPFavoritesResponse, error)
 
-	// UnfavoriteMCPWithResponse Unfavorite without revoking OAuth
+	// UnfavoriteMCPWithResponse 取消收藏，保留现有 OAuth 授权
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /v1/mcp/favorites/{marketID} (the `UnfavoriteMCP` operationId).
 	UnfavoriteMCPWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*UnfavoriteMCPResponse, error)
 
-	// FavoriteMCPWithResponse Favorite without authorizing
+	// FavoriteMCPWithResponse 收藏 MCP 服务
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /v1/mcp/favorites/{marketID} (the `FavoriteMCP` operationId).
 	FavoriteMCPWithResponse(ctx context.Context, marketID string, reqEditors ...RequestEditorFn) (*FavoriteMCPResponse, error)
 
-	// CompleteMCPOAuthWithResponse Complete one-time GitHub OAuth callback in the system browser
+	// CompleteMCPOAuthWithResponse 完成浏览器中的一次性 MCP OAuth 回调
 	//
-	// Fixed HTTPS callback. State binds the account and PKCE transaction. Does not accept Isodo API keys or return OAuth tokens. Query strings must never be logged.
+	// 固定 HTTPS 回调。state 绑定账号和 PKCE 事务；不接受 Isodo API Key，也不返回 OAuth 令牌。查询参数不得写入日志。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/mcp/oauth/callback (the `CompleteMCPOAuth` operationId).
 	CompleteMCPOAuthWithResponse(ctx context.Context, params *CompleteMCPOAuthParams, reqEditors ...RequestEditorFn) (*CompleteMCPOAuthResponse, error)
 
-	// CancelMCPOAuthTransactionWithResponse Cancel authorization transaction
+	// CancelMCPOAuthTransactionWithResponse 取消授权事务
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /v1/mcp/oauth/transactions/{transactionID} (the `CancelMCPOAuthTransaction` operationId).
 	CancelMCPOAuthTransactionWithResponse(ctx context.Context, transactionID string, reqEditors ...RequestEditorFn) (*CancelMCPOAuthTransactionResponse, error)
 
-	// GetMCPOAuthTransactionWithResponse Poll account authorization transaction
+	// GetMCPOAuthTransactionWithResponse 查询账号授权事务状态
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/mcp/oauth/transactions/{transactionID} (the `GetMCPOAuthTransaction` operationId).
 	GetMCPOAuthTransactionWithResponse(ctx context.Context, transactionID string, reqEditors ...RequestEditorFn) (*GetMCPOAuthTransactionResponse, error)
 
-	// ListSandboxesWithResponse List sandboxes
+	// ListSandboxesWithResponse 列出沙箱
 	//
-	// Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
+	// 返回当前认证用户拥有的沙箱，使用 limit 和 offset 分页。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/sandboxes (the `ListSandboxes` operationId).
 	ListSandboxesWithResponse(ctx context.Context, params *ListSandboxesParams, reqEditors ...RequestEditorFn) (*ListSandboxesResponse, error)
 
-	// CreateSandboxWithBodyWithResponse Create a sandbox
+	// CreateSandboxWithBodyWithResponse 创建沙箱
 	//
-	// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+	// 为当前认证用户创建沙箱并登记初始期望状态。运行时可用性取决于已配置的后端；应继续查询实际运行状态。.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/sandboxes (the `CreateSandbox` operationId).
 	CreateSandboxWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSandboxResponse, error)
 
-	// CreateSandboxWithResponse Create a sandbox
+	// CreateSandboxWithResponse 创建沙箱
 	//
-	// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+	// 为当前认证用户创建沙箱并登记初始期望状态。运行时可用性取决于已配置的后端；应继续查询实际运行状态。.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/sandboxes (the `CreateSandbox` operationId).
 	CreateSandboxWithResponse(ctx context.Context, body CreateSandboxJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSandboxResponse, error)
 
-	// DeleteSandboxWithResponse Delete a sandbox
+	// DeleteSandboxWithResponse 删除沙箱
 	//
-	// Requests Node cleanup. The resource remains readable until cleanup completes; repeated deletion returns the same action while pending or completed. Missing resources return 204.
+	// 请求 Node 清理资源。清理完成前资源仍可读取；重复删除返回同一删除动作的当前结果。不存在的资源返回 204。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /v1/sandboxes/{sandboxID} (the `DeleteSandbox` operationId).
 	DeleteSandboxWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*DeleteSandboxResponse, error)
 
-	// GetSandboxWithResponse Get a sandbox
+	// GetSandboxWithResponse 查询沙箱
 	//
-	// Returns one sandbox owned by the authenticated user. A sandbox owned by another user is reported as not found.
+	// 返回当前用户拥有的一个沙箱；其他用户的沙箱统一返回未找到。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID} (the `GetSandbox` operationId).
 	GetSandboxWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*GetSandboxResponse, error)
 
-	// UpdateSandboxWithBodyWithResponse Update a sandbox
+	// UpdateSandboxWithBodyWithResponse 更新沙箱信息
 	//
-	// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+	// 更新当前用户所拥有沙箱的可变名称和元数据。.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /v1/sandboxes/{sandboxID} (the `UpdateSandbox` operationId).
 	UpdateSandboxWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateSandboxResponse, error)
 
-	// UpdateSandboxWithResponse Update a sandbox
+	// UpdateSandboxWithResponse 更新沙箱信息
 	//
-	// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+	// 更新当前用户所拥有沙箱的可变名称和元数据。.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /v1/sandboxes/{sandboxID} (the `UpdateSandbox` operationId).
 	UpdateSandboxWithResponse(ctx context.Context, sandboxID string, body UpdateSandboxJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateSandboxResponse, error)
 
-	// GetSandboxAppWithResponse Open a sandbox application
+	// GetSandboxAppWithResponse 打开沙箱应用
 	//
-	// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and redirects the browser to the sandbox application.
+	// 为已认证的沙箱所有者创建短期 Agent 工作台配对链接，并将浏览器重定向至沙箱应用。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID}/app (the `GetSandboxApp` operationId).
 	GetSandboxAppWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*GetSandboxAppResponse, error)
 
-	// CreateSandboxAppLinkWithResponse Create a sandbox application link
+	// CreateSandboxAppLinkWithResponse 获取沙箱应用链接
 	//
-	// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and returns it as JSON. Desktop clients and SDKs use this endpoint; browsers can use `GET /v1/sandboxes/{sandboxID}/app` instead. The pairing credential is carried in the `pairing_url` fragment and is never sent to the Isodo API.
+	// 为已认证的沙箱所有者创建短期 Agent 工作台配对链接，并返回 JSON。桌面客户端使用此接口；浏览器也可访问 GET /v1/sandboxes/{sandboxID}/app。配对凭证位于 pairing_url 的 fragment 中，不通过该链接发送至 Isodo API。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/app-link (the `CreateSandboxAppLink` operationId).
 	CreateSandboxAppLinkWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*CreateSandboxAppLinkResponse, error)
 
-	// RunSandboxCommandWithBodyWithResponse Run a bounded non-interactive command inside a sandbox Guest
+	// RunSandboxCommandWithBodyWithResponse 在沙箱 Guest 内执行命令
 	//
-	// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+	// 在运行中的 Guest 内执行 argv，不在宿主 Shell 执行。必须提供 8–128 个安全 ASCII 字符组成的 Idempotency-Key；同一请求重试时复用该键。命令以非零退出码结束时，HTTP 仍返回 200，应检查 exit_code。.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/commands/run (the `RunSandboxCommand` operationId).
 	RunSandboxCommandWithBodyWithResponse(ctx context.Context, sandboxID string, params *RunSandboxCommandParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*RunSandboxCommandResponse, error)
 
-	// RunSandboxCommandWithResponse Run a bounded non-interactive command inside a sandbox Guest
+	// RunSandboxCommandWithResponse 在沙箱 Guest 内执行命令
 	//
-	// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+	// 在运行中的 Guest 内执行 argv，不在宿主 Shell 执行。必须提供 8–128 个安全 ASCII 字符组成的 Idempotency-Key；同一请求重试时复用该键。命令以非零退出码结束时，HTTP 仍返回 200，应检查 exit_code。.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/commands/run (the `RunSandboxCommand` operationId).
 	RunSandboxCommandWithResponse(ctx context.Context, sandboxID string, params *RunSandboxCommandParams, body RunSandboxCommandJSONRequestBody, reqEditors ...RequestEditorFn) (*RunSandboxCommandResponse, error)
 
-	// ListSandboxDirectoryWithResponse List a workspace directory
+	// ListSandboxDirectoryWithResponse 列出工作区目录
 	//
-	// Lexical name order. page_size defaults to 100 and is limited to 500. Pass next_page_token unchanged to page_token; tokens are name cursors, not a consistent snapshot across concurrent mutations. A directory is limited to 4096 entries. Symlink metadata is returned without following the final symlink.
+	// 按名称字典序返回条目。page_size 默认 100、最大 500；将 next_page_token 原样传回 page_token。令牌是名称游标，不保证并发修改下的一致性快照。单目录最多 4096 个条目；返回最终符号链接的元数据，不跟随该链接。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID}/directories (the `ListSandboxDirectory` operationId).
 	ListSandboxDirectoryWithResponse(ctx context.Context, sandboxID string, params *ListSandboxDirectoryParams, reqEditors ...RequestEditorFn) (*ListSandboxDirectoryResponse, error)
 
-	// MakeSandboxDirectoryWithBodyWithResponse Create a workspace directory
+	// MakeSandboxDirectoryWithBodyWithResponse 创建工作区目录
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
 	MakeSandboxDirectoryWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MakeSandboxDirectoryResponse, error)
 
-	// MakeSandboxDirectoryWithResponse Create a workspace directory
+	// MakeSandboxDirectoryWithResponse 创建工作区目录
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/directories (the `MakeSandboxDirectory` operationId).
 	MakeSandboxDirectoryWithResponse(ctx context.Context, sandboxID string, body MakeSandboxDirectoryJSONRequestBody, reqEditors ...RequestEditorFn) (*MakeSandboxDirectoryResponse, error)
 
-	// RemoveSandboxFileWithResponse Remove a workspace file or directory
+	// RemoveSandboxFileWithResponse 删除工作区文件或目录
 	//
-	// Idempotent for missing paths. Removes symlinks themselves. Empty directories require no recursive flag; nonempty directories require recursive=true and are limited to 4096 entries. Workspace root and runtime-owned paths are forbidden. Mutations reject symlink parents.
+	// 不存在的路径也视为成功。符号链接只删除链接本身；空目录可直接删除，非空目录要求 recursive=true，最多处理 4096 个条目。禁止删除工作区根目录和运行时保护路径，拒绝符号链接父目录。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /v1/sandboxes/{sandboxID}/files (the `RemoveSandboxFile` operationId).
 	RemoveSandboxFileWithResponse(ctx context.Context, sandboxID string, params *RemoveSandboxFileParams, reqEditors ...RequestEditorFn) (*RemoveSandboxFileResponse, error)
 
-	// DownloadSandboxFileWithResponse Download a verified binary file
+	// DownloadSandboxFileWithResponse 下载经过完整性校验的文件
 	//
-	// Stages at most 256 MiB in private temporary storage and verifies the Guest completion digest before responding. X-Content-SHA256 describes the complete response body.
+	// 在私有临时空间暂存最多 256 MiB，校验 Guest 完成摘要后再返回响应。X-Content-SHA256 表示完整响应体的摘要。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID}/files (the `DownloadSandboxFile` operationId).
 	DownloadSandboxFileWithResponse(ctx context.Context, sandboxID string, params *DownloadSandboxFileParams, reqEditors ...RequestEditorFn) (*DownloadSandboxFileResponse, error)
 
-	// UploadSandboxFileWithBodyWithResponse Upload and atomically commit one file
+	// UploadSandboxFileWithBodyWithResponse 上传并原子提交文件
 	//
-	// Defaults to overwrite=true. One multipart part named file, up to 256 MiB. Upload bytes are staged in bounded private temporary storage before forwarding through Node and Guest. Success means Guest confirmed the SHA256 and atomic commit. COMMIT_UNKNOWN must be verified by reading the target before retrying.
+	// 默认 overwrite=true。请求包含名为 file 的单个 multipart 文件部分，最大 256 MiB。上传内容先在有界私有临时空间暂存，再经 Node 转发至 Guest。成功代表 Guest 已确认 SHA-256 和原子提交。遇到 COMMIT_UNKNOWN 时应先读取目标文件确认结果，再决定是否重试。.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/files (the `UploadSandboxFile` operationId).
 	UploadSandboxFileWithBodyWithResponse(ctx context.Context, sandboxID string, params *UploadSandboxFileParams, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UploadSandboxFileResponse, error)
 
-	// MoveSandboxFileWithBodyWithResponse Move a workspace file or directory
+	// MoveSandboxFileWithBodyWithResponse 移动工作区文件或目录
 	//
-	// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+	// 默认 overwrite=true，与文件上传一致。只有普通文件可以覆盖已有普通文件，不覆盖目录。overwrite=false 使用原子禁止覆盖操作。源和目标都必须是工作区内的规范路径；禁止工作区根、运行时保护路径和符号链接父目录。源和目标相同时返回当前元数据。.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/files/move (the `MoveSandboxFile` operationId).
 	MoveSandboxFileWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*MoveSandboxFileResponse, error)
 
-	// MoveSandboxFileWithResponse Move a workspace file or directory
+	// MoveSandboxFileWithResponse 移动工作区文件或目录
 	//
-	// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+	// 默认 overwrite=true，与文件上传一致。只有普通文件可以覆盖已有普通文件，不覆盖目录。overwrite=false 使用原子禁止覆盖操作。源和目标都必须是工作区内的规范路径；禁止工作区根、运行时保护路径和符号链接父目录。源和目标相同时返回当前元数据。.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/files/move (the `MoveSandboxFile` operationId).
 	MoveSandboxFileWithResponse(ctx context.Context, sandboxID string, body MoveSandboxFileJSONRequestBody, reqEditors ...RequestEditorFn) (*MoveSandboxFileResponse, error)
 
-	// StatSandboxFileWithResponse Inspect workspace path metadata
+	// StatSandboxFileWithResponse 查询工作区路径元数据
 	//
-	// Returns lstat metadata, including symlink_target for a final symlink, without following it. Workspace root is allowed; paths outside workspace are rejected.
+	// 返回 lstat 元数据；最终路径为符号链接时包含 symlink_target，不跟随该链接。允许查询 /workspace 本身，拒绝工作区外的路径。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID}/files/stat (the `StatSandboxFile` operationId).
 	StatSandboxFileWithResponse(ctx context.Context, sandboxID string, params *StatSandboxFileParams, reqEditors ...RequestEditorFn) (*StatSandboxFileResponse, error)
 
-	// GetSandboxInjectionsWithResponse Read masked host-side injection configuration
+	// GetSandboxInjectionsWithResponse 读取脱敏后的沙箱凭证注入配置
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID}/injections (the `GetSandboxInjections` operationId).
 	GetSandboxInjectionsWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*GetSandboxInjectionsResponse, error)
 
-	// SetSandboxInjectionsWithBodyWithResponse Replace sandbox host-side injection rules
+	// SetSandboxInjectionsWithBodyWithResponse 替换沙箱的宿主侧凭证注入规则
 	//
-	// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+	// 需要所有者的交互式授权。秘密材料仅通过 Node mTLS 传递，不写入 Guest 文件。Control 和 Node 均校验生命周期 revision。.
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
 	SetSandboxInjectionsWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetSandboxInjectionsResponse, error)
 
-	// SetSandboxInjectionsWithResponse Replace sandbox host-side injection rules
+	// SetSandboxInjectionsWithResponse 替换沙箱的宿主侧凭证注入规则
 	//
-	// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+	// 需要所有者的交互式授权。秘密材料仅通过 Node mTLS 传递，不写入 Guest 文件。Control 和 Node 均校验生命周期 revision。.
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /v1/sandboxes/{sandboxID}/injections (the `SetSandboxInjections` operationId).
 	SetSandboxInjectionsWithResponse(ctx context.Context, sandboxID string, body SetSandboxInjectionsJSONRequestBody, reqEditors ...RequestEditorFn) (*SetSandboxInjectionsResponse, error)
 
-	// ListSandboxMCPBindingsWithResponse List explicit sandbox bindings
+	// ListSandboxMCPBindingsWithResponse 列出沙箱显式授权的 MCP 绑定
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID}/mcp (the `ListSandboxMCPBindings` operationId).
 	ListSandboxMCPBindingsWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*ListSandboxMCPBindingsResponse, error)
 
-	// UnbindSandboxMCPWithResponse Revoke binding before syncing config
+	// UnbindSandboxMCPWithResponse 先撤销沙箱绑定，再同步配置
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /v1/sandboxes/{sandboxID}/mcp/{marketID} (the `UnbindSandboxMCP` operationId).
 	UnbindSandboxMCPWithResponse(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*UnbindSandboxMCPResponse, error)
 
-	// BindSandboxMCPWithResponse Bind authorized MCP and sync Codex config
+	// BindSandboxMCPWithResponse 绑定已授权 MCP 并同步 Codex 配置
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /v1/sandboxes/{sandboxID}/mcp/{marketID} (the `BindSandboxMCP` operationId).
 	BindSandboxMCPWithResponse(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*BindSandboxMCPResponse, error)
 
-	// SyncSandboxMCPWithResponse Apply saved MCP config; Agent restart required
+	// SyncSandboxMCPWithResponse 应用已保存的 MCP 配置；新 Agent 会话加载更改
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/mcp/{marketID}/sync (the `SyncSandboxMCP` operationId).
 	SyncSandboxMCPWithResponse(ctx context.Context, sandboxID string, marketID string, reqEditors ...RequestEditorFn) (*SyncSandboxMCPResponse, error)
 
-	// CreateSandboxPreviewWithBodyWithResponse Authorize a sandbox HTTP port preview
+	// CreateSandboxPreviewWithBodyWithResponse 获取沙箱 HTTP 端口预览入口
 	//
-	// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+	// 需要运行中的远程 CHV 沙箱；API Key 需要 sandboxes:preview。未配置的端口默认为 public，返回可直接访问的 URL。private 端口返回有效期五分钟、绑定账号、策略 revision 和当前 Guest 运行身份的 authorization_url。禁止访问运行时端口 31024、31080、38080 及旧端口 1024、1080、8080。启停、删除和策略变化会撤销私有授权。
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/previews (the `CreateSandboxPreview` operationId).
 	CreateSandboxPreviewWithBodyWithResponse(ctx context.Context, sandboxID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateSandboxPreviewResponse, error)
 
-	// CreateSandboxPreviewWithResponse Authorize a sandbox HTTP port preview
+	// CreateSandboxPreviewWithResponse 获取沙箱 HTTP 端口预览入口
 	//
-	// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+	// 需要运行中的远程 CHV 沙箱；API Key 需要 sandboxes:preview。未配置的端口默认为 public，返回可直接访问的 URL。private 端口返回有效期五分钟、绑定账号、策略 revision 和当前 Guest 运行身份的 authorization_url。禁止访问运行时端口 31024、31080、38080 及旧端口 1024、1080、8080。启停、删除和策略变化会撤销私有授权。
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/previews (the `CreateSandboxPreview` operationId).
 	CreateSandboxPreviewWithResponse(ctx context.Context, sandboxID string, body CreateSandboxPreviewJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateSandboxPreviewResponse, error)
 
-	// GetSandboxPortPreviewWithResponse Get a sandbox HTTP port visibility
+	// GetSandboxPortPreviewWithResponse 查询 HTTP 端口可见性
 	//
-	// Requires ownership and sandboxes:read. Unconfigured ports default to public. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited.
+	// 需要沙箱所有权和 sandboxes:read。未配置的端口默认为 public。禁止使用运行时端口 31024、31080、38080 及旧端口 1024、1080、8080。
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/sandboxes/{sandboxID}/previews/{port} (the `GetSandboxPortPreview` operationId).
 	GetSandboxPortPreviewWithResponse(ctx context.Context, sandboxID string, port int, reqEditors ...RequestEditorFn) (*GetSandboxPortPreviewResponse, error)
 
-	// SetSandboxPortPreviewWithBodyWithResponse Change a sandbox HTTP port visibility
+	// SetSandboxPortPreviewWithBodyWithResponse 修改 HTTP 端口可见性
 	//
-	// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+	// 需要沙箱所有权和 sandboxes:preview。策略在停止、启动后保留，删除沙箱时清理。新请求读取已提交的策略；确认切换前取消本 Gateway 的活动流，其他 Gateway 最迟每 100ms 重新校验。T3 工作台鉴权保持不变。
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /v1/sandboxes/{sandboxID}/previews/{port} (the `SetSandboxPortPreview` operationId).
 	SetSandboxPortPreviewWithBodyWithResponse(ctx context.Context, sandboxID string, port int, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetSandboxPortPreviewResponse, error)
 
-	// SetSandboxPortPreviewWithResponse Change a sandbox HTTP port visibility
+	// SetSandboxPortPreviewWithResponse 修改 HTTP 端口可见性
 	//
-	// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+	// 需要沙箱所有权和 sandboxes:preview。策略在停止、启动后保留，删除沙箱时清理。新请求读取已提交的策略；确认切换前取消本 Gateway 的活动流，其他 Gateway 最迟每 100ms 重新校验。T3 工作台鉴权保持不变。
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -6929,18 +6929,18 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /v1/sandboxes/{sandboxID}/skills (the `SetSandboxSkills` operationId).
 	SetSandboxSkillsWithResponse(ctx context.Context, sandboxID openapi_types.UUID, body SetSandboxSkillsJSONRequestBody, reqEditors ...RequestEditorFn) (*SetSandboxSkillsResponse, error)
 
-	// StartSandboxWithResponse Start a stopped sandbox
+	// StartSandboxWithResponse 启动已停止的沙箱
 	//
-	// Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
+	// 对当前用户拥有且已停止的云端沙箱执行保留磁盘的冷启动。这是异步操作，应轮询直至 observed_state 为 running。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/sandboxes/{sandboxID}/start (the `StartSandbox` operationId).
 	StartSandboxWithResponse(ctx context.Context, sandboxID string, reqEditors ...RequestEditorFn) (*StartSandboxResponse, error)
 
-	// StopSandboxWithResponse Stop a running sandbox
+	// StopSandboxWithResponse 停止运行中的沙箱
 	//
-	// Requests a graceful stop for a cloud sandbox owned by the authenticated user while preserving its instance disks. The operation is asynchronous; poll the sandbox until observed_state becomes stopped.
+	// 优雅停止当前用户拥有的云端沙箱并保留实例磁盘。这是异步操作，应轮询直至 observed_state 为 stopped。.
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
@@ -6982,119 +6982,119 @@ type ClientWithResponsesInterface interface {
 	// Corresponds with PUT /v1/skills/{skillID}/favorite (the `FavoriteSkill` operationId).
 	FavoriteSkillWithResponse(ctx context.Context, skillID openapi_types.UUID, reqEditors ...RequestEditorFn) (*FavoriteSkillResponse, error)
 
-	// ListSystemTemplatesWithResponse List platform default templates
+	// ListSystemTemplatesWithResponse 列出平台默认模板
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/system-templates (the `ListSystemTemplates` operationId).
 	ListSystemTemplatesWithResponse(ctx context.Context, params *ListSystemTemplatesParams, reqEditors ...RequestEditorFn) (*ListSystemTemplatesResponse, error)
 
-	// ListTemplatesWithResponse List templates visible to the authenticated user
+	// ListTemplatesWithResponse 列出当前用户可见的模板
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/templates (the `ListTemplates` operationId).
 	ListTemplatesWithResponse(ctx context.Context, params *ListTemplatesParams, reqEditors ...RequestEditorFn) (*ListTemplatesResponse, error)
 
-	// CreateTemplateWithBodyWithResponse Create a personal template
+	// CreateTemplateWithBodyWithResponse 创建个人模板
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/templates (the `CreateTemplate` operationId).
 	CreateTemplateWithBodyWithResponse(ctx context.Context, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTemplateResponse, error)
 
-	// CreateTemplateWithResponse Create a personal template
+	// CreateTemplateWithResponse 创建个人模板
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/templates (the `CreateTemplate` operationId).
 	CreateTemplateWithResponse(ctx context.Context, body CreateTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTemplateResponse, error)
 
-	// DeleteTemplateWithResponse Delete an owned template
+	// DeleteTemplateWithResponse 删除本人拥有的模板
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /v1/templates/{templateID} (the `DeleteTemplate` operationId).
 	DeleteTemplateWithResponse(ctx context.Context, templateID string, reqEditors ...RequestEditorFn) (*DeleteTemplateResponse, error)
 
-	// GetTemplateWithResponse Get a template
+	// GetTemplateWithResponse 查询模板
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/templates/{templateID} (the `GetTemplate` operationId).
 	GetTemplateWithResponse(ctx context.Context, templateID string, reqEditors ...RequestEditorFn) (*GetTemplateResponse, error)
 
-	// UpdateTemplateWithBodyWithResponse Update an owned template
+	// UpdateTemplateWithBodyWithResponse 更新本人拥有的模板
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /v1/templates/{templateID} (the `UpdateTemplate` operationId).
 	UpdateTemplateWithBodyWithResponse(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*UpdateTemplateResponse, error)
 
-	// UpdateTemplateWithResponse Update an owned template
+	// UpdateTemplateWithResponse 更新本人拥有的模板
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PATCH /v1/templates/{templateID} (the `UpdateTemplate` operationId).
 	UpdateTemplateWithResponse(ctx context.Context, templateID string, body UpdateTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*UpdateTemplateResponse, error)
 
-	// CreateTemplateBuildWithBodyWithResponse Queue an immutable template build
+	// CreateTemplateBuildWithBodyWithResponse 提交不可变模板构建任务
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/templates/{templateID}/builds (the `CreateTemplateBuild` operationId).
 	CreateTemplateBuildWithBodyWithResponse(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*CreateTemplateBuildResponse, error)
 
-	// CreateTemplateBuildWithResponse Queue an immutable template build
+	// CreateTemplateBuildWithResponse 提交不可变模板构建任务
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/templates/{templateID}/builds (the `CreateTemplateBuild` operationId).
 	CreateTemplateBuildWithResponse(ctx context.Context, templateID string, body CreateTemplateBuildJSONRequestBody, reqEditors ...RequestEditorFn) (*CreateTemplateBuildResponse, error)
 
-	// GetTemplateBuildWithResponse Get template build status
+	// GetTemplateBuildWithResponse 查询模板构建状态
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/templates/{templateID}/builds/{buildID} (the `GetTemplateBuild` operationId).
 	GetTemplateBuildWithResponse(ctx context.Context, templateID string, buildID string, reqEditors ...RequestEditorFn) (*GetTemplateBuildResponse, error)
 
-	// ForkTemplateWithBodyWithResponse Fork an accessible Ready build into a personal template
+	// ForkTemplateWithBodyWithResponse 从可访问的 Ready 构建派生个人模板
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/templates/{templateID}/fork (the `ForkTemplate` operationId).
 	ForkTemplateWithBodyWithResponse(ctx context.Context, templateID string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*ForkTemplateResponse, error)
 
-	// ForkTemplateWithResponse Fork an accessible Ready build into a personal template
+	// ForkTemplateWithResponse 从可访问的 Ready 构建派生个人模板
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with POST /v1/templates/{templateID}/fork (the `ForkTemplate` operationId).
 	ForkTemplateWithResponse(ctx context.Context, templateID string, body ForkTemplateJSONRequestBody, reqEditors ...RequestEditorFn) (*ForkTemplateResponse, error)
 
-	// DeleteTemplateTagWithResponse Remove a template build tag
+	// DeleteTemplateTagWithResponse 移除模板构建标签
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with DELETE /v1/templates/{templateID}/tags/{tag} (the `DeleteTemplateTag` operationId).
 	DeleteTemplateTagWithResponse(ctx context.Context, templateID string, tag string, reqEditors ...RequestEditorFn) (*DeleteTemplateTagResponse, error)
 
-	// GetTemplateTagWithResponse Resolve a Ready build tag
+	// GetTemplateTagWithResponse 解析 Ready 构建标签
 	//
 	// Returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with GET /v1/templates/{templateID}/tags/{tag} (the `GetTemplateTag` operationId).
 	GetTemplateTagWithResponse(ctx context.Context, templateID string, tag string, reqEditors ...RequestEditorFn) (*GetTemplateTagResponse, error)
 
-	// SetTemplateTagWithBodyWithResponse Atomically publish a Ready build under a tag
+	// SetTemplateTagWithBodyWithResponse 将 Ready 构建原子发布至标签
 	//
 	// Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 	//
 	// Corresponds with PUT /v1/templates/{templateID}/tags/{tag} (the `SetTemplateTag` operationId).
 	SetTemplateTagWithBodyWithResponse(ctx context.Context, templateID string, tag string, contentType string, body io.Reader, reqEditors ...RequestEditorFn) (*SetTemplateTagResponse, error)
 
-	// SetTemplateTagWithResponse Atomically publish a Ready build under a tag
+	// SetTemplateTagWithResponse 将 Ready 构建原子发布至标签
 	//
 	// Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 	//
@@ -10271,9 +10271,9 @@ func (r SetTemplateTagResponse) ContentType() string {
 	return ""
 }
 
-// ListCredentialDocumentsWithResponse List encrypted account credential configurations
+// ListCredentialDocumentsWithResponse 列出账号加密保存的凭证配置文档
 //
-// Interactive login required. Kind is agents or sandboxes. Values are decrypted only for the owning account.
+// 需要交互式登录。kind 为 agents 或 sandboxes，只有所属账号可以解密读取配置内容。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10286,7 +10286,7 @@ func (c *ClientWithResponses) ListCredentialDocumentsWithResponse(ctx context.Co
 	return ParseListCredentialDocumentsResponse(rsp)
 }
 
-// DeleteCredentialDocumentWithResponse Delete one configuration owned by the current account
+// DeleteCredentialDocumentWithResponse 删除当前账号的一份配置
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10299,9 +10299,9 @@ func (c *ClientWithResponses) DeleteCredentialDocumentWithResponse(ctx context.C
 	return ParseDeleteCredentialDocumentResponse(rsp)
 }
 
-// PutCredentialDocumentWithBodyWithResponse Save an account Agent configuration or sandbox credential selection
+// PutCredentialDocumentWithBodyWithResponse 保存账号 Agent 配置或沙箱凭证选择
 //
-// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+// Agent 配置包含 id、name、agent、connectionId、modelNames、defaultModel、filePath、content、updatedAt。沙箱配置包含 agentIds、credentialIds 和已应用的模型快照。所引用的 Agent 必须属于当前账号，API Key 不能管理这些记录。.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10314,9 +10314,9 @@ func (c *ClientWithResponses) PutCredentialDocumentWithBodyWithResponse(ctx cont
 	return ParsePutCredentialDocumentResponse(rsp)
 }
 
-// PutCredentialDocumentWithResponse Save an account Agent configuration or sandbox credential selection
+// PutCredentialDocumentWithResponse 保存账号 Agent 配置或沙箱凭证选择
 //
-// Agent values include id, name, agent, connectionId, modelNames, defaultModel, filePath, content and updatedAt. Sandbox values include agentIds, credentialIds and the applied models snapshot. Agent references must belong to the authenticated account. API keys cannot manage these records.
+// Agent 配置包含 id、name、agent、connectionId、modelNames、defaultModel、filePath、content、updatedAt。沙箱配置包含 agentIds、credentialIds 和已应用的模型快照。所引用的 Agent 必须属于当前账号，API Key 不能管理这些记录。.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10329,9 +10329,9 @@ func (c *ClientWithResponses) PutCredentialDocumentWithResponse(ctx context.Cont
 	return ParsePutCredentialDocumentResponse(rsp)
 }
 
-// ListInjectionRulesWithResponse List account injection rules
+// ListInjectionRulesWithResponse 列出账号凭证注入规则
 //
-// Returns the authenticated account's persistent injection rules. Secrets are never returned; only a short masked hint is exposed.
+// 返回当前账号的持久注入规则。只返回简短脱敏提示，不返回秘密内容。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10344,9 +10344,9 @@ func (c *ClientWithResponses) ListInjectionRulesWithResponse(ctx context.Context
 	return ParseListInjectionRulesResponse(rsp)
 }
 
-// CreateInjectionRuleWithBodyWithResponse Create an account injection rule
+// CreateInjectionRuleWithBodyWithResponse 创建账号凭证注入规则
 //
-// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+// 创建账号级持久规则，所有者可将其授权给沙箱。秘密材料在写入存储前加密封装。.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10359,9 +10359,9 @@ func (c *ClientWithResponses) CreateInjectionRuleWithBodyWithResponse(ctx contex
 	return ParseCreateInjectionRuleResponse(rsp)
 }
 
-// CreateInjectionRuleWithResponse Create an account injection rule
+// CreateInjectionRuleWithResponse 创建账号凭证注入规则
 //
-// Creates a persistent, account-level rule that the owner can attach to sandboxes. The secret is sealed before storage.
+// 创建账号级持久规则，所有者可将其授权给沙箱。秘密材料在写入存储前加密封装。.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10374,7 +10374,7 @@ func (c *ClientWithResponses) CreateInjectionRuleWithResponse(ctx context.Contex
 	return ParseCreateInjectionRuleResponse(rsp)
 }
 
-// DeleteInjectionRuleWithResponse Delete an account injection rule
+// DeleteInjectionRuleWithResponse 删除账号凭证注入规则
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10387,7 +10387,7 @@ func (c *ClientWithResponses) DeleteInjectionRuleWithResponse(ctx context.Contex
 	return ParseDeleteInjectionRuleResponse(rsp)
 }
 
-// GetInjectionRuleWithResponse Get an account injection rule
+// GetInjectionRuleWithResponse 查询账号凭证注入规则
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10400,9 +10400,9 @@ func (c *ClientWithResponses) GetInjectionRuleWithResponse(ctx context.Context, 
 	return ParseGetInjectionRuleResponse(rsp)
 }
 
-// UpdateInjectionRuleWithBodyWithResponse Update an account injection rule
+// UpdateInjectionRuleWithBodyWithResponse 更新账号凭证注入规则
 //
-// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+// 更新当前账号拥有的规则；省略 secret 时保留已有的加密秘密材料。.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10415,9 +10415,9 @@ func (c *ClientWithResponses) UpdateInjectionRuleWithBodyWithResponse(ctx contex
 	return ParseUpdateInjectionRuleResponse(rsp)
 }
 
-// UpdateInjectionRuleWithResponse Update an account injection rule
+// UpdateInjectionRuleWithResponse 更新账号凭证注入规则
 //
-// Updates a rule owned by the authenticated account. Omit secret to keep the existing sealed value.
+// 更新当前账号拥有的规则；省略 secret 时保留已有的加密秘密材料。.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10430,9 +10430,9 @@ func (c *ClientWithResponses) UpdateInjectionRuleWithResponse(ctx context.Contex
 	return ParseUpdateInjectionRuleResponse(rsp)
 }
 
-// GetInjectionRuleMaterialWithResponse Read injection material
+// GetInjectionRuleMaterialWithResponse 读取凭证注入材料
 //
-// Returns the plaintext header/key for the authenticated owner so a trusted local runtime can apply it. The response is never cached; secrets are never logged.
+// 为已认证所有者返回明文请求头或密钥，以供受信任的本地运行时应用。响应禁止缓存，秘密不得写入日志。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10445,7 +10445,7 @@ func (c *ClientWithResponses) GetInjectionRuleMaterialWithResponse(ctx context.C
 	return ParseGetInjectionRuleMaterialResponse(rsp)
 }
 
-// ListMCPCatalogWithResponse List available MCP services
+// ListMCPCatalogWithResponse 列出可用的 MCP 服务
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10458,7 +10458,7 @@ func (c *ClientWithResponses) ListMCPCatalogWithResponse(ctx context.Context, re
 	return ParseListMCPCatalogResponse(rsp)
 }
 
-// GetMCPCatalogWithResponse Get MCP catalog service
+// GetMCPCatalogWithResponse 查询 MCP 服务详情
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10471,7 +10471,7 @@ func (c *ClientWithResponses) GetMCPCatalogWithResponse(ctx context.Context, mar
 	return ParseGetMCPCatalogResponse(rsp)
 }
 
-// DisconnectMCPOAuthWithResponse Disconnect and invalidate sandbox calls
+// DisconnectMCPOAuthWithResponse 断开连接并禁止后续沙箱调用
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10484,7 +10484,7 @@ func (c *ClientWithResponses) DisconnectMCPOAuthWithResponse(ctx context.Context
 	return ParseDisconnectMCPOAuthResponse(rsp)
 }
 
-// GetMCPOAuthConnectionWithResponse Get connection without secrets
+// GetMCPOAuthConnectionWithResponse 查询连接状态（不返回秘密）
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10497,9 +10497,9 @@ func (c *ClientWithResponses) GetMCPOAuthConnectionWithResponse(ctx context.Cont
 	return ParseGetMCPOAuthConnectionResponse(rsp)
 }
 
-// StartMCPOAuthWithResponse Connect an official MCP using PKCE and provider registration
+// StartMCPOAuthWithResponse 使用 PKCE 和供应方注册信息连接官方 MCP
 //
-// GitHub uses the pre-registered App. Notion discovers OAuth metadata and registers through DCR with PKCE S256. No PAT or CIMD fallback.
+// GitHub 使用预注册的 GitHub App；Notion 发现 OAuth 元数据并通过 DCR 注册，使用 PKCE S256。不使用 PAT 或 CIMD 回退。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10512,7 +10512,7 @@ func (c *ClientWithResponses) StartMCPOAuthWithResponse(ctx context.Context, mar
 	return ParseStartMCPOAuthResponse(rsp)
 }
 
-// ListMCPToolsWithResponse Discover allowed upstream tools
+// ListMCPToolsWithResponse 查询允许使用的上游工具
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10568,7 +10568,7 @@ func (c *ClientWithResponses) DeleteCustomMCPWithResponse(ctx context.Context, c
 	return ParseDeleteCustomMCPResponse(rsp)
 }
 
-// ListMCPFavoritesWithResponse List account favorites
+// ListMCPFavoritesWithResponse 列出账号收藏的 MCP
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10581,7 +10581,7 @@ func (c *ClientWithResponses) ListMCPFavoritesWithResponse(ctx context.Context, 
 	return ParseListMCPFavoritesResponse(rsp)
 }
 
-// UnfavoriteMCPWithResponse Unfavorite without revoking OAuth
+// UnfavoriteMCPWithResponse 取消收藏，保留现有 OAuth 授权
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10594,7 +10594,7 @@ func (c *ClientWithResponses) UnfavoriteMCPWithResponse(ctx context.Context, mar
 	return ParseUnfavoriteMCPResponse(rsp)
 }
 
-// FavoriteMCPWithResponse Favorite without authorizing
+// FavoriteMCPWithResponse 收藏 MCP 服务
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10607,9 +10607,9 @@ func (c *ClientWithResponses) FavoriteMCPWithResponse(ctx context.Context, marke
 	return ParseFavoriteMCPResponse(rsp)
 }
 
-// CompleteMCPOAuthWithResponse Complete one-time GitHub OAuth callback in the system browser
+// CompleteMCPOAuthWithResponse 完成浏览器中的一次性 MCP OAuth 回调
 //
-// Fixed HTTPS callback. State binds the account and PKCE transaction. Does not accept Isodo API keys or return OAuth tokens. Query strings must never be logged.
+// 固定 HTTPS 回调。state 绑定账号和 PKCE 事务；不接受 Isodo API Key，也不返回 OAuth 令牌。查询参数不得写入日志。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10622,7 +10622,7 @@ func (c *ClientWithResponses) CompleteMCPOAuthWithResponse(ctx context.Context, 
 	return ParseCompleteMCPOAuthResponse(rsp)
 }
 
-// CancelMCPOAuthTransactionWithResponse Cancel authorization transaction
+// CancelMCPOAuthTransactionWithResponse 取消授权事务
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10635,7 +10635,7 @@ func (c *ClientWithResponses) CancelMCPOAuthTransactionWithResponse(ctx context.
 	return ParseCancelMCPOAuthTransactionResponse(rsp)
 }
 
-// GetMCPOAuthTransactionWithResponse Poll account authorization transaction
+// GetMCPOAuthTransactionWithResponse 查询账号授权事务状态
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10648,9 +10648,9 @@ func (c *ClientWithResponses) GetMCPOAuthTransactionWithResponse(ctx context.Con
 	return ParseGetMCPOAuthTransactionResponse(rsp)
 }
 
-// ListSandboxesWithResponse List sandboxes
+// ListSandboxesWithResponse 列出沙箱
 //
-// Returns sandboxes owned by the authenticated user. Use `limit` and `offset` to paginate results.
+// 返回当前认证用户拥有的沙箱，使用 limit 和 offset 分页。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10663,9 +10663,9 @@ func (c *ClientWithResponses) ListSandboxesWithResponse(ctx context.Context, par
 	return ParseListSandboxesResponse(rsp)
 }
 
-// CreateSandboxWithBodyWithResponse Create a sandbox
+// CreateSandboxWithBodyWithResponse 创建沙箱
 //
-// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+// 为当前认证用户创建沙箱并登记初始期望状态。运行时可用性取决于已配置的后端；应继续查询实际运行状态。.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10678,9 +10678,9 @@ func (c *ClientWithResponses) CreateSandboxWithBodyWithResponse(ctx context.Cont
 	return ParseCreateSandboxResponse(rsp)
 }
 
-// CreateSandboxWithResponse Create a sandbox
+// CreateSandboxWithResponse 创建沙箱
 //
-// Creates a sandbox for the authenticated user. The sandbox is created in its initial desired state; runtime availability depends on the configured backend.
+// 为当前认证用户创建沙箱并登记初始期望状态。运行时可用性取决于已配置的后端；应继续查询实际运行状态。.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10693,9 +10693,9 @@ func (c *ClientWithResponses) CreateSandboxWithResponse(ctx context.Context, bod
 	return ParseCreateSandboxResponse(rsp)
 }
 
-// DeleteSandboxWithResponse Delete a sandbox
+// DeleteSandboxWithResponse 删除沙箱
 //
-// Requests Node cleanup. The resource remains readable until cleanup completes; repeated deletion returns the same action while pending or completed. Missing resources return 204.
+// 请求 Node 清理资源。清理完成前资源仍可读取；重复删除返回同一删除动作的当前结果。不存在的资源返回 204。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10708,9 +10708,9 @@ func (c *ClientWithResponses) DeleteSandboxWithResponse(ctx context.Context, san
 	return ParseDeleteSandboxResponse(rsp)
 }
 
-// GetSandboxWithResponse Get a sandbox
+// GetSandboxWithResponse 查询沙箱
 //
-// Returns one sandbox owned by the authenticated user. A sandbox owned by another user is reported as not found.
+// 返回当前用户拥有的一个沙箱；其他用户的沙箱统一返回未找到。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10723,9 +10723,9 @@ func (c *ClientWithResponses) GetSandboxWithResponse(ctx context.Context, sandbo
 	return ParseGetSandboxResponse(rsp)
 }
 
-// UpdateSandboxWithBodyWithResponse Update a sandbox
+// UpdateSandboxWithBodyWithResponse 更新沙箱信息
 //
-// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+// 更新当前用户所拥有沙箱的可变名称和元数据。.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10738,9 +10738,9 @@ func (c *ClientWithResponses) UpdateSandboxWithBodyWithResponse(ctx context.Cont
 	return ParseUpdateSandboxResponse(rsp)
 }
 
-// UpdateSandboxWithResponse Update a sandbox
+// UpdateSandboxWithResponse 更新沙箱信息
 //
-// Updates mutable sandbox metadata for a sandbox owned by the authenticated user.
+// 更新当前用户所拥有沙箱的可变名称和元数据。.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10753,9 +10753,9 @@ func (c *ClientWithResponses) UpdateSandboxWithResponse(ctx context.Context, san
 	return ParseUpdateSandboxResponse(rsp)
 }
 
-// GetSandboxAppWithResponse Open a sandbox application
+// GetSandboxAppWithResponse 打开沙箱应用
 //
-// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and redirects the browser to the sandbox application.
+// 为已认证的沙箱所有者创建短期 Agent 工作台配对链接，并将浏览器重定向至沙箱应用。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10768,9 +10768,9 @@ func (c *ClientWithResponses) GetSandboxAppWithResponse(ctx context.Context, san
 	return ParseGetSandboxAppResponse(rsp)
 }
 
-// CreateSandboxAppLinkWithResponse Create a sandbox application link
+// CreateSandboxAppLinkWithResponse 获取沙箱应用链接
 //
-// Creates a short-lived Agent workbench pairing link for an authenticated sandbox owner and returns it as JSON. Desktop clients and SDKs use this endpoint; browsers can use `GET /v1/sandboxes/{sandboxID}/app` instead. The pairing credential is carried in the `pairing_url` fragment and is never sent to the Isodo API.
+// 为已认证的沙箱所有者创建短期 Agent 工作台配对链接，并返回 JSON。桌面客户端使用此接口；浏览器也可访问 GET /v1/sandboxes/{sandboxID}/app。配对凭证位于 pairing_url 的 fragment 中，不通过该链接发送至 Isodo API。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10783,9 +10783,9 @@ func (c *ClientWithResponses) CreateSandboxAppLinkWithResponse(ctx context.Conte
 	return ParseCreateSandboxAppLinkResponse(rsp)
 }
 
-// RunSandboxCommandWithBodyWithResponse Run a bounded non-interactive command inside a sandbox Guest
+// RunSandboxCommandWithBodyWithResponse 在沙箱 Guest 内执行命令
 //
-// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+// 在运行中的 Guest 内执行 argv，不在宿主 Shell 执行。必须提供 8–128 个安全 ASCII 字符组成的 Idempotency-Key；同一请求重试时复用该键。命令以非零退出码结束时，HTTP 仍返回 200，应检查 exit_code。.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10798,9 +10798,9 @@ func (c *ClientWithResponses) RunSandboxCommandWithBodyWithResponse(ctx context.
 	return ParseRunSandboxCommandResponse(rsp)
 }
 
-// RunSandboxCommandWithResponse Run a bounded non-interactive command inside a sandbox Guest
+// RunSandboxCommandWithResponse 在沙箱 Guest 内执行命令
 //
-// Executes argv inside the running Guest (never on a host Shell). Idempotency-Key is required, must contain 8-128 safe ASCII characters, and must be reused when retrying the same request. A command with a nonzero exit code still returns HTTP 200.
+// 在运行中的 Guest 内执行 argv，不在宿主 Shell 执行。必须提供 8–128 个安全 ASCII 字符组成的 Idempotency-Key；同一请求重试时复用该键。命令以非零退出码结束时，HTTP 仍返回 200，应检查 exit_code。.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10813,9 +10813,9 @@ func (c *ClientWithResponses) RunSandboxCommandWithResponse(ctx context.Context,
 	return ParseRunSandboxCommandResponse(rsp)
 }
 
-// ListSandboxDirectoryWithResponse List a workspace directory
+// ListSandboxDirectoryWithResponse 列出工作区目录
 //
-// Lexical name order. page_size defaults to 100 and is limited to 500. Pass next_page_token unchanged to page_token; tokens are name cursors, not a consistent snapshot across concurrent mutations. A directory is limited to 4096 entries. Symlink metadata is returned without following the final symlink.
+// 按名称字典序返回条目。page_size 默认 100、最大 500；将 next_page_token 原样传回 page_token。令牌是名称游标，不保证并发修改下的一致性快照。单目录最多 4096 个条目；返回最终符号链接的元数据，不跟随该链接。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10828,7 +10828,7 @@ func (c *ClientWithResponses) ListSandboxDirectoryWithResponse(ctx context.Conte
 	return ParseListSandboxDirectoryResponse(rsp)
 }
 
-// MakeSandboxDirectoryWithBodyWithResponse Create a workspace directory
+// MakeSandboxDirectoryWithBodyWithResponse 创建工作区目录
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10841,7 +10841,7 @@ func (c *ClientWithResponses) MakeSandboxDirectoryWithBodyWithResponse(ctx conte
 	return ParseMakeSandboxDirectoryResponse(rsp)
 }
 
-// MakeSandboxDirectoryWithResponse Create a workspace directory
+// MakeSandboxDirectoryWithResponse 创建工作区目录
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10854,9 +10854,9 @@ func (c *ClientWithResponses) MakeSandboxDirectoryWithResponse(ctx context.Conte
 	return ParseMakeSandboxDirectoryResponse(rsp)
 }
 
-// RemoveSandboxFileWithResponse Remove a workspace file or directory
+// RemoveSandboxFileWithResponse 删除工作区文件或目录
 //
-// Idempotent for missing paths. Removes symlinks themselves. Empty directories require no recursive flag; nonempty directories require recursive=true and are limited to 4096 entries. Workspace root and runtime-owned paths are forbidden. Mutations reject symlink parents.
+// 不存在的路径也视为成功。符号链接只删除链接本身；空目录可直接删除，非空目录要求 recursive=true，最多处理 4096 个条目。禁止删除工作区根目录和运行时保护路径，拒绝符号链接父目录。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10869,9 +10869,9 @@ func (c *ClientWithResponses) RemoveSandboxFileWithResponse(ctx context.Context,
 	return ParseRemoveSandboxFileResponse(rsp)
 }
 
-// DownloadSandboxFileWithResponse Download a verified binary file
+// DownloadSandboxFileWithResponse 下载经过完整性校验的文件
 //
-// Stages at most 256 MiB in private temporary storage and verifies the Guest completion digest before responding. X-Content-SHA256 describes the complete response body.
+// 在私有临时空间暂存最多 256 MiB，校验 Guest 完成摘要后再返回响应。X-Content-SHA256 表示完整响应体的摘要。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10884,9 +10884,9 @@ func (c *ClientWithResponses) DownloadSandboxFileWithResponse(ctx context.Contex
 	return ParseDownloadSandboxFileResponse(rsp)
 }
 
-// UploadSandboxFileWithBodyWithResponse Upload and atomically commit one file
+// UploadSandboxFileWithBodyWithResponse 上传并原子提交文件
 //
-// Defaults to overwrite=true. One multipart part named file, up to 256 MiB. Upload bytes are staged in bounded private temporary storage before forwarding through Node and Guest. Success means Guest confirmed the SHA256 and atomic commit. COMMIT_UNKNOWN must be verified by reading the target before retrying.
+// 默认 overwrite=true。请求包含名为 file 的单个 multipart 文件部分，最大 256 MiB。上传内容先在有界私有临时空间暂存，再经 Node 转发至 Guest。成功代表 Guest 已确认 SHA-256 和原子提交。遇到 COMMIT_UNKNOWN 时应先读取目标文件确认结果，再决定是否重试。.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10899,9 +10899,9 @@ func (c *ClientWithResponses) UploadSandboxFileWithBodyWithResponse(ctx context.
 	return ParseUploadSandboxFileResponse(rsp)
 }
 
-// MoveSandboxFileWithBodyWithResponse Move a workspace file or directory
+// MoveSandboxFileWithBodyWithResponse 移动工作区文件或目录
 //
-// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+// 默认 overwrite=true，与文件上传一致。只有普通文件可以覆盖已有普通文件，不覆盖目录。overwrite=false 使用原子禁止覆盖操作。源和目标都必须是工作区内的规范路径；禁止工作区根、运行时保护路径和符号链接父目录。源和目标相同时返回当前元数据。.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10914,9 +10914,9 @@ func (c *ClientWithResponses) MoveSandboxFileWithBodyWithResponse(ctx context.Co
 	return ParseMoveSandboxFileResponse(rsp)
 }
 
-// MoveSandboxFileWithResponse Move a workspace file or directory
+// MoveSandboxFileWithResponse 移动工作区文件或目录
 //
-// Defaults to overwrite=true, consistent with Files upload. Only regular files can replace existing regular files; directories are never replaced. overwrite=false uses atomic no-replace. Both paths must be canonical under workspace; root, runtime-owned paths and symlink parents are forbidden. Source equal to destination returns metadata.
+// 默认 overwrite=true，与文件上传一致。只有普通文件可以覆盖已有普通文件，不覆盖目录。overwrite=false 使用原子禁止覆盖操作。源和目标都必须是工作区内的规范路径；禁止工作区根、运行时保护路径和符号链接父目录。源和目标相同时返回当前元数据。.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10929,9 +10929,9 @@ func (c *ClientWithResponses) MoveSandboxFileWithResponse(ctx context.Context, s
 	return ParseMoveSandboxFileResponse(rsp)
 }
 
-// StatSandboxFileWithResponse Inspect workspace path metadata
+// StatSandboxFileWithResponse 查询工作区路径元数据
 //
-// Returns lstat metadata, including symlink_target for a final symlink, without following it. Workspace root is allowed; paths outside workspace are rejected.
+// 返回 lstat 元数据；最终路径为符号链接时包含 symlink_target，不跟随该链接。允许查询 /workspace 本身，拒绝工作区外的路径。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10944,7 +10944,7 @@ func (c *ClientWithResponses) StatSandboxFileWithResponse(ctx context.Context, s
 	return ParseStatSandboxFileResponse(rsp)
 }
 
-// GetSandboxInjectionsWithResponse Read masked host-side injection configuration
+// GetSandboxInjectionsWithResponse 读取脱敏后的沙箱凭证注入配置
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -10957,9 +10957,9 @@ func (c *ClientWithResponses) GetSandboxInjectionsWithResponse(ctx context.Conte
 	return ParseGetSandboxInjectionsResponse(rsp)
 }
 
-// SetSandboxInjectionsWithBodyWithResponse Replace sandbox host-side injection rules
+// SetSandboxInjectionsWithBodyWithResponse 替换沙箱的宿主侧凭证注入规则
 //
-// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+// 需要所有者的交互式授权。秘密材料仅通过 Node mTLS 传递，不写入 Guest 文件。Control 和 Node 均校验生命周期 revision。.
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10972,9 +10972,9 @@ func (c *ClientWithResponses) SetSandboxInjectionsWithBodyWithResponse(ctx conte
 	return ParseSetSandboxInjectionsResponse(rsp)
 }
 
-// SetSandboxInjectionsWithResponse Replace sandbox host-side injection rules
+// SetSandboxInjectionsWithResponse 替换沙箱的宿主侧凭证注入规则
 //
-// Interactive owner authorization required. Material is forwarded only over Node mTLS and never written into Guest files. Lifecycle revision is fenced by Control and Node.
+// 需要所有者的交互式授权。秘密材料仅通过 Node mTLS 传递，不写入 Guest 文件。Control 和 Node 均校验生命周期 revision。.
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -10987,7 +10987,7 @@ func (c *ClientWithResponses) SetSandboxInjectionsWithResponse(ctx context.Conte
 	return ParseSetSandboxInjectionsResponse(rsp)
 }
 
-// ListSandboxMCPBindingsWithResponse List explicit sandbox bindings
+// ListSandboxMCPBindingsWithResponse 列出沙箱显式授权的 MCP 绑定
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11000,7 +11000,7 @@ func (c *ClientWithResponses) ListSandboxMCPBindingsWithResponse(ctx context.Con
 	return ParseListSandboxMCPBindingsResponse(rsp)
 }
 
-// UnbindSandboxMCPWithResponse Revoke binding before syncing config
+// UnbindSandboxMCPWithResponse 先撤销沙箱绑定，再同步配置
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11013,7 +11013,7 @@ func (c *ClientWithResponses) UnbindSandboxMCPWithResponse(ctx context.Context, 
 	return ParseUnbindSandboxMCPResponse(rsp)
 }
 
-// BindSandboxMCPWithResponse Bind authorized MCP and sync Codex config
+// BindSandboxMCPWithResponse 绑定已授权 MCP 并同步 Codex 配置
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11026,7 +11026,7 @@ func (c *ClientWithResponses) BindSandboxMCPWithResponse(ctx context.Context, sa
 	return ParseBindSandboxMCPResponse(rsp)
 }
 
-// SyncSandboxMCPWithResponse Apply saved MCP config; Agent restart required
+// SyncSandboxMCPWithResponse 应用已保存的 MCP 配置；新 Agent 会话加载更改
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11039,9 +11039,9 @@ func (c *ClientWithResponses) SyncSandboxMCPWithResponse(ctx context.Context, sa
 	return ParseSyncSandboxMCPResponse(rsp)
 }
 
-// CreateSandboxPreviewWithBodyWithResponse Authorize a sandbox HTTP port preview
+// CreateSandboxPreviewWithBodyWithResponse 获取沙箱 HTTP 端口预览入口
 //
-// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+// 需要运行中的远程 CHV 沙箱；API Key 需要 sandboxes:preview。未配置的端口默认为 public，返回可直接访问的 URL。private 端口返回有效期五分钟、绑定账号、策略 revision 和当前 Guest 运行身份的 authorization_url。禁止访问运行时端口 31024、31080、38080 及旧端口 1024、1080、8080。启停、删除和策略变化会撤销私有授权。
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11054,9 +11054,9 @@ func (c *ClientWithResponses) CreateSandboxPreviewWithBodyWithResponse(ctx conte
 	return ParseCreateSandboxPreviewResponse(rsp)
 }
 
-// CreateSandboxPreviewWithResponse Authorize a sandbox HTTP port preview
+// CreateSandboxPreviewWithResponse 获取沙箱 HTTP 端口预览入口
 //
-// Requires a running remote CHV sandbox and sandboxes:preview for API keys. Unconfigured ports are public and return a directly usable URL. Private ports return a five-minute authorization_url bound to the account, policy revision and current Guest runtime. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited. Stop, Start, Delete and policy changes revoke private grants.
+// 需要运行中的远程 CHV 沙箱；API Key 需要 sandboxes:preview。未配置的端口默认为 public，返回可直接访问的 URL。private 端口返回有效期五分钟、绑定账号、策略 revision 和当前 Guest 运行身份的 authorization_url。禁止访问运行时端口 31024、31080、38080 及旧端口 1024、1080、8080。启停、删除和策略变化会撤销私有授权。
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11069,9 +11069,9 @@ func (c *ClientWithResponses) CreateSandboxPreviewWithResponse(ctx context.Conte
 	return ParseCreateSandboxPreviewResponse(rsp)
 }
 
-// GetSandboxPortPreviewWithResponse Get a sandbox HTTP port visibility
+// GetSandboxPortPreviewWithResponse 查询 HTTP 端口可见性
 //
-// Requires ownership and sandboxes:read. Unconfigured ports default to public. Runtime ports 31024, 31080, 38080 and legacy 1024, 1080, 8080 are prohibited.
+// 需要沙箱所有权和 sandboxes:read。未配置的端口默认为 public。禁止使用运行时端口 31024、31080、38080 及旧端口 1024、1080、8080。
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11084,9 +11084,9 @@ func (c *ClientWithResponses) GetSandboxPortPreviewWithResponse(ctx context.Cont
 	return ParseGetSandboxPortPreviewResponse(rsp)
 }
 
-// SetSandboxPortPreviewWithBodyWithResponse Change a sandbox HTTP port visibility
+// SetSandboxPortPreviewWithBodyWithResponse 修改 HTTP 端口可见性
 //
-// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+// 需要沙箱所有权和 sandboxes:preview。策略在停止、启动后保留，删除沙箱时清理。新请求读取已提交的策略；确认切换前取消本 Gateway 的活动流，其他 Gateway 最迟每 100ms 重新校验。T3 工作台鉴权保持不变。
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11099,9 +11099,9 @@ func (c *ClientWithResponses) SetSandboxPortPreviewWithBodyWithResponse(ctx cont
 	return ParseSetSandboxPortPreviewResponse(rsp)
 }
 
-// SetSandboxPortPreviewWithResponse Change a sandbox HTTP port visibility
+// SetSandboxPortPreviewWithResponse 修改 HTTP 端口可见性
 //
-// Requires ownership and sandboxes:preview. Persisted across Stop/Start and removed on Delete. New requests read the committed policy; active local streams are cancelled before acknowledgment and other Gateway instances revalidate at most every 100ms. T3 authentication is unchanged.
+// 需要沙箱所有权和 sandboxes:preview。策略在停止、启动后保留，删除沙箱时清理。新请求读取已提交的策略；确认切换前取消本 Gateway 的活动流，其他 Gateway 最迟每 100ms 重新校验。T3 工作台鉴权保持不变。
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11157,9 +11157,9 @@ func (c *ClientWithResponses) SetSandboxSkillsWithResponse(ctx context.Context, 
 	return ParseSetSandboxSkillsResponse(rsp)
 }
 
-// StartSandboxWithResponse Start a stopped sandbox
+// StartSandboxWithResponse 启动已停止的沙箱
 //
-// Requests a disk-preserving cold start for a stopped cloud sandbox owned by the authenticated user. The operation is asynchronous; poll the sandbox until observed_state becomes running.
+// 对当前用户拥有且已停止的云端沙箱执行保留磁盘的冷启动。这是异步操作，应轮询直至 observed_state 为 running。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11172,9 +11172,9 @@ func (c *ClientWithResponses) StartSandboxWithResponse(ctx context.Context, sand
 	return ParseStartSandboxResponse(rsp)
 }
 
-// StopSandboxWithResponse Stop a running sandbox
+// StopSandboxWithResponse 停止运行中的沙箱
 //
-// Requests a graceful stop for a cloud sandbox owned by the authenticated user while preserving its instance disks. The operation is asynchronous; poll the sandbox until observed_state becomes stopped.
+// 优雅停止当前用户拥有的云端沙箱并保留实例磁盘。这是异步操作，应轮询直至 observed_state 为 stopped。.
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11252,7 +11252,7 @@ func (c *ClientWithResponses) FavoriteSkillWithResponse(ctx context.Context, ski
 	return ParseFavoriteSkillResponse(rsp)
 }
 
-// ListSystemTemplatesWithResponse List platform default templates
+// ListSystemTemplatesWithResponse 列出平台默认模板
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11265,7 +11265,7 @@ func (c *ClientWithResponses) ListSystemTemplatesWithResponse(ctx context.Contex
 	return ParseListSystemTemplatesResponse(rsp)
 }
 
-// ListTemplatesWithResponse List templates visible to the authenticated user
+// ListTemplatesWithResponse 列出当前用户可见的模板
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11278,7 +11278,7 @@ func (c *ClientWithResponses) ListTemplatesWithResponse(ctx context.Context, par
 	return ParseListTemplatesResponse(rsp)
 }
 
-// CreateTemplateWithBodyWithResponse Create a personal template
+// CreateTemplateWithBodyWithResponse 创建个人模板
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11291,7 +11291,7 @@ func (c *ClientWithResponses) CreateTemplateWithBodyWithResponse(ctx context.Con
 	return ParseCreateTemplateResponse(rsp)
 }
 
-// CreateTemplateWithResponse Create a personal template
+// CreateTemplateWithResponse 创建个人模板
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11304,7 +11304,7 @@ func (c *ClientWithResponses) CreateTemplateWithResponse(ctx context.Context, bo
 	return ParseCreateTemplateResponse(rsp)
 }
 
-// DeleteTemplateWithResponse Delete an owned template
+// DeleteTemplateWithResponse 删除本人拥有的模板
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11317,7 +11317,7 @@ func (c *ClientWithResponses) DeleteTemplateWithResponse(ctx context.Context, te
 	return ParseDeleteTemplateResponse(rsp)
 }
 
-// GetTemplateWithResponse Get a template
+// GetTemplateWithResponse 查询模板
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11330,7 +11330,7 @@ func (c *ClientWithResponses) GetTemplateWithResponse(ctx context.Context, templ
 	return ParseGetTemplateResponse(rsp)
 }
 
-// UpdateTemplateWithBodyWithResponse Update an owned template
+// UpdateTemplateWithBodyWithResponse 更新本人拥有的模板
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11343,7 +11343,7 @@ func (c *ClientWithResponses) UpdateTemplateWithBodyWithResponse(ctx context.Con
 	return ParseUpdateTemplateResponse(rsp)
 }
 
-// UpdateTemplateWithResponse Update an owned template
+// UpdateTemplateWithResponse 更新本人拥有的模板
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11356,7 +11356,7 @@ func (c *ClientWithResponses) UpdateTemplateWithResponse(ctx context.Context, te
 	return ParseUpdateTemplateResponse(rsp)
 }
 
-// CreateTemplateBuildWithBodyWithResponse Queue an immutable template build
+// CreateTemplateBuildWithBodyWithResponse 提交不可变模板构建任务
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11369,7 +11369,7 @@ func (c *ClientWithResponses) CreateTemplateBuildWithBodyWithResponse(ctx contex
 	return ParseCreateTemplateBuildResponse(rsp)
 }
 
-// CreateTemplateBuildWithResponse Queue an immutable template build
+// CreateTemplateBuildWithResponse 提交不可变模板构建任务
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11382,7 +11382,7 @@ func (c *ClientWithResponses) CreateTemplateBuildWithResponse(ctx context.Contex
 	return ParseCreateTemplateBuildResponse(rsp)
 }
 
-// GetTemplateBuildWithResponse Get template build status
+// GetTemplateBuildWithResponse 查询模板构建状态
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11395,7 +11395,7 @@ func (c *ClientWithResponses) GetTemplateBuildWithResponse(ctx context.Context, 
 	return ParseGetTemplateBuildResponse(rsp)
 }
 
-// ForkTemplateWithBodyWithResponse Fork an accessible Ready build into a personal template
+// ForkTemplateWithBodyWithResponse 从可访问的 Ready 构建派生个人模板
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11408,7 +11408,7 @@ func (c *ClientWithResponses) ForkTemplateWithBodyWithResponse(ctx context.Conte
 	return ParseForkTemplateResponse(rsp)
 }
 
-// ForkTemplateWithResponse Fork an accessible Ready build into a personal template
+// ForkTemplateWithResponse 从可访问的 Ready 构建派生个人模板
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11421,7 +11421,7 @@ func (c *ClientWithResponses) ForkTemplateWithResponse(ctx context.Context, temp
 	return ParseForkTemplateResponse(rsp)
 }
 
-// DeleteTemplateTagWithResponse Remove a template build tag
+// DeleteTemplateTagWithResponse 移除模板构建标签
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11434,7 +11434,7 @@ func (c *ClientWithResponses) DeleteTemplateTagWithResponse(ctx context.Context,
 	return ParseDeleteTemplateTagResponse(rsp)
 }
 
-// GetTemplateTagWithResponse Resolve a Ready build tag
+// GetTemplateTagWithResponse 解析 Ready 构建标签
 //
 // Returns a wrapper object for the known response body format(s).
 //
@@ -11447,7 +11447,7 @@ func (c *ClientWithResponses) GetTemplateTagWithResponse(ctx context.Context, te
 	return ParseGetTemplateTagResponse(rsp)
 }
 
-// SetTemplateTagWithBodyWithResponse Atomically publish a Ready build under a tag
+// SetTemplateTagWithBodyWithResponse 将 Ready 构建原子发布至标签
 //
 // Takes any type of body and a specified content type, and returns a wrapper object for the known response body format(s).
 //
@@ -11460,7 +11460,7 @@ func (c *ClientWithResponses) SetTemplateTagWithBodyWithResponse(ctx context.Con
 	return ParseSetTemplateTagResponse(rsp)
 }
 
-// SetTemplateTagWithResponse Atomically publish a Ready build under a tag
+// SetTemplateTagWithResponse 将 Ready 构建原子发布至标签
 //
 // Takes a body of the `application/json` content type, and returns a wrapper object for the known response body format(s).
 //
@@ -13693,49 +13693,49 @@ func ParseSetTemplateTagResponse(rsp *http.Response) (*SetTemplateTagResponse, e
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-	// ListCredentialDocuments List encrypted account credential configurations
+	// ListCredentialDocuments 列出账号加密保存的凭证配置文档
 	// (GET /v1/credential-documents/{kind})
 	ListCredentialDocuments(w http.ResponseWriter, r *http.Request, kind string)
-	// DeleteCredentialDocument Delete one configuration owned by the current account
+	// DeleteCredentialDocument 删除当前账号的一份配置
 	// (DELETE /v1/credential-documents/{kind}/{id})
 	DeleteCredentialDocument(w http.ResponseWriter, r *http.Request, kind string, id string)
-	// PutCredentialDocument Save an account Agent configuration or sandbox credential selection
+	// PutCredentialDocument 保存账号 Agent 配置或沙箱凭证选择
 	// (PUT /v1/credential-documents/{kind}/{id})
 	PutCredentialDocument(w http.ResponseWriter, r *http.Request, kind string, id string)
-	// ListInjectionRules List account injection rules
+	// ListInjectionRules 列出账号凭证注入规则
 	// (GET /v1/injection-rules)
 	ListInjectionRules(w http.ResponseWriter, r *http.Request)
-	// CreateInjectionRule Create an account injection rule
+	// CreateInjectionRule 创建账号凭证注入规则
 	// (POST /v1/injection-rules)
 	CreateInjectionRule(w http.ResponseWriter, r *http.Request)
-	// DeleteInjectionRule Delete an account injection rule
+	// DeleteInjectionRule 删除账号凭证注入规则
 	// (DELETE /v1/injection-rules/{ruleID})
 	DeleteInjectionRule(w http.ResponseWriter, r *http.Request, ruleID string)
-	// GetInjectionRule Get an account injection rule
+	// GetInjectionRule 查询账号凭证注入规则
 	// (GET /v1/injection-rules/{ruleID})
 	GetInjectionRule(w http.ResponseWriter, r *http.Request, ruleID string)
-	// UpdateInjectionRule Update an account injection rule
+	// UpdateInjectionRule 更新账号凭证注入规则
 	// (PATCH /v1/injection-rules/{ruleID})
 	UpdateInjectionRule(w http.ResponseWriter, r *http.Request, ruleID string)
-	// GetInjectionRuleMaterial Read injection material
+	// GetInjectionRuleMaterial 读取凭证注入材料
 	// (GET /v1/injection-rules/{ruleID}/material)
 	GetInjectionRuleMaterial(w http.ResponseWriter, r *http.Request, ruleID string)
-	// ListMCPCatalog List available MCP services
+	// ListMCPCatalog 列出可用的 MCP 服务
 	// (GET /v1/mcp/catalog)
 	ListMCPCatalog(w http.ResponseWriter, r *http.Request)
-	// GetMCPCatalog Get MCP catalog service
+	// GetMCPCatalog 查询 MCP 服务详情
 	// (GET /v1/mcp/catalog/{marketID})
 	GetMCPCatalog(w http.ResponseWriter, r *http.Request, marketID string)
-	// DisconnectMCPOAuth Disconnect and invalidate sandbox calls
+	// DisconnectMCPOAuth 断开连接并禁止后续沙箱调用
 	// (DELETE /v1/mcp/connections/{marketID})
 	DisconnectMCPOAuth(w http.ResponseWriter, r *http.Request, marketID string)
-	// GetMCPOAuthConnection Get connection without secrets
+	// GetMCPOAuthConnection 查询连接状态（不返回秘密）
 	// (GET /v1/mcp/connections/{marketID})
 	GetMCPOAuthConnection(w http.ResponseWriter, r *http.Request, marketID string)
-	// StartMCPOAuth Connect an official MCP using PKCE and provider registration
+	// StartMCPOAuth 使用 PKCE 和供应方注册信息连接官方 MCP
 	// (POST /v1/mcp/connections/{marketID}/authorize)
 	StartMCPOAuth(w http.ResponseWriter, r *http.Request, marketID string)
-	// ListMCPTools Discover allowed upstream tools
+	// ListMCPTools 查询允许使用的上游工具
 	// (GET /v1/mcp/connections/{marketID}/tools)
 	ListMCPTools(w http.ResponseWriter, r *http.Request, marketID string)
 	// CreateCustomMCP 添加账号私有 HTTPS MCP 并验证工具发现
@@ -13744,94 +13744,94 @@ type ServerInterface interface {
 	// DeleteCustomMCP 删除自己的私有 MCP 并撤销全部沙箱绑定
 	// (DELETE /v1/mcp/custom/{customID})
 	DeleteCustomMCP(w http.ResponseWriter, r *http.Request, customID openapi_types.UUID)
-	// ListMCPFavorites List account favorites
+	// ListMCPFavorites 列出账号收藏的 MCP
 	// (GET /v1/mcp/favorites)
 	ListMCPFavorites(w http.ResponseWriter, r *http.Request)
-	// UnfavoriteMCP Unfavorite without revoking OAuth
+	// UnfavoriteMCP 取消收藏，保留现有 OAuth 授权
 	// (DELETE /v1/mcp/favorites/{marketID})
 	UnfavoriteMCP(w http.ResponseWriter, r *http.Request, marketID string)
-	// FavoriteMCP Favorite without authorizing
+	// FavoriteMCP 收藏 MCP 服务
 	// (PUT /v1/mcp/favorites/{marketID})
 	FavoriteMCP(w http.ResponseWriter, r *http.Request, marketID string)
-	// CompleteMCPOAuth Complete one-time GitHub OAuth callback in the system browser
+	// CompleteMCPOAuth 完成浏览器中的一次性 MCP OAuth 回调
 	// (GET /v1/mcp/oauth/callback)
 	CompleteMCPOAuth(w http.ResponseWriter, r *http.Request, params CompleteMCPOAuthParams)
-	// CancelMCPOAuthTransaction Cancel authorization transaction
+	// CancelMCPOAuthTransaction 取消授权事务
 	// (DELETE /v1/mcp/oauth/transactions/{transactionID})
 	CancelMCPOAuthTransaction(w http.ResponseWriter, r *http.Request, transactionID string)
-	// GetMCPOAuthTransaction Poll account authorization transaction
+	// GetMCPOAuthTransaction 查询账号授权事务状态
 	// (GET /v1/mcp/oauth/transactions/{transactionID})
 	GetMCPOAuthTransaction(w http.ResponseWriter, r *http.Request, transactionID string)
-	// ListSandboxes List sandboxes
+	// ListSandboxes 列出沙箱
 	// (GET /v1/sandboxes)
 	ListSandboxes(w http.ResponseWriter, r *http.Request, params ListSandboxesParams)
-	// CreateSandbox Create a sandbox
+	// CreateSandbox 创建沙箱
 	// (POST /v1/sandboxes)
 	CreateSandbox(w http.ResponseWriter, r *http.Request)
-	// DeleteSandbox Delete a sandbox
+	// DeleteSandbox 删除沙箱
 	// (DELETE /v1/sandboxes/{sandboxID})
 	DeleteSandbox(w http.ResponseWriter, r *http.Request, sandboxID string)
-	// GetSandbox Get a sandbox
+	// GetSandbox 查询沙箱
 	// (GET /v1/sandboxes/{sandboxID})
 	GetSandbox(w http.ResponseWriter, r *http.Request, sandboxID string)
-	// UpdateSandbox Update a sandbox
+	// UpdateSandbox 更新沙箱信息
 	// (PATCH /v1/sandboxes/{sandboxID})
 	UpdateSandbox(w http.ResponseWriter, r *http.Request, sandboxID string)
-	// GetSandboxApp Open a sandbox application
+	// GetSandboxApp 打开沙箱应用
 	// (GET /v1/sandboxes/{sandboxID}/app)
 	GetSandboxApp(w http.ResponseWriter, r *http.Request, sandboxID string)
-	// CreateSandboxAppLink Create a sandbox application link
+	// CreateSandboxAppLink 获取沙箱应用链接
 	// (POST /v1/sandboxes/{sandboxID}/app-link)
 	CreateSandboxAppLink(w http.ResponseWriter, r *http.Request, sandboxID string)
-	// RunSandboxCommand Run a bounded non-interactive command inside a sandbox Guest
+	// RunSandboxCommand 在沙箱 Guest 内执行命令
 	// (POST /v1/sandboxes/{sandboxID}/commands/run)
 	RunSandboxCommand(w http.ResponseWriter, r *http.Request, sandboxID string, params RunSandboxCommandParams)
-	// ListSandboxDirectory List a workspace directory
+	// ListSandboxDirectory 列出工作区目录
 	// (GET /v1/sandboxes/{sandboxID}/directories)
 	ListSandboxDirectory(w http.ResponseWriter, r *http.Request, sandboxID string, params ListSandboxDirectoryParams)
-	// MakeSandboxDirectory Create a workspace directory
+	// MakeSandboxDirectory 创建工作区目录
 	// (POST /v1/sandboxes/{sandboxID}/directories)
 	MakeSandboxDirectory(w http.ResponseWriter, r *http.Request, sandboxID string)
-	// RemoveSandboxFile Remove a workspace file or directory
+	// RemoveSandboxFile 删除工作区文件或目录
 	// (DELETE /v1/sandboxes/{sandboxID}/files)
 	RemoveSandboxFile(w http.ResponseWriter, r *http.Request, sandboxID string, params RemoveSandboxFileParams)
-	// DownloadSandboxFile Download a verified binary file
+	// DownloadSandboxFile 下载经过完整性校验的文件
 	// (GET /v1/sandboxes/{sandboxID}/files)
 	DownloadSandboxFile(w http.ResponseWriter, r *http.Request, sandboxID string, params DownloadSandboxFileParams)
-	// UploadSandboxFile Upload and atomically commit one file
+	// UploadSandboxFile 上传并原子提交文件
 	// (POST /v1/sandboxes/{sandboxID}/files)
 	UploadSandboxFile(w http.ResponseWriter, r *http.Request, sandboxID string, params UploadSandboxFileParams)
-	// MoveSandboxFile Move a workspace file or directory
+	// MoveSandboxFile 移动工作区文件或目录
 	// (POST /v1/sandboxes/{sandboxID}/files/move)
 	MoveSandboxFile(w http.ResponseWriter, r *http.Request, sandboxID string)
-	// StatSandboxFile Inspect workspace path metadata
+	// StatSandboxFile 查询工作区路径元数据
 	// (GET /v1/sandboxes/{sandboxID}/files/stat)
 	StatSandboxFile(w http.ResponseWriter, r *http.Request, sandboxID string, params StatSandboxFileParams)
-	// GetSandboxInjections Read masked host-side injection configuration
+	// GetSandboxInjections 读取脱敏后的沙箱凭证注入配置
 	// (GET /v1/sandboxes/{sandboxID}/injections)
 	GetSandboxInjections(w http.ResponseWriter, r *http.Request, sandboxID string)
-	// SetSandboxInjections Replace sandbox host-side injection rules
+	// SetSandboxInjections 替换沙箱的宿主侧凭证注入规则
 	// (PUT /v1/sandboxes/{sandboxID}/injections)
 	SetSandboxInjections(w http.ResponseWriter, r *http.Request, sandboxID string)
-	// ListSandboxMCPBindings List explicit sandbox bindings
+	// ListSandboxMCPBindings 列出沙箱显式授权的 MCP 绑定
 	// (GET /v1/sandboxes/{sandboxID}/mcp)
 	ListSandboxMCPBindings(w http.ResponseWriter, r *http.Request, sandboxID string)
-	// UnbindSandboxMCP Revoke binding before syncing config
+	// UnbindSandboxMCP 先撤销沙箱绑定，再同步配置
 	// (DELETE /v1/sandboxes/{sandboxID}/mcp/{marketID})
 	UnbindSandboxMCP(w http.ResponseWriter, r *http.Request, sandboxID string, marketID string)
-	// BindSandboxMCP Bind authorized MCP and sync Codex config
+	// BindSandboxMCP 绑定已授权 MCP 并同步 Codex 配置
 	// (PUT /v1/sandboxes/{sandboxID}/mcp/{marketID})
 	BindSandboxMCP(w http.ResponseWriter, r *http.Request, sandboxID string, marketID string)
-	// SyncSandboxMCP Apply saved MCP config; Agent restart required
+	// SyncSandboxMCP 应用已保存的 MCP 配置；新 Agent 会话加载更改
 	// (POST /v1/sandboxes/{sandboxID}/mcp/{marketID}/sync)
 	SyncSandboxMCP(w http.ResponseWriter, r *http.Request, sandboxID string, marketID string)
-	// CreateSandboxPreview Authorize a sandbox HTTP port preview
+	// CreateSandboxPreview 获取沙箱 HTTP 端口预览入口
 	// (POST /v1/sandboxes/{sandboxID}/previews)
 	CreateSandboxPreview(w http.ResponseWriter, r *http.Request, sandboxID string)
-	// GetSandboxPortPreview Get a sandbox HTTP port visibility
+	// GetSandboxPortPreview 查询 HTTP 端口可见性
 	// (GET /v1/sandboxes/{sandboxID}/previews/{port})
 	GetSandboxPortPreview(w http.ResponseWriter, r *http.Request, sandboxID string, port int)
-	// SetSandboxPortPreview Change a sandbox HTTP port visibility
+	// SetSandboxPortPreview 修改 HTTP 端口可见性
 	// (PUT /v1/sandboxes/{sandboxID}/previews/{port})
 	SetSandboxPortPreview(w http.ResponseWriter, r *http.Request, sandboxID string, port int)
 	// GetSandboxSkills 读取沙箱 Skill 选择与同步状态
@@ -13840,10 +13840,10 @@ type ServerInterface interface {
 	// SetSandboxSkills 保存完整 Skill 选择并同步；停止状态保留为 pending
 	// (PUT /v1/sandboxes/{sandboxID}/skills)
 	SetSandboxSkills(w http.ResponseWriter, r *http.Request, sandboxID openapi_types.UUID)
-	// StartSandbox Start a stopped sandbox
+	// StartSandbox 启动已停止的沙箱
 	// (POST /v1/sandboxes/{sandboxID}/start)
 	StartSandbox(w http.ResponseWriter, r *http.Request, sandboxID string)
-	// StopSandbox Stop a running sandbox
+	// StopSandbox 停止运行中的沙箱
 	// (POST /v1/sandboxes/{sandboxID}/stop)
 	StopSandbox(w http.ResponseWriter, r *http.Request, sandboxID string)
 	// ListSkills 列出平台与本人私有 Skill
@@ -13858,40 +13858,40 @@ type ServerInterface interface {
 	// FavoriteSkill 收藏 Skill
 	// (PUT /v1/skills/{skillID}/favorite)
 	FavoriteSkill(w http.ResponseWriter, r *http.Request, skillID openapi_types.UUID)
-	// ListSystemTemplates List platform default templates
+	// ListSystemTemplates 列出平台默认模板
 	// (GET /v1/system-templates)
 	ListSystemTemplates(w http.ResponseWriter, r *http.Request, params ListSystemTemplatesParams)
-	// ListTemplates List templates visible to the authenticated user
+	// ListTemplates 列出当前用户可见的模板
 	// (GET /v1/templates)
 	ListTemplates(w http.ResponseWriter, r *http.Request, params ListTemplatesParams)
-	// CreateTemplate Create a personal template
+	// CreateTemplate 创建个人模板
 	// (POST /v1/templates)
 	CreateTemplate(w http.ResponseWriter, r *http.Request)
-	// DeleteTemplate Delete an owned template
+	// DeleteTemplate 删除本人拥有的模板
 	// (DELETE /v1/templates/{templateID})
 	DeleteTemplate(w http.ResponseWriter, r *http.Request, templateID string)
-	// GetTemplate Get a template
+	// GetTemplate 查询模板
 	// (GET /v1/templates/{templateID})
 	GetTemplate(w http.ResponseWriter, r *http.Request, templateID string)
-	// UpdateTemplate Update an owned template
+	// UpdateTemplate 更新本人拥有的模板
 	// (PATCH /v1/templates/{templateID})
 	UpdateTemplate(w http.ResponseWriter, r *http.Request, templateID string)
-	// CreateTemplateBuild Queue an immutable template build
+	// CreateTemplateBuild 提交不可变模板构建任务
 	// (POST /v1/templates/{templateID}/builds)
 	CreateTemplateBuild(w http.ResponseWriter, r *http.Request, templateID string)
-	// GetTemplateBuild Get template build status
+	// GetTemplateBuild 查询模板构建状态
 	// (GET /v1/templates/{templateID}/builds/{buildID})
 	GetTemplateBuild(w http.ResponseWriter, r *http.Request, templateID string, buildID string)
-	// ForkTemplate Fork an accessible Ready build into a personal template
+	// ForkTemplate 从可访问的 Ready 构建派生个人模板
 	// (POST /v1/templates/{templateID}/fork)
 	ForkTemplate(w http.ResponseWriter, r *http.Request, templateID string)
-	// DeleteTemplateTag Remove a template build tag
+	// DeleteTemplateTag 移除模板构建标签
 	// (DELETE /v1/templates/{templateID}/tags/{tag})
 	DeleteTemplateTag(w http.ResponseWriter, r *http.Request, templateID string, tag string)
-	// GetTemplateTag Resolve a Ready build tag
+	// GetTemplateTag 解析 Ready 构建标签
 	// (GET /v1/templates/{templateID}/tags/{tag})
 	GetTemplateTag(w http.ResponseWriter, r *http.Request, templateID string, tag string)
-	// SetTemplateTag Atomically publish a Ready build under a tag
+	// SetTemplateTag 将 Ready 构建原子发布至标签
 	// (PUT /v1/templates/{templateID}/tags/{tag})
 	SetTemplateTag(w http.ResponseWriter, r *http.Request, templateID string, tag string)
 }

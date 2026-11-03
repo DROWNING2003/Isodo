@@ -2,7 +2,7 @@
 
 ## 实现与验证边界
 
-分支 `drowning/github-mcp-market`。第一版只内置 GitHub 官方 Streamable HTTP，只读端点为 `https://api.githubcopilot.com/mcp/readonly`。不使用 DCR，不改变 Casdoor 登录，不使用已有 PAT 验收。当前 GitHub App 已注册，但尚无服务器 Client Secret，也未安装到仓库、部署新 Callback 或执行真实 GitHub + Codex + CHV E2E，**不能标记 GitHub MCP 已接入**。
+GitHub 官方 Streamable HTTP 只读端点为 `https://api.githubcopilot.com/mcp/readonly`。使用预注册 GitHub App 与 Authorization Code + PKCE，不使用 DCR，不改变 Casdoor 登录。已完成真实授权及 CHV Codex 工具调用，验证范围见[当前状态](current-status.md)。
 
 市场、收藏、OAuth 授权和 SandboxBinding 是四类记录。账号当前由唯一 `tenant_id` 对应一个 `user_identity`，所有账户查询均使用认证上下文的 tenant，不接受请求指定 tenant。取消收藏不撤销 OAuth；断开 OAuth 不删除收藏；删除沙箱只清理绑定。账号操作拒绝普通 Sandbox API Key。
 
@@ -25,17 +25,11 @@
 - Organization、Account、Enterprise permissions：No access
 - 安装范围：Any account。首次验收时选择 Only select repositories，仅选择 `DROWNING2003/Isodo`
 
-GitHub 注册提示安装前需生成 private key。注册动作未生成 private key 或 Client Secret，未安装。当前 Control 走 user access token 的 Authorization Code + PKCE，不用 installation token，不读取私钥；如安装流程要求私钥，应由管理员在服务器安全保存，不能提交到 Git。
+GitHub App 的仓库安装范围由用户在 GitHub 管理；Isodo 的重新授权不自动重置安装选择。需要改仓库时使用“配置 GitHub 仓库访问”。Client Secret 保存在服务器受保护配置中，不提交到仓库。
 
-## 当前入口的只读核对（2026-11-02）
+## 演示入口与安全配置
 
-服务器 `jfcs1024`：`10.210.10.32`。独立 Nginx 配置 `/opt/isodo/nginx/nginx.conf`，仅绑定 `10.210.10.32:18443`。`api.drowning.top` 转发到 `10.210.10.32:5004`；`web.drowning.top` 的 `/v1/` 同样转发到该 Control。Nomad 作业 `isodo-api-pr18-test` 正在运行。
-
-已使用真实 TLS 校验、定向解析检查：Web 首页 HTTP 200；线上 `/v1/mcp/oauth/callback` HTTP 404，说明新代码尚未部署。公共 Google DNS-over-HTTPS 与当前 DNS 查询 `api.drowning.top` 均为 NXDOMAIN；没有证据证明公网可访问，服务器地址也不是公网地址。浏览器 OAuth 回调由用户浏览器完成，当前入口要求用户连 VPN 并能解析该域名。它可以用于受控 VPN 演示，但不是公网产品入口。
-
-没有修改 DNS、Nginx、Nomad、数据库、现有 Node、VM，也未重启服务。注册 URL 的确定不代表部署已完成。
-
-## 安全部署配置（需另行授权实施）
+当前入口使用 `https://api.drowning.top:18443/v1/mcp/oauth/callback`。服务器位于 VPN 私网，浏览器需要具备 VPN 与内部域名解析；不能宣称为公网产品入口。实际服务版本见[部署快照](current-status.md)。
 
 Control 环境：
 
@@ -79,7 +73,7 @@ ISODO_MCP_BROKER_URL=https://api.drowning.top:18443
 
 配置只含内部 URL、工具列表和无上游权限的占位符。绑定保存在 Node 加密存储，Stop/Start 保留；建立出站环境时恢复配置。运行中在“安全连接”页勾选或取消 MCP，卡片回显已启用、待启用、待停用或待同步状态。MCP、Agent、HTTP 凭证与临时配置统一点击右下角保存，弹窗编辑只更新待保存配置；GitHub 账号 OAuth 仍是独立账号授权。保存先撤销取消勾选的 MCP，再写入凭证与 Agent、应用新增 MCP 并恢复配置。多步调用不宣称数据库/Guest 原子事务；后续失败保留待保存选择，明确报告已完成步骤。UI 明确提示重启当前 Codex 会话；尚未实现自动重启已有 Codex 会话的按钮，不能声称热加载已验证。撤销不依赖 Agent 重启。
 
-旧静态 Header MCP 凭证仍保留在凭证库/API；创建选择区的 MCP 改为收藏目录。Agent 和 HTTP 凭证选择保持原有链路。
+凭证库不再展示旧 MCP 凭证区；MCP 通过市场连接与沙箱选择管理。Agent 和 HTTP 凭证选择保持原有链路。
 
 ## API
 
@@ -87,7 +81,7 @@ OpenAPI 的 MCP 分组生成 Go/TypeScript 客户端和端点文档：catalog �
 
 ## 验证与后续扩展
 
-见 [验收记录](validation/github-mcp-market-20261102.md)。只有真实 OAuth、真实 CHV Codex 发现及只读调用、撤销和 Guest 无密钥扫描全部完成，才能标记正式接入。
+见 [验收记录](current-status.md)。只有真实 OAuth、真实 CHV Codex 发现及只读调用、撤销和 Guest 无密钥扫描全部完成，才能标记正式接入。
 
 新增供应商时新增经过审查的 catalog seed、固定 metadata/issuer/network allowlist、最小工具权限及 OAuth 客户端注册配置，然后复用 favorites/connection/binding 表与 Node capability 链路。不能仅添加卡片就标记可连接，不接受 Guest 任意 URL，不将 DCR 作为通用必选前提。
 

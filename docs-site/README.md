@@ -1,6 +1,6 @@
-# Isodo Docs
+# Isodo 文档
 
-基于 Next.js 和 Fumadocs 的产品文档站，提供指南、产品概念和由公开 OpenAPI 契约生成的 API Reference。
+基于 Next.js 和 Fumadocs 的产品文档站，提供指南、产品概念和由公开 OpenAPI 契约生成的 API 参考。
 
 ## 本地运行
 
@@ -19,7 +19,7 @@ make docs
 
 公开 API 页面由 `api/openapi/openapi-public.yaml` 生成到 `content/docs/api-reference/endpoints/`。控制面定义 `api/openapi/openapi.yaml` 不会进入用户文档站。生成文件不要手动编辑。
 
-根目录 `make generate` 是仓库所有生成器的统一入口。引入 protobuf/gRPC 生成时，新增 `generate-proto` 子目标并将它加入 `generate` 聚合目标。无需更换生成入口，也无需让 gRPC 生成依赖 Fumadocs。
+根目录 `make generate` 是仓库所有生成器的统一入口。现有 `generate-proto` 子目标已纳入 `generate` 聚合目标。无需更换生成入口，也无需让 gRPC 生成依赖 Fumadocs。
 
 ## jfcs1024 HTTPS 部署
 

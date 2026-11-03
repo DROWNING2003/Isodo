@@ -23,6 +23,6 @@ API Key 与创建者绑定，可设置资源读写权限和过期时间。沙箱
 
 不要把 API Key 放进浏览器代码、源码仓库、命令历史或日志。生产调用应由受信任的服务端安全保存并注入密钥。
 
-完整的执行与预览调用流程见 [HTTP 服务预览指南](/docs/guides/http-port-preview)。预览授权独立于签发它的 API Key，固定五分钟到期；撤销 Key 阻止新授权，沙箱生命周期变化则提前撤销旧授权。
+完整的执行与预览调用流程见 [HTTP 服务预览指南](/docs/guides/http-port-preview)。通用 public 预览无需 Token/Cookie；private 预览授权独立于签发它的 API Key，固定五分钟到期；撤销 Key 阻止新授权，沙箱生命周期变化则提前撤销旧授权。
 
 管理 API Key 的控制面接口不属于公开 API Reference。

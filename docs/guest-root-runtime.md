@@ -25,4 +25,4 @@ ISODO_LIMA_ROOT_INTEGRATION=true ISODO_GUEST_AGENT_BINARY=/tmp/isodo-root-guest-
 
 必须在实际 Guest 检查 `id -u`、`id -g` 为 0、`/etc` 写入、包管理器，并验证终端和 Agent。源码或镜像启动脚本检查不能替代真实 VM 验收。发布仍遵守 Web/Node 发布清单，保留 Node 的 hosts 私有挂载和 Broker 解析；不需要更改宿主 root 权限或公开管理端口。
 
-2026-11-03 的部署和真实验证见 [发布验证记录](validation/guest-root-runtime-20261103.md)。
+2026-11-03 的部署和真实验证见 [发布验证记录](current-status.md)。

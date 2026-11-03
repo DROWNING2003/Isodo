@@ -1,6 +1,6 @@
 # Notion 官方 MCP
 
-本轮在既有 MCP 市场、收藏、沙箱绑定和 Control Broker 链路上增加 Notion 官方 Provider；GitHub 继续使用预注册 Client，Casdoor 登录不变。
+在既有 MCP 市场、收藏、沙箱绑定和 Control Broker 链路上增加 Notion 官方 Provider；GitHub 继续使用预注册 Client，Casdoor 登录不变。
 
 | Provider | 官方端点 | 限制 |
 | --- | --- | --- |
@@ -26,11 +26,11 @@ Guest 和 Codex 配置只获得沙箱内 loopback Broker 地址与占位认证�
 - 当前正式回调路径为 /v1/mcp/oauth/callback，部署入口为 https://api.drowning.top:18443/v1/mcp/oauth/callback。
 - Notion 无需手填伪造 Client ID；注册由 Control 执行。GitHub 原有配置不变。
 - 上线需执行 0019_mcp_dcr.sql，并按 deploy/sql/grant-mcp-market.sql 更新专用角色的最小权限；随后发布匹配的 API、Node 和 Web。
-- 本轮没有执行上述上线操作，也没有修改 DNS、现有 VM 或生产数据库。
+- Notion 已部署并完成真实 OAuth 与工具发现；授权页面的完整 Agent 读取仍需单独验收，见[当前状态](current-status.md)。
 
 ## 验证
 
-自动化与真实验收状态见 [验收记录](validation/mcp-dcr-20261103.md)。真实脚本 scripts/test-official-mcp-chv.py 需要专用授权资源，成功路径尚未真实运行。
+自动化与真实验收状态见 [验收记录](current-status.md)。真实脚本 scripts/test-official-mcp-chv.py 需要专用授权资源，成功路径尚未真实运行。
 
 脚本所需环境变量：ISODO_MCP_E2E_API、ISODO_MCP_E2E_HEADERS_FILE、ISODO_MCP_E2E_MODEL_RULES_FILE、ISODO_MCP_E2E_MODEL_BASE_URL、ISODO_MCP_E2E_MODEL、ISODO_MCP_E2E_NOTION_PAGE、ISODO_MCP_E2E_TEST_RESOURCES_APPROVED=1；可用 ISODO_MCP_E2E_REPORT 指定报告路径。缺少条件时输出 BLOCKED，不创建资源。
 

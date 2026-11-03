@@ -190,12 +190,4 @@ Vite 需要允许生成的预览 Host；外部 HTTPS 非标准端口可能还需
 
 ## 历史演示范围
 
-以下演示部署使用原有 private 授权策略；本次默认 public 的实现尚未部署，不代表该演示入口已经切换策略。
-
-2026-11-02，部署版本 `78c513d` 在 jfcs1024 上通过真实账号的临时 API Key 完成：Control worker 创建新 CHV 沙箱、Commands API 查询 Python 3.10.12 并启动 HTTP 服务、公开 HTTPS API 签发预览、Nginx → Gateway → mTLS Node → Guest 转发，以及真实浏览器授权跳转和页面显示。API Key 明文及短期授权 URL 不保存在文档中。
-
-独立 CHV 测试另覆盖 GET/POST、SSE flush、WebSocket、运行身份变化后的旧授权拒绝及活跃连接关闭。完整 Vite 页面 HMR、Electron E2E、生产 worker 驱动的 Stop/Start/Delete 全部组合仍需单独验收。
-
-## 内部服务端口升级
-
-当前开发版将 Guest 管理、出站代理和 T3 分别改为 31024、31080、38080；需匹配升级 Node、Guest 和基础镜像。迁移期旧 1024/1080/8080 也不允许通用预览。Control 宿主监听地址不随之改变。T3 仍使用原有独立授权流程；本次没有部署新端口到演示环境。
+当前默认 public 与五位运行时端口已用于新模板。真实验证涵盖 API 创建、Guest 命令、HTTP 转发与浏览器访问；具体 Sandbox ID、验证范围和线上版本见仓库 `docs/current-status.md`。旧测试沙箱链接不是长期演示入口，应创建专用资源验证并在完成后删除。

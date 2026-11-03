@@ -3,7 +3,7 @@ title: GitHub MCP 市场
 description: 收藏、独立 GitHub OAuth 和沙箱级只读工具绑定。
 ---
 
-本功能在独立开发分支实现，尚未部署或完成真实 GitHub + Codex + CHV 验收。GitHub App 注册完成不代表集成已可用。
+GitHub MCP 已完成真实 OAuth 和 CHV Codex 工具调用验收；注册、连接、沙箱绑定与 Agent 实际调用是不同阶段。
 
 ## 使用流程
 
@@ -23,7 +23,7 @@ Control 需要独立预注册 GitHub App 的 Client ID、Client Secret、固定 
 
 使用五位运行时端口的匹配 Node/Guest/template、Python 3.10+（3.10 需 python3-tomli）和支持 Streamable HTTP 的 Codex。Lima 本轮不承诺支持。
 
-当前演示 Callback 计划使用 `https://api.drowning.top:18443/v1/mcp/oauth/callback`。它尚未部署，公共 DNS 为 NXDOMAIN；现有 HTTPS 只绑定 VPN 私网地址。用户浏览器必须连接 VPN 并能解析该域名，不能将其描述为公网可访问。
+当前演示 Callback 使用 `https://api.drowning.top:18443/v1/mcp/oauth/callback`。现有 HTTPS 使用 VPN 私网地址。用户浏览器必须连接 VPN 并能解析该域名，不能将其描述为公网可访问。
 
 ## 安全边界
 

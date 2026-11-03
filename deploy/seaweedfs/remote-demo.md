@@ -50,4 +50,4 @@ ssh jfcs1024 'docker compose \
 
 Docker `mini` 预创建 bucket。发布辅助程序不应将 `CreateBucket` 的 `BucketAlreadyOwnedByYou` 当作上传失败；本轮隔离辅助程序直接调用现有 `S3Store.Publish`，没有修改正式存储代码。
 
-运行证据见 [本轮验收](../../docs/validation/unify-seaweedfs-docker-20261025.md)。部署命令参考现有仓库配置及 [SeaweedFS 4.48 mini 源码](https://github.com/seaweedfs/seaweedfs/blob/4.48/weed/command/mini.go)。
+运行证据见 [本轮验收](../../docs/current-status.md)。部署命令参考现有仓库配置及 [SeaweedFS 4.48 mini 源码](https://github.com/seaweedfs/seaweedfs/blob/4.48/weed/command/mini.go)。

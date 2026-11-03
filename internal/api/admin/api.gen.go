@@ -79,28 +79,28 @@ type CreateAPIKeyJSONRequestBody = CreateAPIKey
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
-
+	// Callback 完成登录回调
 	// (GET /auth/callback)
 	Callback(w http.ResponseWriter, r *http.Request)
-
+	// Login 发起网页登录
 	// (GET /auth/login)
 	Login(w http.ResponseWriter, r *http.Request)
-
+	// Logout 退出登录
 	// (POST /auth/logout)
 	Logout(w http.ResponseWriter, r *http.Request)
-
+	// GetSession 查询当前登录会话
 	// (GET /auth/me)
 	GetSession(w http.ResponseWriter, r *http.Request)
-
+	// Health 查询服务健康状态
 	// (GET /healthz)
 	Health(w http.ResponseWriter, r *http.Request)
-
+	// ListAPIKeys 列出 API Key
 	// (GET /v1/api-keys)
 	ListAPIKeys(w http.ResponseWriter, r *http.Request)
-
+	// CreateAPIKey 创建 API Key
 	// (POST /v1/api-keys)
 	CreateAPIKey(w http.ResponseWriter, r *http.Request)
-
+	// RevokeAPIKey 撤销 API Key
 	// (DELETE /v1/api-keys/{keyID})
 	RevokeAPIKey(w http.ResponseWriter, r *http.Request, keyID string)
 }

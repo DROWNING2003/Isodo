@@ -69,4 +69,4 @@ CHV 与 Lima 共用 Guest Files backend 和 Node Runtime RPC，本地 Node HTTP 
 
 OpenAPI 是公开契约源；Go/TypeScript 客户端、Node Proto 生成代码及文档页面由现有生成器更新。Node Proto 接收 SandboxTarget，Guest Proto 接收完整 RuntimeIdentity；不将 Guest 身份字段暴露给公开 HTTP 客户端。
 
-部署本功能需要更新 API/Node，并使用包含 Guest 删除/移动安全修复的新模板。不会自动改写运行中 Guest。真实验收及重跑命令见 [Files CHV 记录](validation/files-public-chv-20261102.md)。
+部署本功能需要更新 API/Node，并使用包含 Guest 删除/移动安全修复的新模板。不会自动改写运行中 Guest。真实验收及重跑命令见 [Files CHV 记录](current-status.md)。

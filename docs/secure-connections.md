@@ -1,6 +1,6 @@
 # 安全连接：账号持久规则与沙箱单次注入
 
-状态：2026-10-25 本地沙箱已实现并验证注入链路；云端沙箱尚未接入宿主机代理。
+本地 Lima 与远程 CHV 均已有真实模型代理调用验证；当前范围见[能力状态](current-status.md)。
 
 ## 产品模型
 
@@ -66,7 +66,7 @@ Guest 内的 curl / git / Agent CLI
 
 ### 未验证 / 边界
 
-- 云端 CHV 沙箱尚未接入宿主机注入代理；页面会明确提示。
+- 云端 CHV 使用 Vsock 出站代理，长期凭证保留在沙箱外；市场 MCP/Skill 的绑定优先支持远程。
 - 不同 Agent CLI 对 `HTTPS_PROXY` 和自定义 CA 的支持取决于其 HTTP 客户端；已验证 curl 路径，Claude Code / Codex 需要在目标镜像中继续验收。
 - 本地代理假定 Lima 宿主网关为 `192.168.5.2`；其他网络模式需要配置 `ISODO_INJECTION_HOST_GATEWAY`。
 - 代理只处理 HTTP/1.1；不覆盖 WebSocket 升级、QUIC/HTTP3、非 HTTP 协议或客户端自带证书固定（certificate pinning）。

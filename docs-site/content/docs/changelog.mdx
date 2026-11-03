@@ -1,27 +1,24 @@
 ---
-title: 更新日志
-description: Isodo 文档和接口变更记录。
+title: 更新记录
+description: 当前实现的主要功能与版本边界。
 ---
 
-# 更新日志
+# 更新记录
 
-## 2026-11-02 · 命令执行与 HTTP 预览
+## 2026-11-03 · 运行时与开发者文档
 
-- 公开 Commands API 支持非交互式 Guest 命令执行，API Key 单独授予 `sandboxes:execute`。
-- 新增短期 HTTP 端口预览授权，API Key 单独授予 `sandboxes:preview`；支持 HTTP、WebSocket 与 SSE。
-- 演示环境通过真实 API Key、Control worker、CHV、Python HTTP 服务及浏览器授权跳转验证。
-- 新增[完整开发者指南](/docs/guides/http-port-preview)，覆盖创建、启动服务、预览续期和停止清理。
+- 新标准 Lima / CHV 模板默认 Guest root，支持系统依赖安装；既有沙箱保持原镜像和用户。
+- 公开 Files 补齐 Stat、分页 ListDirectory、Remove 和 Move，保留工作区安全边界。
+- Notion 接入元数据发现、DCR、PKCE 与只读工具白名单；不再提供 Supabase 官方目录项。
+- T3 优雅退出卡住时的有界 pidfd 终止兜底已合并；当前 Node 尚未部署该补丁。
+- 整理 README、当前能力、验收边界和路演检查；API 文案与在线调试器改为中文，协议字段保持不变。
 
-Commands 来自已合并的 #23；预览功能与文档在 #24，已部署演示版本，正式合并状态以该 PR 为准。完整 Vite HMR 与 Electron E2E 仍待验收。
+## 2026-11-02 · Agent 与工具链路
 
-## 2026-10-26 · 黑客松 MVP 联调
+- Commands API 提供有界非交互式 Guest 命令执行，独立 `sandboxes:execute` 权限。
+- 通用 HTTP Preview 支持 HTTP、WebSocket、SSE，默认 public，可逐端口切换 private；管理端口禁止预览，T3 鉴权独立。
+- GitHub 官方只读 MCP、公共自定义 HTTPS MCP 与 Skill 完成真实 CHV / Codex 调用验证。
+- MCP / Skill 的收藏与沙箱授权分离，安全连接页统一保存选择。
+- 出站环境准备前移至沙箱 Ready，API 驱动 Agent 不再依赖先打开工作台。
 
-- 同一 App 的 SandboxClient 接入本地 IPC 与云端 HTTP，使用 revision 与动作结果等待生命周期完成。
-- 实机打通 Control → SSH/mTLS → CHV → Agent 工作台 → Codex 模型任务，生成文件并运行测试。
-- 通用 Files 接入配置写入；CHV Vsock 出站与宿主凭证注入完成实际模型调用验证。
-- 修复 Preview Cookie bootstrap、指定 App origin 的 CORS 和 Guest devpts 终端挂载。
-- 更新运行说明、模块规格与分工、演示指南，以及从最新 OpenAPI 生成的 Files / Agent 配置接口参考。
-
-本轮修改的发布状态以 GitHub PR 为准；本地联调通过不等于代码和视频已经上传。
-
-该页面记录发布后的产品与 API 变化。当前接口契约版本为 `0.1.0`；开发中的变更以仓库中的 OpenAPI 契约和代码为准。
+公开接口版本仍为 `0.1.0`。源码合并、线上部署、文档发布和打包验收分别记录；完整证据与限制见仓库 `docs/current-status.md`。

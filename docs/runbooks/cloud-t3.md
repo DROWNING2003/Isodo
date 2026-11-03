@@ -13,7 +13,7 @@
 
 ## 2. 构建 4 GiB t3-base
 
-先构建基础镜像与 T3 镜像（见 [images/t3-base/README.md](../../images/t3-base/README.md)），然后：
+先构建基础镜像与 T3 镜像（见 [images/t3-base/README.md](../../images/base/README.md)），然后：
 
 ```sh
 # 冷启动内核（无 VMGENID）；有 VMGENID 时去掉 ISODO_ALLOW_NO_VMGENID

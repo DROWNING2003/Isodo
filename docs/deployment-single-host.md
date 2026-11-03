@@ -1,47 +1,20 @@
-# Isodo single-host Nomad deployment (isolated API test)
+# 单机部署边界
 
-This workflow deploys only `isodo-api-pr18-test`; it does not replace the existing E2B `api` job and does not deploy or modify a Node. Existing PostgreSQL, Redis, SeaweedFS, templates, Node state, and the Isodo checkout are preserved.
+当前演示主机为 VPN 内 `jfcs1024`（10.210.10.32），不是公网产品入口。HTTPS 域名与当前版本见[部署快照](current-status.md)，详细入口配置见[drowning.top 部署](deployment-drowning-top.md)。历史无证书、无 Node 的 API 探针不作为当前运行说明。
 
-Environment observed on 2026-10-30: Nomad datacenter `dc1`; Nomad client `jfcs1024` is ready with healthy Docker and `raw_exec` drivers; the host private interface is `10.210.10.32`. Port `5004` was free during the read-only check. Use the isolated config and artifacts directory `/root/zkp/isodo-pr18-test`; do not reuse `/root/zkp/isodo-unify-demo-20261025-s3`, `/root/zkp/isodo-api-unify`, `/root/zkp/isodo`, or the existing Postgres database `isodo_probe_t3` without a separate safety review.
+| 服务 | 管理方式与职责 |
+| --- | --- |
+| Control API | 独立 Nomad/Docker 作业 `isodo-api-pr18-test`，负责账号、持久状态及 Node RPC |
+| PostgreSQL / Casdoor | Isodo 独立依赖，不能复用或覆盖其他项目的凭证及数据库 |
+| Node | systemd `isodo-node-pr18-test.service`，管理 CHV 和工作盘 |
+| Nginx | systemd 独立入口，VPN 地址 HTTPS 18443 |
+| 文档 | systemd `isodo-docs.service`，loopback Next.js 经 Nginx 转发 |
+| 工件 | SeaweedFS S3 接口，构建上传与 Node 读取权限分别管理 |
 
-The existing Nomad `api` job is E2B and remains untouched. The isolated test stack now has its own PostgreSQL and Casdoor Compose services under `/root/zkp/isodo-pr18-test`, plus Nomad job `isodo-api-pr18-test` on `jfcs1024`. The API is at `http://10.210.10.32:5004`; Casdoor is at `http://10.210.10.32:18000`. `/healthz` returns 200, the Casdoor discovery document returns 200, and `/auth/login` redirects to Casdoor with the registered `http://app.isodo.localhost:5734/auth/callback` and PKCE S256. This is a private-LAN test only; its OIDC HTTP traffic is unencrypted.
+`deploy.sh` 提供构建、计划及更新入口，发布应先审查生成配置、Nomad plan、镜像版本与环境文件。迁移不由 API 启动自动执行，应按目标数据库和备份单独审核。不要修改宿主其他 E2B 服务。
 
-- API: Nomad Docker task, image pushed to aslan-spock-register.qiniu.io/las, version-pinned.
-- Node: optional raw_exec Nomad job, **disabled by default**. Current CHVServer.Close() stops live VMs and runtime ownership is not reconciled on restart.
-- Desktop: Electron bundles React assets. A 127.0.0.1 HTTP origin proxies /auth, /v1 to a configured remote API. For release set ISODO_REMOTE_API_URL=https://YOUR_API_ORIGIN or configure desktop.json in Electron userData.
+Node 升级可能中断 VM，必须在明确授权的维护窗口执行。保留有效 systemd drop-in、PrivateMounts、BindReadOnlyPaths、hosts 映射和证书设置。Node 实际命名空间的 Broker DNS/HTTPS 与专用 Guest 的 MCP tools/list 是发布验收条件，见[发布检查](web-preview-release-checklist.md)。
 
-## API workflow
+Web 使用仓库固定构建脚本，上传和切换前都检查构建清单。API、Web、Node、Guest 模板与文档站分别确认版本；合并 main 不会自动更新线上。
 
-Build and push a versioned image from a machine with registry access:
-```sh
-ISODO_RELEASE=pr18-test-20261030-private-http-01 bash deploy.sh build-api
-docker push aslan-spock-register.qiniu.io/las/isodo-api:pr18-test-20261030-private-http-01
-```
-
-On `jfcs1024`, create the test-only config under `/root/zkp/isodo-pr18-test` without copying E2B credentials or pointing at an existing production database. The API env file must provide `ISODO_DATABASE_URL`, `ISODO_CASDOOR_ISSUER`, `ISODO_CASDOOR_CLIENT_ID`, `ISODO_CASDOOR_CLIENT_SECRET`, and a valid `ISODO_WEB_ORIGIN`; the mounted cert directory must contain `injection.key`. Keep any Node RPC/mTLS variables unset: this API test intentionally disables its Node client and create worker.
-
-For this isolated LAN test only, `ISODO_CASDOOR_INSECURE_HTTP_HOST` may contain the exact private IP and port of a plain-HTTP Casdoor issuer, for example `10.210.10.32:18000`. This opts that one authority into unencrypted OIDC discovery, user-info, authorization, and token requests. The setting is rejected unless it is a private unicast IP with a valid port, and all HTTP endpoints must use that exact authority. Leave it unset in production; use HTTPS for any non-loopback production issuer.
-
-First run the read-only Nomad validate and scheduler plan:
-```sh
-ISODO_NOMAD_NODE_NAME=jfcs1024 \
-ISODO_API_BIND_ADDR=10.210.10.32 \
-ISODO_API_PORT=5004 \
-ISODO_API_CONFIG_DIR=/root/zkp/isodo-pr18-test \
-ISODO_API_IMAGE=aslan-spock-register.qiniu.io/las/isodo-api:pr18-test-20261030-private-http-01 \
-bash deploy.sh plan-api
-```
-
-Only after confirming the test credentials, database, Casdoor issuer, API config files, and port isolation, apply with `ISODO_CONFIRM_UPDATE_API=yes bash deploy.sh update-api`. The script validates that Nomad planned a successful placement and stops on plan errors. The Isodo API process does not run SQL migrations on startup; any schema setup must be reviewed and run only against a newly isolated test database. The API test job is separate from the E2B `api` job and does not connect to the existing Isodo Node.
-
-The temporary no-certificate LAN test can bind Casdoor and the Isodo API to `10.210.10.32` on their dedicated ports. Set the Casdoor issuer to `http://10.210.10.32:18000` and `ISODO_CASDOOR_INSECURE_HTTP_HOST=10.210.10.32:18000` in the isolated API config. This sends OIDC discovery and authorization traffic unencrypted inside the private LAN; use only for this isolated test and switch to HTTPS before any shared or production use. Do not put the private IP in the Electron package.
-
-## Node caveat
-
-Only use update-node during an approved maintenance window, after confirming no active VMs, orphans or pending operations. Its journal guard is intentionally conservative, not a full runtime reconciliation implementation. The example Node resource limits and raw_exec cgroup model must be verified before activation.
-
-## Desktop Action
-
-Run workflow **Desktop macOS build** manually or on a PR. It produces an **unsigned development-only arm64 ZIP**, not a notarized distributable. The artifact includes Electron, bundled renderer, native macOS Node binary and Linux arm64 guest binary, but **does not include the local T3 workspace bundle**. Local Agent workspace and complete OAuth/Preview pairing have not been E2E verified. The fixed 127.0.0.1:5734 origin requires matching server-side OAuth callback and session origin configuration; this is **not yet production-ready**.
-
-No GitHub Actions job accesses jfcs1024, registry, or production secrets.
+桌面打包工作流产出开发 ZIP；未签名、未公证的制品不能作为正式商业发行。源码本地运行的验收与打包制品验收分别记录，不能互相替代。
