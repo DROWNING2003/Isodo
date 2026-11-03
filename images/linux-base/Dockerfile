@@ -9,7 +9,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && passwd -l root && passwd -l isodo \
     && find / -xdev -type f -perm /6000 -exec chmod a-s {} + \
     && mkdir -p /workspace /etc/acpi/events \
-    && chown isodo:isodo /workspace
+    && chown root:root /workspace
 COPY isodo-guest /usr/local/bin/isodo-guest
 COPY isodo-init /sbin/isodo-init
 COPY isodo-agent /sbin/isodo-agent

@@ -285,7 +285,7 @@ func (s *LimaServer) startT3Server(ctx context.Context, operation *nodev1.Operat
 		"T3CODE_HOME":    "/workspace/.t3",
 		"CODEX_HOME":     "/workspace/.codex",
 		"T3CODE_SANDBOX": "1",
-		"PATH":           "/usr/local/bin:/usr/bin:/bin",
+		"PATH":           "/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin",
 	}
 	if s.injections != nil {
 		proxyEnv, err := s.injections.Environment(operation.GetSandboxId())

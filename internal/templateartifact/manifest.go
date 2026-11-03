@@ -181,7 +181,10 @@ func (m Manifest) Validate() error {
 	if m.RootFS.Format != "raw" || m.RootFS.Filesystem != "ext4" || m.RootFS.Partitioned || m.Workspace.Filesystem != "ext4" || m.Workspace.MinimumSizeBytes <= 0 {
 		return errors.New("unsupported disk layout")
 	}
-	if m.GuestProtocol.Major != 1 || m.GuestAgent.Version == "" || !slices.Contains(m.GuestAgent.Capabilities, "ready.v1") || m.WorkloadUser.Name != "isodo" || m.WorkloadUser.UID != 1000 || m.WorkloadUser.GID != 1000 || m.MinimumMemoryMiB < 128 {
+	// Accept legacy non-root artifacts without relabeling their runtime identity.
+	validWorkloadUser := (m.WorkloadUser.Name == "root" && m.WorkloadUser.UID == 0 && m.WorkloadUser.GID == 0) ||
+		(m.WorkloadUser.Name == "isodo" && m.WorkloadUser.UID == 1000 && m.WorkloadUser.GID == 1000)
+	if m.GuestProtocol.Major != 1 || m.GuestAgent.Version == "" || !slices.Contains(m.GuestAgent.Capabilities, "ready.v1") || !validWorkloadUser || m.MinimumMemoryMiB < 128 {
 		return errors.New("invalid Guest Agent/workload baseline")
 	}
 	return nil
